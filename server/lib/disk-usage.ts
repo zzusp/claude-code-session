@@ -18,6 +18,7 @@ export async function computeDiskUsage(): Promise<DiskUsage> {
     projectId: string;
     sessionId: string;
     title: string;
+    customTitle: string | null;
     bytes: number;
     lastAt: string | null;
   }> = [];
@@ -42,6 +43,7 @@ export async function computeDiskUsage(): Promise<DiskUsage> {
         projectId: p.id,
         sessionId: s.id,
         title: s.title,
+        customTitle: s.customTitle,
         bytes: total,
         lastAt: s.lastAt,
       });
@@ -61,6 +63,7 @@ export async function computeDiskUsage(): Promise<DiskUsage> {
       projectId: f.projectId,
       sessionId: f.sessionId,
       title: f.title,
+      customTitle: f.customTitle,
       totalBytes: f.bytes,
       lastAt: f.lastAt,
     }));
