@@ -1,10 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useParams } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs.tsx';
 import MessageBubble from '../components/MessageBubble.tsx';
-import PageHeader, { MetaItem } from '../components/PageHeader.tsx';
 import {
   api,
   type Block,
@@ -52,13 +58,16 @@ export default function SessionDetailRoute() {
     enabled: !!pid && !!sid,
   });
 
+  // Double-rAF so the (taller) masthead has flushed layout before we measure.
   useEffect(() => {
     if (!data) return;
     if (lastScrolledSid.current === sid) return;
     lastScrolledSid.current = sid;
     if (deferredQuery) return;
     requestAnimationFrame(() => {
-      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'auto' });
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'auto' });
+      });
     });
   }, [sid, data, deferredQuery]);
 
@@ -90,8 +99,6 @@ export default function SessionDetailRoute() {
     return list;
   }, [indexed, showMeta, onlyUser, deferredQuery]);
 
-  // Intent-driven filters (search, only-me) want all matches across the whole
-  // conversation; windowing is for "paginate recency" and would hide matches.
   const skipWindowing = !!deferredQuery || onlyUser;
   const renderList = useMemo(() => {
     if (skipWindowing) return visibleMessages;
@@ -141,127 +148,107 @@ export default function SessionDetailRoute() {
 
       {data && (
         <div className="mt-4">
-          <PageHeader
-            eyebrow={
-              <span className="font-mono normal-case tracking-[0.05em] text-[var(--color-fg-faint)]">
-                {sid}
-              </span>
-            }
-            title={sessionTitle ?? <span className="font-mono">{sid.slice(0, 12)}…</span>}
-            editableValue={sessionTitle ?? ''}
-            onTitleEdit={async (next) => {
-              await renameMutation.mutateAsync(next);
-            }}
+          <SessionMasthead
+            sid={sid}
+            title={sessionTitle}
             tagline={t('session.tagline', {
               started: formatRelativeTime(data.meta.firstAt),
               lastTouched: formatRelativeTime(data.meta.lastAt),
               branchPart: taglineBranchPart,
             })}
-            meta={
-              <>
-                <MetaItem label={t('session.meta.messages')} value={data.meta.messageCount.toLocaleString()} />
-                <MetaItem label={t('session.meta.size')} value={formatBytes(data.meta.bytes)} />
-                {data.meta.version && (
-                  <MetaItem label={t('session.meta.version')} value={data.meta.version} />
-                )}
-                <MetaItem label={t('session.meta.started')} value={formatDateTime(data.meta.firstAt)} />
-              </>
-            }
+            firstAt={data.meta.firstAt}
+            messageCount={data.meta.messageCount}
+            bytes={data.meta.bytes}
+            version={data.meta.version}
+            branch={data.meta.gitBranch}
+            editableValue={sessionTitle ?? ''}
+            onTitleEdit={async (next) => {
+              await renameMutation.mutateAsync(next);
+            }}
           />
         </div>
       )}
 
-      <div className="sticky top-0 z-30 -mx-5 sm:-mx-8 lg:-mx-12 mt-6 border-y border-[var(--color-hairline)] bg-[var(--color-canvas)]/85 px-5 sm:px-8 lg:px-12 py-3 backdrop-blur">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[12rem]">
-            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-fg-muted)]" />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('common.searchPlaceholder')}
-              className="w-full rounded-md border border-[var(--color-hairline)] bg-[var(--color-surface)] py-1.5 pl-9 pr-3 text-sm text-[var(--color-fg-primary)] placeholder:text-[var(--color-fg-faint)] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-soft)]"
-            />
-          </div>
-          <label className="inline-flex items-center gap-2 text-xs text-[var(--color-fg-secondary)]">
-            <input
-              type="checkbox"
-              checked={showMeta}
-              onChange={(e) => setShowMeta(e.target.checked)}
-              className="h-3.5 w-3.5 cursor-pointer accent-[var(--color-accent)]"
-            />
-            <span className="font-mono uppercase tracking-[0.14em] text-[var(--color-fg-muted)]">
-              {t('common.system')}
-            </span>
-          </label>
-          <label className="inline-flex items-center gap-2 text-xs text-[var(--color-fg-secondary)]">
-            <input
-              type="checkbox"
-              checked={onlyUser}
-              onChange={(e) => setOnlyUser(e.target.checked)}
-              className="h-3.5 w-3.5 cursor-pointer accent-[var(--color-accent)]"
-            />
-            <span className="font-mono uppercase tracking-[0.14em] text-[var(--color-fg-muted)]">
-              {t('common.onlyUser')}
-            </span>
-          </label>
-          {data && (
-            <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
-              {t('session.shown', {
-                shown: renderList.length,
-                total: visibleMessages.length,
-              })}
-            </span>
-          )}
-        </div>
-      </div>
+      <FilterLedger
+        query={query}
+        onQuery={setQuery}
+        showMeta={showMeta}
+        onShowMeta={setShowMeta}
+        onlyUser={onlyUser}
+        onOnlyUser={setOnlyUser}
+        shown={renderList.length}
+        total={visibleMessages.length}
+        hasData={!!data}
+      />
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6">
+        {data?.truncated && (
+          <Admonition tone="warn" className="mb-6">
+            {t('session.truncated', { n: MAX_SESSION_MESSAGES.toLocaleString() })}
+          </Admonition>
+        )}
+
         {isLoading && (
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
             {t('common.loadingSession')}
           </p>
         )}
         {error && (
-          <p className="rounded-md border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-danger)]">
+          <Admonition tone="danger">
             {t('common.failedSession')}: {(error as Error).message}
-          </p>
+          </Admonition>
         )}
-        {data?.truncated && (
-          <p className="rounded-[10px] border border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] px-4 py-2.5 text-xs text-[var(--color-accent-ink)] dark:text-[var(--color-fg-primary)]">
-            {t('session.truncated', { n: MAX_SESSION_MESSAGES.toLocaleString() })}
-          </p>
-        )}
-        {hasMoreEarlier && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={() =>
-                setWindowSize((w) => Math.min(w + LOAD_STEP, visibleMessages.length))
-              }
-              className="rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
-            >
-              {t('common.loadEarlier', {
-                n: Math.min(LOAD_STEP, visibleMessages.length - renderList.length),
-              })}
-            </button>
-          </div>
-        )}
-        <motion.div
-          key={renderList.length === 0 ? 'empty' : 'list'}
-          initial="hidden"
-          animate="show"
-          variants={staggerParent}
-          className="space-y-4"
-        >
-          {renderList.map((m, i) => (
-            <motion.div key={m.message.uuid || m.message.ts || String(i)} variants={fadeUpItem}>
-              <MessageBubble message={m.message} query={deferredQuery} />
-            </motion.div>
-          ))}
-        </motion.div>
+
         {data && visibleMessages.length === 0 && (
-          <p className="text-sm text-[var(--color-fg-muted)]">{t('common.noMessagesMatch')}</p>
+          <p className="mt-2 max-w-2xl font-display text-[15px] italic text-[var(--color-fg-muted)]">
+            {t('common.noMessagesMatch')}
+          </p>
+        )}
+
+        {data && visibleMessages.length > 0 && (
+          <ol className="border-t border-[var(--color-hairline-strong)]">
+            {hasMoreEarlier && (
+              <li>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setWindowSize((w) => Math.min(w + LOAD_STEP, visibleMessages.length))
+                  }
+                  className="group flex w-full items-center gap-4 border-b border-[var(--color-hairline)] py-3 text-left transition hover:bg-[var(--color-sunken)]"
+                >
+                  <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--color-fg-secondary)] group-hover:text-[var(--color-accent)]">
+                    {t('common.loadEarlier', {
+                      n: Math.min(LOAD_STEP, visibleMessages.length - renderList.length),
+                    })}
+                  </span>
+                  <span className="rule-dotted h-px flex-1" aria-hidden />
+                  <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)] group-hover:text-[var(--color-accent)]">
+                    +{Math.min(LOAD_STEP, visibleMessages.length - renderList.length)}
+                  </span>
+                </button>
+              </li>
+            )}
+
+            <motion.div
+              key={renderList.length === 0 ? 'empty' : 'list'}
+              initial="hidden"
+              animate="show"
+              variants={staggerParent}
+            >
+              {renderList.map((m, i) => {
+                const isMeta = m.message.isMeta;
+                return (
+                  <motion.li
+                    key={m.message.uuid || m.message.ts || String(i)}
+                    variants={fadeUpItem}
+                    className={isMeta ? 'py-2' : 'border-b border-[var(--color-hairline)] py-6'}
+                  >
+                    <MessageBubble message={m.message} query={deferredQuery} />
+                  </motion.li>
+                );
+              })}
+            </motion.div>
+          </ol>
         )}
       </div>
 
@@ -270,8 +257,338 @@ export default function SessionDetailRoute() {
   );
 }
 
-// Match MessageBubble.tsx's classification: a `type:user` message whose blocks
-// are exclusively tool_result is rendered as a "tool" bubble, not as the user.
+/* ─────────────────────────────────────────────────────────────────── */
+
+function SessionMasthead({
+  sid,
+  title,
+  tagline,
+  firstAt,
+  messageCount,
+  bytes,
+  version,
+  branch,
+  editableValue,
+  onTitleEdit,
+}: {
+  sid: string;
+  title: string | null;
+  tagline: string;
+  firstAt: string | null;
+  messageCount: number;
+  bytes: number;
+  version: string | null;
+  branch: string | null;
+  editableValue: string;
+  onTitleEdit: (next: string) => Promise<void>;
+}) {
+  const t = useT();
+  const dateline = formatDateline(firstAt);
+
+  return (
+    <header className="relative">
+      <div className="flex items-center justify-between gap-4 border-y border-[var(--color-hairline-strong)] py-2">
+        <div className="flex min-w-0 items-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-fg-muted)]">
+          <span className="text-[var(--color-accent)]">●</span>
+          <span>§ SESSION</span>
+          <span className="hidden h-3 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
+          <span className="hidden truncate normal-case tracking-[0.05em] text-[var(--color-fg-faint)] sm:inline">
+            {sid}
+          </span>
+          {branch && (
+            <>
+              <span className="hidden h-3 w-px bg-[var(--color-hairline-strong)] md:inline-block" />
+              <span className="hidden truncate md:inline">{branch}</span>
+            </>
+          )}
+        </div>
+        <div className="shrink-0 font-mono text-[10px] uppercase tracking-[0.22em] tabular-nums text-[var(--color-fg-muted)]">
+          {dateline}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-x-10 gap-y-6 pt-8 pb-2 lg:grid-cols-12">
+        <div className="lg:col-span-8">
+          <TitleSlot
+            title={title ?? sid.slice(0, 12) + '…'}
+            editableValue={editableValue}
+            onTitleEdit={onTitleEdit}
+            isFallback={!title}
+          />
+        </div>
+
+        <div className="lg:col-span-4 lg:pt-3">
+          <p className="border-l-2 border-[var(--color-accent)] pl-4 font-display text-[15px] italic leading-[1.55] text-[var(--color-fg-secondary)]">
+            {tagline}
+          </p>
+        </div>
+      </div>
+
+      <div className="rule-dotted mt-6" aria-hidden />
+      <dl className="mt-3 flex flex-wrap items-baseline gap-x-8 gap-y-2">
+        <Fact label={t('session.meta.messages')} value={messageCount.toLocaleString()} />
+        <Fact label={t('session.meta.size')} value={formatBytes(bytes)} />
+        {version && <Fact label={t('session.meta.version')} value={version} />}
+        <Fact label={t('session.meta.started')} value={formatDateTime(firstAt)} />
+      </dl>
+    </header>
+  );
+}
+
+const MASTHEAD_TITLE_CLASS =
+  'font-display text-[clamp(2.4rem,6.5vw,4.6rem)] font-light leading-[0.98] tracking-[-0.028em] text-[var(--color-fg-primary)]';
+
+function TitleSlot({
+  title,
+  editableValue,
+  onTitleEdit,
+  isFallback,
+}: {
+  title: ReactNode;
+  editableValue: string;
+  onTitleEdit: (next: string) => Promise<void>;
+  isFallback: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(editableValue);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!editing) setDraft(editableValue);
+  }, [editing, editableValue]);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.select();
+  }, [editing]);
+
+  function startEdit() {
+    setDraft(editableValue);
+    setError(null);
+    setEditing(true);
+  }
+
+  async function commit() {
+    const next = draft.trim();
+    if (!next || next === editableValue) {
+      setEditing(false);
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onTitleEdit(next);
+      setEditing(false);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div>
+        <input
+          ref={inputRef}
+          value={draft}
+          disabled={submitting}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              void commit();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              setEditing(false);
+              setError(null);
+            }
+          }}
+          onBlur={() => {
+            if (!submitting) {
+              setEditing(false);
+              setError(null);
+            }
+          }}
+          maxLength={200}
+          className={
+            MASTHEAD_TITLE_CLASS +
+            ' w-full bg-transparent border-b border-[var(--color-accent)] outline-none focus:outline-none disabled:opacity-60'
+          }
+        />
+        {error && <p className="mt-1 text-xs text-[var(--color-danger)]">{error}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div className="group flex items-baseline gap-3">
+      <h1 className={MASTHEAD_TITLE_CLASS + (isFallback ? ' font-mono' : '')}>
+        {title}
+        <span className="text-[var(--color-accent)]">.</span>
+      </h1>
+      <button
+        type="button"
+        onClick={startEdit}
+        aria-label="Rename"
+        title="Rename"
+        className="flex-shrink-0 rounded-md p-1.5 text-[var(--color-fg-muted)] opacity-0 transition hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)] focus:opacity-100 group-hover:opacity-100"
+      >
+        <PencilIcon />
+      </button>
+    </div>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <dt className="eyebrow">{label}</dt>
+      <dd className="font-mono text-[12px] tabular-nums text-[var(--color-fg-primary)]">
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function formatDateline(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d
+    .toLocaleDateString('en-GB', {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    })
+    .toUpperCase()
+    .replace(/,/g, ' ·');
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+
+function FilterLedger({
+  query,
+  onQuery,
+  showMeta,
+  onShowMeta,
+  onlyUser,
+  onOnlyUser,
+  shown,
+  total,
+  hasData,
+}: {
+  query: string;
+  onQuery: (v: string) => void;
+  showMeta: boolean;
+  onShowMeta: (v: boolean) => void;
+  onlyUser: boolean;
+  onOnlyUser: (v: boolean) => void;
+  shown: number;
+  total: number;
+  hasData: boolean;
+}) {
+  const t = useT();
+  return (
+    <div className="sticky top-0 z-30 -mx-5 sm:-mx-8 lg:-mx-12 mt-6 border-y border-[var(--color-hairline-strong)] bg-[var(--color-canvas)]/85 px-5 sm:px-8 lg:px-12 py-2.5 backdrop-blur">
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-1 min-w-[14rem] items-center gap-2 border-b border-[var(--color-hairline)] py-1 transition focus-within:border-[var(--color-accent)]">
+          <SearchIcon className="text-[var(--color-fg-muted)]" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => onQuery(e.target.value)}
+            placeholder={t('common.searchPlaceholder')}
+            className="w-full bg-transparent text-sm text-[var(--color-fg-primary)] placeholder:text-[var(--color-fg-faint)] focus:outline-none"
+          />
+        </div>
+
+        <span className="hidden h-4 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
+
+        <div className="flex items-center gap-4">
+          <ToggleSwitch
+            checked={showMeta}
+            onChange={onShowMeta}
+            label={t('common.system')}
+          />
+          <ToggleSwitch
+            checked={onlyUser}
+            onChange={onOnlyUser}
+            label={t('common.onlyUser')}
+          />
+        </div>
+
+        {hasData && (
+          <>
+            <span className="hidden h-4 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
+            <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
+              {t('session.shown', { shown, total })}
+            </span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ToggleSwitch({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-1.5">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="sr-only"
+      />
+      <span
+        aria-hidden
+        className={
+          'font-mono text-[11px] uppercase tracking-[0.16em] transition ' +
+          (checked
+            ? 'text-[var(--color-accent)] underline underline-offset-[6px] decoration-[var(--color-accent)]/50'
+            : 'text-[var(--color-fg-faint)] hover:text-[var(--color-fg-secondary)]')
+        }
+      >
+        {label}
+      </span>
+    </label>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+
+function Admonition({
+  tone,
+  className = '',
+  children,
+}: {
+  tone: 'warn' | 'danger';
+  className?: string;
+  children: ReactNode;
+}) {
+  const colors =
+    tone === 'warn'
+      ? 'border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] text-[var(--color-accent-ink)] dark:text-[var(--color-fg-primary)]'
+      : 'border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] text-[var(--color-danger)]';
+  return (
+    <div className={`rounded-[10px] border px-4 py-3 text-sm ${colors} ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+
 function isUserTyped(m: Message): boolean {
   if (m.type !== 'user') return false;
   if (m.blocks.length === 0) return true;
@@ -317,6 +634,25 @@ function SearchIcon({ className = '' }: { className?: string }) {
   );
 }
 
+function PencilIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+    </svg>
+  );
+}
+
 const EDGE_THRESHOLD = 320;
 
 function ScrollToEdges() {
@@ -350,18 +686,18 @@ function ScrollToEdges() {
 
   if (!showTop && !showBottom) return null;
 
-  const buttonClass =
-    'rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] p-2.5 text-[var(--color-fg-secondary)] shadow-[var(--shadow-rise)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]';
+  const tileClass =
+    'flex h-9 w-9 items-center justify-center border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-fg-secondary)] shadow-[var(--shadow-rise)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]';
 
   return (
-    <div className="fixed bottom-6 right-6 z-30 flex flex-col gap-2">
+    <div className="fixed bottom-6 right-6 z-30 flex flex-col">
       {showTop && (
         <button
           type="button"
           aria-label={t('common.scrollToTop')}
           title={t('common.scrollToTop')}
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className={buttonClass}
+          className={tileClass + (showBottom ? ' border-b-0' : '')}
         >
           <ChevronIcon direction="up" />
         </button>
@@ -374,7 +710,7 @@ function ScrollToEdges() {
           onClick={() =>
             window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
           }
-          className={buttonClass}
+          className={tileClass}
         >
           <ChevronIcon direction="down" />
         </button>
