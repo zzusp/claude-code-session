@@ -208,23 +208,17 @@ export default function SessionDetailRoute() {
         {data && visibleMessages.length > 0 && (
           <ol className="border-t border-[var(--color-hairline-strong)]">
             {hasMoreEarlier && (
-              <li>
+              <li className="flex justify-center border-b border-[var(--color-hairline)] py-3">
                 <button
                   type="button"
                   onClick={() =>
                     setWindowSize((w) => Math.min(w + LOAD_STEP, visibleMessages.length))
                   }
-                  className="group flex w-full items-center gap-4 border-b border-[var(--color-hairline)] py-3 text-left transition hover:bg-[var(--color-sunken)]"
+                  className="rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
                 >
-                  <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--color-fg-secondary)] group-hover:text-[var(--color-accent)]">
-                    {t('common.loadEarlier', {
-                      n: Math.min(LOAD_STEP, visibleMessages.length - renderList.length),
-                    })}
-                  </span>
-                  <span className="rule-dotted h-px flex-1" aria-hidden />
-                  <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)] group-hover:text-[var(--color-accent)]">
-                    +{Math.min(LOAD_STEP, visibleMessages.length - renderList.length)}
-                  </span>
+                  {t('common.loadEarlier', {
+                    n: Math.min(LOAD_STEP, visibleMessages.length - renderList.length),
+                  })}
                 </button>
               </li>
             )}
@@ -686,18 +680,18 @@ function ScrollToEdges() {
 
   if (!showTop && !showBottom) return null;
 
-  const tileClass =
-    'flex h-9 w-9 items-center justify-center border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-fg-secondary)] shadow-[var(--shadow-rise)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]';
+  const buttonClass =
+    'rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] p-2.5 text-[var(--color-fg-secondary)] shadow-[var(--shadow-rise)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]';
 
   return (
-    <div className="fixed bottom-6 right-6 z-30 flex flex-col">
+    <div className="fixed bottom-6 right-6 z-30 flex flex-col gap-2">
       {showTop && (
         <button
           type="button"
           aria-label={t('common.scrollToTop')}
           title={t('common.scrollToTop')}
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className={tileClass + (showBottom ? ' border-b-0' : '')}
+          className={buttonClass}
         >
           <ChevronIcon direction="up" />
         </button>
@@ -710,7 +704,7 @@ function ScrollToEdges() {
           onClick={() =>
             window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
           }
-          className={tileClass}
+          className={buttonClass}
         >
           <ChevronIcon direction="down" />
         </button>
