@@ -12,24 +12,49 @@ export default function MessageBubble({
   query: string;
 }) {
   if (message.isMeta) return <SystemMessage message={message} query={query} />;
+  if (
+    message.type === 'user' &&
+    message.blocks.length > 0 &&
+    message.blocks.every((b) => b.type === 'tool_result')
+  ) {
+    return <AssistantMessage message={message} query={query} variant="tool" />;
+  }
   if (message.type === 'user') return <UserMessage message={message} query={query} />;
   return <AssistantMessage message={message} query={query} />;
 }
 
-function AssistantMessage({ message, query }: { message: Message; query: string }) {
+function AssistantMessage({
+  message,
+  query,
+  variant = 'assistant',
+}: {
+  message: Message;
+  query: string;
+  variant?: 'assistant' | 'tool';
+}) {
   const t = useT();
+  const isTool = variant === 'tool';
+  const label = isTool ? t('message.role.tool') : t('message.role.claude');
+  const borderClass = isTool
+    ? 'border-l-[var(--color-hairline-strong)]'
+    : 'border-l-[var(--color-accent)]';
   return (
     <div className="flex items-start gap-3" data-uuid={message.uuid}>
       <Avatar role="assistant" />
       <div className="min-w-0 flex-1 max-w-[min(54rem,calc(100%-3rem))]">
         <Header
           align="left"
-          label={t('message.role.claude')}
+          label={label}
           model={message.model}
           ts={message.ts}
-          accent
+          accent={!isTool}
         />
-        <article className="mt-1.5 rounded-2xl rounded-tl-sm border border-l-[3px] border-l-[var(--color-accent)] border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-3 shadow-[0_1px_0_0_var(--color-hairline)]">
+        <article
+          className={
+            'mt-1.5 rounded-2xl rounded-tl-sm border border-l-[3px] border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-3 shadow-[0_1px_0_0_var(--color-hairline)] ' +
+            borderClass
+          }
+        >
           <Blocks blocks={message.blocks} query={query} />
         </article>
       </div>

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs.tsx';
 import MessageBubble from '../components/MessageBubble.tsx';
@@ -36,6 +36,7 @@ export default function SessionDetailRoute() {
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
+  const lastScrolledSid = useRef<string | null>(null);
 
   useEffect(() => {
     setWindowSize(INITIAL_WINDOW);
@@ -49,6 +50,16 @@ export default function SessionDetailRoute() {
       ),
     enabled: !!pid && !!sid,
   });
+
+  useEffect(() => {
+    if (!data) return;
+    if (lastScrolledSid.current === sid) return;
+    lastScrolledSid.current = sid;
+    if (deferredQuery) return;
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'auto' });
+    });
+  }, [sid, data, deferredQuery]);
 
   const projectsQuery = useQuery({
     queryKey: queryKeys.projects(),
