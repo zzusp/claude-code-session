@@ -44,6 +44,8 @@ const DICT = {
     'common.failed': 'Failed',
     'common.searchPlaceholder': 'Search this session…',
     'common.loadEarlier': 'Load earlier (+{{n}})',
+    'common.scrollToTop': 'Jump to top',
+    'common.scrollToBottom': 'Jump to bottom',
 
     'projects.eyebrow': 'Workspace',
     'projects.title': 'Projects',
@@ -207,6 +209,8 @@ const DICT = {
     'common.failed': '失败',
     'common.searchPlaceholder': '在此会话中搜索…',
     'common.loadEarlier': '加载更早 (+{{n}})',
+    'common.scrollToTop': '回到顶部',
+    'common.scrollToBottom': '回到底部',
 
     'projects.eyebrow': '工作区',
     'projects.title': '项目',

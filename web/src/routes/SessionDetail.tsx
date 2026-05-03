@@ -264,6 +264,8 @@ export default function SessionDetailRoute() {
           <p className="text-sm text-[var(--color-fg-muted)]">{t('common.noMessagesMatch')}</p>
         )}
       </div>
+
+      {data && <ScrollToEdges />}
     </section>
   );
 }
@@ -311,6 +313,90 @@ function SearchIcon({ className = '' }: { className?: string }) {
     >
       <circle cx="11" cy="11" r="6.2" />
       <path d="M20 20l-4.3-4.3" />
+    </svg>
+  );
+}
+
+const EDGE_THRESHOLD = 320;
+
+function ScrollToEdges() {
+  const t = useT();
+  const [showTop, setShowTop] = useState(false);
+  const [showBottom, setShowBottom] = useState(false);
+
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const scrollY = window.scrollY;
+      const viewport = window.innerHeight;
+      const total = document.documentElement.scrollHeight;
+      setShowTop(scrollY >= EDGE_THRESHOLD);
+      setShowBottom(total - (scrollY + viewport) >= EDGE_THRESHOLD);
+    };
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  if (!showTop && !showBottom) return null;
+
+  const buttonClass =
+    'rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] p-2.5 text-[var(--color-fg-secondary)] shadow-[var(--shadow-rise)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]';
+
+  return (
+    <div className="fixed bottom-6 right-6 z-30 flex flex-col gap-2">
+      {showTop && (
+        <button
+          type="button"
+          aria-label={t('common.scrollToTop')}
+          title={t('common.scrollToTop')}
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className={buttonClass}
+        >
+          <ChevronIcon direction="up" />
+        </button>
+      )}
+      {showBottom && (
+        <button
+          type="button"
+          aria-label={t('common.scrollToBottom')}
+          title={t('common.scrollToBottom')}
+          onClick={() =>
+            window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
+          }
+          className={buttonClass}
+        >
+          <ChevronIcon direction="down" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ChevronIcon({ direction }: { direction: 'up' | 'down' }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d={direction === 'up' ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} />
     </svg>
   );
 }
