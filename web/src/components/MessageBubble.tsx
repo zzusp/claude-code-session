@@ -17,67 +17,39 @@ export default function MessageBubble({
     message.blocks.length > 0 &&
     message.blocks.every((b) => b.type === 'tool_result')
   ) {
-    return <AssistantMessage message={message} query={query} variant="tool" />;
+    return <Entry message={message} query={query} variant="tool" />;
   }
-  if (message.type === 'user') return <UserMessage message={message} query={query} />;
-  return <AssistantMessage message={message} query={query} />;
+  if (message.type === 'user') return <Entry message={message} query={query} variant="user" />;
+  return <Entry message={message} query={query} variant="assistant" />;
 }
 
-function AssistantMessage({
+function Entry({
   message,
   query,
-  variant = 'assistant',
+  variant,
 }: {
   message: Message;
   query: string;
-  variant?: 'assistant' | 'tool';
+  variant: 'user' | 'assistant' | 'tool';
 }) {
   const t = useT();
-  const isTool = variant === 'tool';
-  const label = isTool ? t('message.role.tool') : t('message.role.claude');
-  const borderClass = isTool
-    ? 'border-l-[var(--color-hairline-strong)]'
-    : 'border-l-[var(--color-accent)]';
-  return (
-    <div className="flex items-start gap-3" data-uuid={message.uuid}>
-      <Avatar role="assistant" />
-      <div className="min-w-0 flex-1 max-w-[min(54rem,calc(100%-3rem))]">
-        <Header
-          align="left"
-          label={label}
-          model={message.model}
-          ts={message.ts}
-          accent={!isTool}
-        />
-        <article
-          className={
-            'mt-1.5 rounded-2xl rounded-tl-sm border border-l-[3px] border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-3 shadow-[0_1px_0_0_var(--color-hairline)] ' +
-            borderClass
-          }
-        >
-          <Blocks blocks={message.blocks} query={query} />
-        </article>
-      </div>
-    </div>
-  );
-}
+  const label =
+    variant === 'user'
+      ? t('message.role.you')
+      : variant === 'tool'
+        ? t('message.role.tool')
+        : t('message.role.claude');
+  const ruleClass =
+    variant === 'user'
+      ? 'border-[var(--color-fg-primary)]'
+      : variant === 'tool'
+        ? 'border-[var(--color-hairline-strong)]'
+        : 'border-[var(--color-accent)]';
 
-function UserMessage({ message, query }: { message: Message; query: string }) {
-  const t = useT();
   return (
-    <div className="flex items-start justify-end gap-3" data-uuid={message.uuid}>
-      <div className="min-w-0 max-w-[min(46rem,calc(100%-3rem))]">
-        <Header
-          align="right"
-          label={t('message.role.you')}
-          model={message.model}
-          ts={message.ts}
-        />
-        <article className="mt-1.5 rounded-2xl rounded-tr-sm bg-[var(--color-accent-soft)] px-4 py-3 text-[var(--color-accent-ink)] dark:text-[var(--color-fg-primary)]">
-          <Blocks blocks={message.blocks} query={query} />
-        </article>
-      </div>
-      <Avatar role="user" />
+    <div className={`relative border-l-2 pl-5 ${ruleClass}`} data-uuid={message.uuid}>
+      <Header label={label} model={message.model} ts={message.ts} />
+      <Blocks blocks={message.blocks} query={query} />
     </div>
   );
 }
@@ -113,41 +85,23 @@ function SystemMessage({ message, query }: { message: Message; query: string }) 
 }
 
 function Header({
-  align,
   label,
   model,
   ts,
-  accent,
 }: {
-  align: 'left' | 'right';
   label: string;
   model: string | null;
   ts: string | null;
-  accent?: boolean;
 }) {
   return (
-    <div
-      className={
-        'flex items-baseline gap-2 text-[11px] ' +
-        (align === 'right' ? 'flex-row-reverse text-right' : '')
-      }
-    >
-      <span
-        className={
-          'font-display text-[14px] font-medium tracking-tight ' +
-          (accent
-            ? 'text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]'
-            : 'text-[var(--color-fg-primary)]')
-        }
-      >
-        {label}
-      </span>
+    <div className="mb-2 flex items-baseline gap-3">
+      <span className="eyebrow">{label}</span>
       {model && (
         <span className="truncate font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--color-fg-faint)]">
           {model}
         </span>
       )}
-      <time className="font-mono tabular-nums text-[var(--color-fg-muted)]">
+      <time className="ml-auto font-mono text-[10px] tabular-nums text-[var(--color-fg-muted)]">
         {formatDateTime(ts)}
       </time>
     </div>
@@ -179,7 +133,7 @@ function Blocks({ blocks, query }: { blocks: Block[]; query: string }) {
             return (
               <div
                 key={i}
-                className="rounded-md border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-3 py-2 font-mono text-[11px] text-[var(--color-fg-muted)]"
+                className="border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-3 py-2 font-mono text-[11px] text-[var(--color-fg-muted)]"
               >
                 {t('tool.image')}{block.mediaType ? ` · ${block.mediaType}` : ''}
               </div>
@@ -188,7 +142,7 @@ function Blocks({ blocks, query }: { blocks: Block[]; query: string }) {
             return (
               <pre
                 key={i}
-                className="overflow-x-auto rounded-md border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-3 py-2 font-mono text-xs text-[var(--color-fg-secondary)]"
+                className="overflow-x-auto border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-3 py-2 font-mono text-xs text-[var(--color-fg-secondary)]"
               >
                 {JSON.stringify(block.raw, null, 2)}
               </pre>
@@ -196,29 +150,5 @@ function Blocks({ blocks, query }: { blocks: Block[]; query: string }) {
         }
       })}
     </div>
-  );
-}
-
-function Avatar({ role }: { role: 'user' | 'assistant' }) {
-  if (role === 'assistant') {
-    return (
-      <span
-        aria-hidden
-        className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-accent)]"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-          <path d="M19 7.5A8 8 0 1 0 19 16.5" />
-          <path d="M15.5 9.5a4.5 4.5 0 1 0 0 5" opacity="0.45" />
-        </svg>
-      </span>
-    );
-  }
-  return (
-    <span
-      aria-hidden
-      className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-fg-primary)] font-display text-sm font-medium text-[var(--color-canvas)]"
-    >
-      Y
-    </span>
   );
 }
