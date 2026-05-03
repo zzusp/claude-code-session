@@ -241,7 +241,7 @@ export default function SessionDetailRoute() {
                   <motion.li
                     key={m.message.uuid || m.message.ts || String(i)}
                     variants={fadeUpItem}
-                    className={isMeta ? 'py-2' : 'border-b border-[var(--color-hairline)] py-6'}
+                    className={isMeta ? 'py-2' : 'py-3'}
                   >
                     <MessageBubble message={m.message} query={deferredQuery} />
                   </motion.li>
