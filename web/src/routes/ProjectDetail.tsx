@@ -89,14 +89,22 @@ export default function ProjectDetail() {
               : t('project.tagline.default')
           }
           actions={
-            <button
-              type="button"
-              onClick={() => setShowDialog(true)}
-              disabled={selected.size === 0}
-              className="inline-flex items-center gap-2 rounded-full border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-[var(--color-danger)] transition hover:border-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <TrashIcon /> {t('project.action.delete', { n: selected.size })}
-            </button>
+            <>
+              <Link
+                to={`/projects/${encodeURIComponent(id)}/memory`}
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
+              >
+                <BrainIcon /> {t('memory.action.open')}
+              </Link>
+              <button
+                type="button"
+                onClick={() => setShowDialog(true)}
+                disabled={selected.size === 0}
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-[var(--color-danger)] transition hover:border-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <TrashIcon /> {t('project.action.delete', { n: selected.size })}
+              </button>
+            </>
           }
           meta={
             sessions.length > 0 ? (
@@ -264,6 +272,15 @@ function TrashIcon() {
       <path d="M3 6h18" />
       <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
       <path d="M5.5 6l1.1 13.2A1.5 1.5 0 0 0 8.1 20.5h7.8a1.5 1.5 0 0 0 1.5-1.3L18.5 6" />
+    </svg>
+  );
+}
+
+function BrainIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M9 4.5a3 3 0 0 0-3 3v.4a3 3 0 0 0-1.5 5.2A3 3 0 0 0 6 18.5a3 3 0 0 0 6 0V4.5a3 3 0 0 0-3 0z" />
+      <path d="M15 4.5a3 3 0 0 1 3 3v.4a3 3 0 0 1 1.5 5.2A3 3 0 0 1 18 18.5a3 3 0 0 1-6 0" />
     </svg>
   );
 }

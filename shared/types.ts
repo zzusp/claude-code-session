@@ -115,6 +115,23 @@ export interface DiskUsage {
   totalSessions: number;
 }
 
+export type MemoryType = 'user' | 'feedback' | 'project' | 'reference';
+
+export interface MemoryEntry {
+  filename: string;
+  name: string | null;
+  description: string | null;
+  type: MemoryType | null;
+  body: string;
+  bytes: number;
+  mtime: string | null;
+}
+
+export interface MemoryResponse {
+  index: string | null;
+  entries: MemoryEntry[];
+}
+
 export interface HealthResponse {
   ok: boolean;
   claudeRoot: string;

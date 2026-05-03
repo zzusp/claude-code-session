@@ -39,6 +39,7 @@ const DICT = {
     'common.failedProjects': 'Failed to load projects',
     'common.failedSessions': 'Failed to load sessions',
     'common.failedSession': 'Failed to load',
+    'common.failedMemory': 'Failed to load memory',
     'common.failed': 'Failed',
     'common.searchPlaceholder': 'Search this session…',
     'common.loadEarlier': 'Load earlier (+{{n}})',
@@ -90,6 +91,7 @@ const DICT = {
 
     'message.role.you': 'You',
     'message.role.claude': 'Claude',
+    'message.role.tool': 'Tool',
     'message.role.system': 'system',
 
     'tool.use': 'tool',
@@ -130,6 +132,21 @@ const DICT = {
     'disk.col.project': 'Project',
     'disk.col.last': 'Last',
     'disk.col.size': 'Size',
+
+    'memory.title': 'Memory',
+    'memory.tagline':
+      "What Claude has remembered for this project across sessions.",
+    'memory.empty': 'No memory recorded yet for this project.',
+    'memory.heading.index': 'Index (MEMORY.md)',
+    'memory.heading.entries': 'Entries',
+    'memory.action.open': 'Memory',
+    'memory.meta.entries': 'Entries',
+    'memory.type.user': 'User',
+    'memory.type.feedback': 'Feedback',
+    'memory.type.project': 'Project',
+    'memory.type.reference': 'Reference',
+    'memory.type.other': 'Other',
+    'memory.loading': 'reading memory…',
 
     'delete.eyebrow.confirm': 'Confirm deletion',
     'delete.eyebrow.result': 'Result',
@@ -184,6 +201,7 @@ const DICT = {
     'common.failedProjects': '加载项目失败',
     'common.failedSessions': '加载会话列表失败',
     'common.failedSession': '加载失败',
+    'common.failedMemory': '加载记忆失败',
     'common.failed': '失败',
     'common.searchPlaceholder': '在此会话中搜索…',
     'common.loadEarlier': '加载更早 (+{{n}})',
@@ -233,6 +251,7 @@ const DICT = {
 
     'message.role.you': '我',
     'message.role.claude': 'Claude',
+    'message.role.tool': '工具',
     'message.role.system': '系统',
 
     'tool.use': '工具',
@@ -272,6 +291,20 @@ const DICT = {
     'disk.col.project': '项目',
     'disk.col.last': '最近',
     'disk.col.size': '大小',
+
+    'memory.title': '记忆',
+    'memory.tagline': 'Claude 在该项目中跨会话记住的内容。',
+    'memory.empty': '该项目尚未沉淀任何记忆。',
+    'memory.heading.index': '索引 (MEMORY.md)',
+    'memory.heading.entries': '条目',
+    'memory.action.open': '记忆',
+    'memory.meta.entries': '条目数',
+    'memory.type.user': '用户',
+    'memory.type.feedback': '反馈',
+    'memory.type.project': '项目',
+    'memory.type.reference': '外链',
+    'memory.type.other': '其他',
+    'memory.loading': '读取记忆中…',
 
     'delete.eyebrow.confirm': '确认删除',
     'delete.eyebrow.result': '结果',
