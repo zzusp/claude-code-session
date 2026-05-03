@@ -18,7 +18,10 @@ export interface RelatedBytes {
 export interface SessionSummary {
   id: string;
   projectId: string;
+  /** Auto-derived from the first user message; always present as fallback. */
   title: string;
+  /** User-set name (Claude Code's `custom-title` record); null if never renamed. */
+  customTitle: string | null;
   firstAt: string | null;
   lastAt: string | null;
   messageCount: number;
@@ -57,6 +60,10 @@ export interface SessionMeta {
   lastAt: string | null;
   messageCount: number;
   bytes: number;
+  /** Auto-derived title (first user message, truncated). */
+  title: string;
+  /** User-set name; null if never renamed. */
+  customTitle: string | null;
 }
 
 export interface SessionDetail {

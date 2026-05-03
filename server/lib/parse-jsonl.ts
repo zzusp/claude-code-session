@@ -4,6 +4,8 @@ import { SYSTEM_TAG_RE } from './system-tags.ts';
 
 export interface JsonlMeta {
   title: string;
+  /** Latest `custom-title` record value, or null if never renamed. */
+  customTitle: string | null;
   firstAt: string | null;
   lastAt: string | null;
   messageCount: number;
@@ -12,6 +14,7 @@ export interface JsonlMeta {
 
 export async function parseJsonlMeta(filePath: string): Promise<JsonlMeta> {
   let title = '';
+  let customTitle: string | null = null;
   let firstAt: string | null = null;
   let lastAt: string | null = null;
   let messageCount = 0;
@@ -42,6 +45,10 @@ export async function parseJsonlMeta(filePath: string): Promise<JsonlMeta> {
       cwdFromMessages = obj.cwd;
     }
 
+    if (obj.type === 'custom-title' && typeof obj.customTitle === 'string') {
+      customTitle = obj.customTitle;
+    }
+
     if (obj.type === 'user' || obj.type === 'assistant') {
       messageCount += 1;
 
@@ -57,6 +64,7 @@ export async function parseJsonlMeta(filePath: string): Promise<JsonlMeta> {
 
   return {
     title: title || '(untitled)',
+    customTitle,
     firstAt,
     lastAt,
     messageCount,
