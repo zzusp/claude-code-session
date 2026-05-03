@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs.tsx';
 import MessageBubble from '../components/MessageBubble.tsx';
@@ -23,6 +23,9 @@ interface IndexedMessage {
   haystack: string;
 }
 
+const INITIAL_WINDOW = 50;
+const LOAD_STEP = 50;
+
 export default function SessionDetailRoute() {
   const t = useT();
   const { projectId, sessionId } = useParams<{ projectId: string; sessionId: string }>();
@@ -32,6 +35,11 @@ export default function SessionDetailRoute() {
   const [showMeta, setShowMeta] = useState(false);
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
+  const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
+
+  useEffect(() => {
+    setWindowSize(INITIAL_WINDOW);
+  }, [pid, sid]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.session(pid, sid),
@@ -68,6 +76,13 @@ export default function SessionDetailRoute() {
     }
     return list;
   }, [indexed, showMeta, deferredQuery]);
+
+  const renderList = useMemo(() => {
+    if (deferredQuery) return visibleMessages;
+    return visibleMessages.slice(-windowSize);
+  }, [visibleMessages, deferredQuery, windowSize]);
+
+  const hasMoreEarlier = !deferredQuery && renderList.length < visibleMessages.length;
 
   const projectTail = useMemo(() => {
     const cwd = project?.decodedCwd;
@@ -149,8 +164,8 @@ export default function SessionDetailRoute() {
           {data && (
             <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
               {t('session.shown', {
-                shown: visibleMessages.length,
-                total: data.messages.length,
+                shown: renderList.length,
+                total: visibleMessages.length,
               })}
             </span>
           )}
@@ -173,14 +188,29 @@ export default function SessionDetailRoute() {
             {t('session.truncated', { n: MAX_SESSION_MESSAGES.toLocaleString() })}
           </p>
         )}
+        {hasMoreEarlier && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() =>
+                setWindowSize((w) => Math.min(w + LOAD_STEP, visibleMessages.length))
+              }
+              className="rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
+            >
+              {t('common.loadEarlier', {
+                n: Math.min(LOAD_STEP, visibleMessages.length - renderList.length),
+              })}
+            </button>
+          </div>
+        )}
         <motion.div
-          key={visibleMessages.length === 0 ? 'empty' : 'list'}
+          key={renderList.length === 0 ? 'empty' : 'list'}
           initial="hidden"
           animate="show"
           variants={staggerParent}
           className="space-y-4"
         >
-          {visibleMessages.map((m, i) => (
+          {renderList.map((m, i) => (
             <motion.div key={m.message.uuid || m.message.ts || String(i)} variants={fadeUpItem}>
               <MessageBubble message={m.message} query={deferredQuery} />
             </motion.div>
