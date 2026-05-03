@@ -180,6 +180,7 @@ export default function ProjectDetail() {
               >
                 {sessions.map((s) => {
                   const isSel = selected.has(s.id);
+                  const displayTitle = s.customTitle ?? s.title;
                   return (
                     <motion.tr
                       key={s.id}
@@ -195,7 +196,7 @@ export default function ProjectDetail() {
                       <td className="px-2 py-3 align-top">
                         <input
                           type="checkbox"
-                          aria-label={s.title}
+                          aria-label={displayTitle}
                           checked={isSel}
                           onChange={() => toggle(s.id)}
                           className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-[var(--color-accent)]"
@@ -205,9 +206,9 @@ export default function ProjectDetail() {
                         <Link
                           to={`/projects/${encodeURIComponent(id)}/sessions/${s.id}`}
                           className="block max-w-md truncate font-medium text-[var(--color-fg-primary)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
-                          title={s.title}
+                          title={displayTitle}
                         >
-                          {s.title}
+                          {displayTitle}
                         </Link>
                         <div className="mt-1 truncate font-mono text-[10.5px] tracking-[0.04em] text-[var(--color-fg-faint)]">
                           {s.id}

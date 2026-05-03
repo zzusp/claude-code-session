@@ -30,6 +30,8 @@ export async function loadSessionDetail(
     lastAt: null,
     messageCount: 0,
     bytes,
+    title: '(untitled)',
+    customTitle: null,
   };
 
   const messages: Message[] = [];
@@ -65,6 +67,7 @@ export async function loadSessionDetail(
   messages.sort((a, b) => (a.ts ?? '').localeCompare(b.ts ?? ''));
 
   meta.messageCount = messages.length;
+  meta.title = deriveAutoTitle(messages);
   return { meta, messages, truncated };
 }
 
@@ -72,11 +75,27 @@ function captureMeta(obj: Record<string, unknown>, meta: SessionMeta): void {
   if (typeof obj.cwd === 'string' && !meta.cwd) meta.cwd = obj.cwd;
   if (typeof obj.gitBranch === 'string' && !meta.gitBranch) meta.gitBranch = obj.gitBranch;
   if (typeof obj.version === 'string' && !meta.version) meta.version = obj.version;
+  if (obj.type === 'custom-title' && typeof obj.customTitle === 'string') {
+    meta.customTitle = obj.customTitle;
+  }
   const ts = typeof obj.timestamp === 'string' ? obj.timestamp : null;
   if (ts) {
     if (!meta.firstAt) meta.firstAt = ts;
     meta.lastAt = ts;
   }
+}
+
+function deriveAutoTitle(messages: Message[]): string {
+  for (const m of messages) {
+    if (m.type !== 'user' || m.isMeta) continue;
+    for (const block of m.blocks) {
+      if (block.type !== 'text') continue;
+      const line = block.text.trim().split('\n')[0] ?? '';
+      if (!line) continue;
+      return line.length > 80 ? line.slice(0, 80) + '…' : line;
+    }
+  }
+  return '(untitled)';
 }
 
 function buildMessage(obj: Record<string, unknown>): Message | null {

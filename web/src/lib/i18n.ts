@@ -32,6 +32,7 @@ const DICT = {
     'common.expand': 'expand',
     'common.collapse': 'collapse',
     'common.system': 'system',
+    'common.onlyUser': 'only me',
     'common.missing': 'missing',
     'common.noSessions': 'No sessions in this project.',
     'common.noProjects': 'No projects found.',
@@ -43,6 +44,8 @@ const DICT = {
     'common.failed': 'Failed',
     'common.searchPlaceholder': 'Search this session…',
     'common.loadEarlier': 'Load earlier (+{{n}})',
+    'common.scrollToTop': 'Jump to top',
+    'common.scrollToBottom': 'Jump to bottom',
 
     'projects.eyebrow': 'Workspace',
     'projects.title': 'Projects',
@@ -194,6 +197,7 @@ const DICT = {
     'common.expand': '展开',
     'common.collapse': '收起',
     'common.system': '系统',
+    'common.onlyUser': '仅我',
     'common.missing': '已不存在',
     'common.noSessions': '该项目下暂无会话。',
     'common.noProjects': '未发现项目。',
@@ -205,6 +209,8 @@ const DICT = {
     'common.failed': '失败',
     'common.searchPlaceholder': '在此会话中搜索…',
     'common.loadEarlier': '加载更早 (+{{n}})',
+    'common.scrollToTop': '回到顶部',
+    'common.scrollToBottom': '回到底部',
 
     'projects.eyebrow': '工作区',
     'projects.title': '项目',

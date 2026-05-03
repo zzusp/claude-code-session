@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
@@ -33,6 +33,7 @@ export default function SessionDetailRoute() {
   const sid = sessionId ?? '';
 
   const [showMeta, setShowMeta] = useState(false);
+  const [onlyUser, setOnlyUser] = useState(false);
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
@@ -81,19 +82,23 @@ export default function SessionDetailRoute() {
   const visibleMessages = useMemo(() => {
     let list = indexed;
     if (!showMeta) list = list.filter((m) => !m.message.isMeta);
+    if (onlyUser) list = list.filter((m) => isUserTyped(m.message));
     if (deferredQuery) {
       const q = deferredQuery.toLowerCase();
       list = list.filter((m) => m.haystack.includes(q));
     }
     return list;
-  }, [indexed, showMeta, deferredQuery]);
+  }, [indexed, showMeta, onlyUser, deferredQuery]);
 
+  // Intent-driven filters (search, only-me) want all matches across the whole
+  // conversation; windowing is for "paginate recency" and would hide matches.
+  const skipWindowing = !!deferredQuery || onlyUser;
   const renderList = useMemo(() => {
-    if (deferredQuery) return visibleMessages;
+    if (skipWindowing) return visibleMessages;
     return visibleMessages.slice(-windowSize);
-  }, [visibleMessages, deferredQuery, windowSize]);
+  }, [visibleMessages, skipWindowing, windowSize]);
 
-  const hasMoreEarlier = !deferredQuery && renderList.length < visibleMessages.length;
+  const hasMoreEarlier = !skipWindowing && renderList.length < visibleMessages.length;
 
   const projectTail = useMemo(() => {
     const cwd = project?.decodedCwd;
@@ -104,8 +109,21 @@ export default function SessionDetailRoute() {
 
   const sessionTitle = useMemo(() => {
     if (!data) return null;
-    return findSessionTitle(data.messages) ?? sid.slice(0, 8);
-  }, [data, sid]);
+    return data.meta.customTitle ?? data.meta.title;
+  }, [data]);
+
+  const queryClient = useQueryClient();
+  const renameMutation = useMutation({
+    mutationFn: (next: string) =>
+      api<{ customTitle: string }>(
+        `/api/sessions/${encodeURIComponent(pid)}/${encodeURIComponent(sid)}`,
+        { method: 'PATCH', body: JSON.stringify({ customTitle: next }) },
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.session(pid, sid) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.projectSessions(pid) });
+    },
+  });
 
   const taglineBranchPart = data?.meta.gitBranch
     ? t('session.tagline.branch', { branch: data.meta.gitBranch })
@@ -130,6 +148,10 @@ export default function SessionDetailRoute() {
               </span>
             }
             title={sessionTitle ?? <span className="font-mono">{sid.slice(0, 12)}…</span>}
+            editableValue={sessionTitle ?? ''}
+            onTitleEdit={async (next) => {
+              await renameMutation.mutateAsync(next);
+            }}
             tagline={t('session.tagline', {
               started: formatRelativeTime(data.meta.firstAt),
               lastTouched: formatRelativeTime(data.meta.lastAt),
@@ -170,6 +192,17 @@ export default function SessionDetailRoute() {
             />
             <span className="font-mono uppercase tracking-[0.14em] text-[var(--color-fg-muted)]">
               {t('common.system')}
+            </span>
+          </label>
+          <label className="inline-flex items-center gap-2 text-xs text-[var(--color-fg-secondary)]">
+            <input
+              type="checkbox"
+              checked={onlyUser}
+              onChange={(e) => setOnlyUser(e.target.checked)}
+              className="h-3.5 w-3.5 cursor-pointer accent-[var(--color-accent)]"
+            />
+            <span className="font-mono uppercase tracking-[0.14em] text-[var(--color-fg-muted)]">
+              {t('common.onlyUser')}
             </span>
           </label>
           {data && (
@@ -231,21 +264,18 @@ export default function SessionDetailRoute() {
           <p className="text-sm text-[var(--color-fg-muted)]">{t('common.noMessagesMatch')}</p>
         )}
       </div>
+
+      {data && <ScrollToEdges />}
     </section>
   );
 }
 
-function findSessionTitle(messages: Message[]): string | null {
-  for (const m of messages) {
-    if (m.type !== 'user' || m.isMeta) continue;
-    for (const block of m.blocks) {
-      if (block.type === 'text' && block.text.trim()) {
-        const line = block.text.trim().split('\n')[0] ?? '';
-        return line.length > 80 ? line.slice(0, 80) + '…' : line;
-      }
-    }
-  }
-  return null;
+// Match MessageBubble.tsx's classification: a `type:user` message whose blocks
+// are exclusively tool_result is rendered as a "tool" bubble, not as the user.
+function isUserTyped(m: Message): boolean {
+  if (m.type !== 'user') return false;
+  if (m.blocks.length === 0) return true;
+  return m.blocks.some((b) => b.type !== 'tool_result');
 }
 
 function indexMessage(message: Message): string {
@@ -283,6 +313,90 @@ function SearchIcon({ className = '' }: { className?: string }) {
     >
       <circle cx="11" cy="11" r="6.2" />
       <path d="M20 20l-4.3-4.3" />
+    </svg>
+  );
+}
+
+const EDGE_THRESHOLD = 320;
+
+function ScrollToEdges() {
+  const t = useT();
+  const [showTop, setShowTop] = useState(false);
+  const [showBottom, setShowBottom] = useState(false);
+
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const scrollY = window.scrollY;
+      const viewport = window.innerHeight;
+      const total = document.documentElement.scrollHeight;
+      setShowTop(scrollY >= EDGE_THRESHOLD);
+      setShowBottom(total - (scrollY + viewport) >= EDGE_THRESHOLD);
+    };
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  if (!showTop && !showBottom) return null;
+
+  const buttonClass =
+    'rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] p-2.5 text-[var(--color-fg-secondary)] shadow-[var(--shadow-rise)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]';
+
+  return (
+    <div className="fixed bottom-6 right-6 z-30 flex flex-col gap-2">
+      {showTop && (
+        <button
+          type="button"
+          aria-label={t('common.scrollToTop')}
+          title={t('common.scrollToTop')}
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className={buttonClass}
+        >
+          <ChevronIcon direction="up" />
+        </button>
+      )}
+      {showBottom && (
+        <button
+          type="button"
+          aria-label={t('common.scrollToBottom')}
+          title={t('common.scrollToBottom')}
+          onClick={() =>
+            window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
+          }
+          className={buttonClass}
+        >
+          <ChevronIcon direction="down" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ChevronIcon({ direction }: { direction: 'up' | 'down' }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d={direction === 'up' ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} />
     </svg>
   );
 }

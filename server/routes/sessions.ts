@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { deleteSessions, type DeleteRequestItem } from '../lib/delete.ts';
 import { loadSessionDetail } from '../lib/load-session.ts';
+import { renameSession } from '../lib/rename-session.ts';
 import { isSafeId } from '../lib/safe-id.ts';
 
 export const sessionsRoute = new Hono();
@@ -14,6 +15,29 @@ sessionsRoute.get('/:projectId/:sessionId', async (c) => {
   const detail = await loadSessionDetail(projectId, sessionId);
   if (!detail) return c.json({ error: 'not found' }, 404);
   return c.json(detail);
+});
+
+sessionsRoute.patch('/:projectId/:sessionId', async (c) => {
+  if (!isAcceptableOrigin(c.req.header('origin'))) {
+    return c.json({ error: 'origin not allowed' }, 403);
+  }
+  const projectId = c.req.param('projectId');
+  const sessionId = c.req.param('sessionId');
+  let body: { customTitle?: unknown };
+  try {
+    body = (await c.req.json()) as { customTitle?: unknown };
+  } catch {
+    return c.json({ error: 'invalid json body' }, 400);
+  }
+  if (typeof body.customTitle !== 'string') {
+    return c.json({ error: 'customTitle (string) required' }, 400);
+  }
+  const result = renameSession(projectId, sessionId, body.customTitle);
+  if (!result.ok) {
+    const status = result.reason.startsWith('live PID') ? 409 : 400;
+    return c.json({ error: result.reason }, status);
+  }
+  return c.json({ customTitle: result.customTitle });
 });
 
 sessionsRoute.delete('/', async (c) => {

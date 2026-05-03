@@ -117,6 +117,7 @@ export async function listSessionsForProject(projectId: string): Promise<Session
     };
 
     let title = '(no jsonl)';
+    let customTitle: string | null = null;
     let firstAt: string | null = null;
     let lastAt: string | null = null;
     let messageCount = 0;
@@ -124,6 +125,7 @@ export async function listSessionsForProject(projectId: string): Promise<Session
     if (fs.existsSync(jsonlPath)) {
       const meta = await parseJsonlMeta(jsonlPath);
       title = meta.title;
+      customTitle = meta.customTitle;
       firstAt = meta.firstAt;
       lastAt = meta.lastAt;
       messageCount = meta.messageCount;
@@ -144,6 +146,7 @@ export async function listSessionsForProject(projectId: string): Promise<Session
       id,
       projectId,
       title,
+      customTitle,
       firstAt,
       lastAt,
       messageCount,
