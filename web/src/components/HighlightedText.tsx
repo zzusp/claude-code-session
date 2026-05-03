@@ -14,7 +14,10 @@ export default function HighlightedText({
     <span className={className}>
       {segments.map((seg, i) =>
         seg.match ? (
-          <mark key={i} className="bg-yellow-200 text-neutral-900">
+          <mark
+            key={i}
+            className="rounded-sm bg-[var(--color-accent-soft)] px-0.5 text-[var(--color-accent-ink)] dark:text-[var(--color-fg-primary)]"
+          >
             {seg.text}
           </mark>
         ) : (
