@@ -1,0 +1,39 @@
+{
+  "name": "claude-code-session-manager",
+  "version": "0.1.0",
+  "description": "Local web UI to view and clean up Claude Code session history (~/.claude/)",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n server,web -c blue,magenta \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:web": "vite",
+    "build": "vite build",
+    "start": "tsx server/index.ts",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@tanstack/react-query": "^5.62.7",
+    "hono": "^4.6.14",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.1",
+    "recharts": "^2.15.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
+  }
+}

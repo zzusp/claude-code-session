@@ -1,0 +1,2 @@
+export const RECENT_ACTIVITY_WINDOW_MIN = 5;
+export const MAX_SESSION_MESSAGES = 5000;
