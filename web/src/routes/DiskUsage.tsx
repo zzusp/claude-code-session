@@ -293,10 +293,17 @@ export default function DiskUsageRoute() {
               <Empty className="mt-6" />
             ) : (
               <div className="mt-4 -mx-2 overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full table-fixed text-sm">
+                  <colgroup>
+                    <col className="w-10" />
+                    <col />
+                    <col className="w-[22rem]" />
+                    <col className="w-24" />
+                    <col className="w-24" />
+                  </colgroup>
                   <thead>
                     <tr className="text-left">
-                      <th className="px-2 py-3 eyebrow w-8">{t('disk.col.num')}</th>
+                      <th className="px-2 py-3 eyebrow">{t('disk.col.num')}</th>
                       <th className="px-2 py-3 eyebrow">{t('disk.col.title')}</th>
                       <th className="px-2 py-3 eyebrow">{t('disk.col.project')}</th>
                       <th className="px-2 py-3 eyebrow text-right">{t('disk.col.last')}</th>
@@ -317,16 +324,16 @@ export default function DiskUsageRoute() {
                         <td className="px-2 py-3 align-top">
                           <Link
                             to={`/projects/${encodeURIComponent(s.projectId)}/sessions/${s.sessionId}`}
-                            className="block max-w-md truncate font-medium text-[var(--color-fg-primary)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
+                            className="block truncate font-medium text-[var(--color-fg-primary)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
                             title={displayTitle}
                           >
                             {displayTitle}
                           </Link>
                         </td>
-                        <td className="px-2 py-3 max-w-xs truncate align-top font-mono text-[12px] text-[var(--color-fg-muted)]">
+                        <td className="px-2 py-3 align-top font-mono text-[12px] text-[var(--color-fg-muted)]">
                           <Link
                             to={`/projects/${encodeURIComponent(s.projectId)}`}
-                            className="hover:text-[var(--color-fg-primary)]"
+                            className="block truncate hover:text-[var(--color-fg-primary)]"
                             title={s.projectId}
                           >
                             {projectCwdLabel(data, s.projectId)}
