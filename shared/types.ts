@@ -110,6 +110,7 @@ export interface DiskUsageTopSession {
   projectId: string;
   sessionId: string;
   title: string;
+  customTitle: string | null;
   totalBytes: number;
   lastAt: string | null;
 }

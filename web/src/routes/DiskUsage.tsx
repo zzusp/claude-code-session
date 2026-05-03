@@ -304,7 +304,9 @@ export default function DiskUsageRoute() {
                     </tr>
                   </thead>
                   <tbody className="border-t border-[var(--color-hairline)]">
-                    {data.topSessions.map((s, i) => (
+                    {data.topSessions.map((s, i) => {
+                      const displayTitle = s.customTitle ?? s.title;
+                      return (
                       <tr
                         key={`${s.projectId}/${s.sessionId}`}
                         className="ribbon-row border-b border-[var(--color-hairline)] hover:bg-[var(--color-sunken)]"
@@ -316,9 +318,9 @@ export default function DiskUsageRoute() {
                           <Link
                             to={`/projects/${encodeURIComponent(s.projectId)}/sessions/${s.sessionId}`}
                             className="block max-w-md truncate font-medium text-[var(--color-fg-primary)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
-                            title={s.title}
+                            title={displayTitle}
                           >
-                            {s.title}
+                            {displayTitle}
                           </Link>
                         </td>
                         <td className="px-2 py-3 max-w-xs truncate align-top font-mono text-[12px] text-[var(--color-fg-muted)]">
@@ -337,7 +339,8 @@ export default function DiskUsageRoute() {
                           {formatBytes(s.totalBytes)}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
