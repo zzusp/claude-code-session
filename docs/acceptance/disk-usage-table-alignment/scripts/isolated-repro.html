@@ -1,0 +1,54 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+body { margin: 0; padding: 40px; background: #1a1a1a; color: #eee; font: 14px sans-serif; }
+table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+th, td { padding: 8px; vertical-align: top; }
+th { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #888; text-align: left; font-weight: 500; }
+.text-right { text-align: right; }
+tbody { border-top: 1px solid #333; }
+tr.ribbon-row { position: relative; isolation: isolate; }
+tr.ribbon-row::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: orange; transform: scaleY(0); }
+tr.ribbon-row:hover::before { transform: scaleY(1); }
+tbody tr { border-bottom: 1px solid #333; }
+.w-10 { width: 2.5rem; }
+.w-22rem { width: 22rem; }
+.w-24 { width: 6rem; }
+.col-debug col:nth-child(1) { background: rgba(255,0,0,0.1); }
+.col-debug col:nth-child(2) { background: rgba(0,255,0,0.1); }
+.col-debug col:nth-child(3) { background: rgba(0,0,255,0.1); }
+.col-debug col:nth-child(4) { background: rgba(255,255,0,0.1); }
+.col-debug col:nth-child(5) { background: rgba(255,0,255,0.1); }
+</style></head>
+<body>
+<h2>Test 1: with ribbon-row (position:relative)</h2>
+<table class="col-debug">
+  <colgroup>
+    <col class="w-10">
+    <col>
+    <col class="w-22rem">
+    <col class="w-24">
+    <col class="w-24">
+  </colgroup>
+  <thead><tr><th>#</th><th>标题</th><th>项目</th><th class="text-right">最近</th><th class="text-right">大小</th></tr></thead>
+  <tbody>
+    <tr class="ribbon-row"><td>01</td><td>productize-sessions-ui</td><td>…/workspace/claude-code-session</td><td class="text-right">4h ago</td><td class="text-right">6.8 MB</td></tr>
+    <tr class="ribbon-row"><td>02</td><td>sessiondetail-editorial-redesign</td><td>…/workspace/claude-code-session</td><td class="text-right">48m ago</td><td class="text-right">2.7 MB</td></tr>
+  </tbody>
+</table>
+
+<h2 style="margin-top:80px">Test 2: without ribbon-row</h2>
+<table class="col-debug">
+  <colgroup>
+    <col class="w-10">
+    <col>
+    <col class="w-22rem">
+    <col class="w-24">
+    <col class="w-24">
+  </colgroup>
+  <thead><tr><th>#</th><th>标题</th><th>项目</th><th class="text-right">最近</th><th class="text-right">大小</th></tr></thead>
+  <tbody>
+    <tr><td>01</td><td>productize-sessions-ui</td><td>…/workspace/claude-code-session</td><td class="text-right">4h ago</td><td class="text-right">6.8 MB</td></tr>
+    <tr><td>02</td><td>sessiondetail-editorial-redesign</td><td>…/workspace/claude-code-session</td><td class="text-right">48m ago</td><td class="text-right">2.7 MB</td></tr>
+  </tbody>
+</table>
+</body></html>
