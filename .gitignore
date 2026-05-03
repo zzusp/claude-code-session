@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.tsbuild/
+.cache/
+*.tsbuildinfo
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local env overrides
+.env
+.env.local
