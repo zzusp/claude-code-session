@@ -66,12 +66,66 @@ docs/
 **命名**：英文小写 + 连字符、3–6 词、不重复目录类型（`spec/plan-foo.md` 不写成 `spec-plan-foo.md`）；`reference/` 豁免。
 
 
-## Repository status
+## 项目概览
 
-This repository is currently unscaffolded — it contains only a `LICENSE` (MIT) and a single initial git commit. There is no source code, build system, package manifest, test suite, or documentation yet.
+**Claude Code Session Manager** —— 一个本地 Web UI，用于浏览 / 清理 `~/.claude/` 下的 Claude Code 会话历史。默认对磁盘只读，唯一的写操作是用户在 UI 显式点击 *Delete*。绑定 `127.0.0.1`，单用户单机使用。
 
-When the project is scaffolded, update this file to cover:
+详细产品说明见 [`README.md`](README.md)；设计文档见 [`docs/spec/`](docs/spec/)。
 
-- Build, lint, test, and run commands (including how to run a single test)
-- High-level architecture that spans multiple files
-- Any project-specific conventions worth knowing before editing
+## 开发命令
+
+需要 **Node 22+**（推荐 24）。
+
+| Script | 用途 |
+|---|---|
+| `npm run dev` | 并发启动 backend (`tsx watch server/index.ts`，端口 3131–3140) + Vite dev server (5173)。Vite 把 `/api/*` 代理到 backend。 |
+| `npm run dev:server` / `npm run dev:web` | 单独启动其中一边。 |
+| `npm run build` | 用 Vite 把 SPA 构建到 `dist/`。 |
+| `npm run start` | 单进程生产模式：Hono 同时托管 `dist/` 静态资源和 API。 |
+| `npm run typecheck` | `tsc -b` 同时校验 `tsconfig.server.json` + `tsconfig.web.json`。 |
+
+**没有 lint / 测试 runner。** 改完代码用 `npm run typecheck` 把整个 monorepo 过一遍；UI 行为靠 `docs/acceptance/` 下的 e2e 方案手动验证。
+
+端口：3131 占用时自动顺延到 3140，并把实际端口打到 stdout。
+
+## 架构
+
+三层结构，所有改动应保持这个分层不被打破：
+
+```
+shared/    Wire 协议（类型 + 常量），server 和 web 都导入。改这里要双向 typecheck。
+server/    Hono backend。所有文件系统读写都集中在这里。
+web/       React 19 + Vite + Tailwind v4 SPA。绝不直接读 ~/.claude/，只走 /api。
+```
+
+### Server 端关键约束
+
+- **`~/.claude/` 路径只在一处定义**：`server/lib/claude-paths.ts` 的 `PATHS` 对象。其它地方需要拼路径必须从 `PATHS` 派生，不要再独立用 `os.homedir()` 拼。
+- **任何路径在读 / 写之前必须过 `isUnderClaudeRoot()` 校验**（Windows 下做大小写折叠），防止 path-traversal 逃出 `~/.claude/`。
+- **ID 校验**：`server/lib/safe-id.ts` 拒绝包含 `/`、`\`、`..` 或以 `.` 开头的 sessionId / projectId。所有从 URL 参数进来的 id 必须先过这一关。
+- **删除流程的 5 个位置**（`server/lib/delete.ts`）：每条 session 实际散落在 `projects/<encoded-cwd>/<sid>.jsonl` + `projects/<encoded-cwd>/<sid>/` + `file-history/<sid>/` + `session-env/<sid>/` + `history.jsonl` 里的对应行 + `sessions/<pid>.json`（仅当 PID 已退出）。一次 delete 必须级联清理这些位置，缺一不可。
+- **删除安全网**（`server/lib/active-sessions.ts`）：sessionId 出现在仍然存活的 `sessions/<pid>.json` 中、或 `.jsonl` 在 5 分钟内被改过 → 跳过不删。Unix 用 `process.kill(pid, 0)`，Windows 用 `tasklist`。
+- **`history.jsonl` 改写用原子三步**：`backup → tmp → rename`，绝不原地写。失败时原文件保留为 `.bak-<timestamp>`。
+- **CSRF 保护**：所有 mutating endpoint（`DELETE /api/sessions`）要求 `Origin` 头匹配 `http(s)://(localhost|127.0.0.1):*`。
+
+路由分布：`server/routes/{projects,sessions,disk}.ts`。每个路由文件做参数校验 → 调 `server/lib/` 下的纯函数 → 返回 `shared/types.ts` 里定义的响应类型。
+
+### Web 端关键约束
+
+- **TanStack Query 的所有 query key 集中在 `web/src/lib/query-keys.ts`**。新接口要先在这里登记，不要散写字符串数组。
+- **`DiskUsage` 路由 + Recharts 是 lazy import**（见 `App.tsx` 的 `lazy()` + `vite.config.ts` 的 `manualChunks`）。初始包 ~124 KB gzipped，charts ~80 KB 仅在 `/disk` 加载。新增重依赖时按这个模式拆。
+- **路由层级**：`/` → `/projects/:id` → `/projects/:id/sessions/:sid`，外加 `/projects/:id/memory` 和 `/disk`。`SessionDetail` 是最复杂的页（消息时间线 + 搜索 + tool 块折叠 + 跳转边界）。
+- **设计系统在 `web/src/index.css`**：字体（Fraunces 标题 / Plus Jakarta Sans 正文 / Geist Mono 代码）+ OKLCH 颜色 token + 暗色变体 + grain 噪点 + hairline / ribbon-row / pulse-amber 等 utility，刻意走 editorial 风格。改样式优先复用 token 和 utility，不要引入 hex / rgb 字面量。
+- **i18n + 主题**：`web/src/lib/i18n.ts`、`web/src/lib/theme.ts`，UI 文本走 i18n（zh / en），不要硬编码。
+
+### 跨平台
+
+- Project id 编码：macOS/Linux `/foo/bar` → `-foo-bar`；Windows `C:\foo\bar` → `C--foo-bar`。
+- 反解时优先用 `.jsonl` 里记录的 `cwd` 字段，找不到才退到启发式 decode + `fs.statSync` 验证。
+
+## 改动时容易踩的坑
+
+- **改了 `shared/types.ts`** → 一定要同时跑 server 和 web 的 typecheck（`npm run typecheck` 会同时跑两边）。wire 协议的字段不向前向后兼容，server / web 必须同步更新。
+- **新增 backend endpoint** → 在 `server/routes/` 下加，路径以 `/api/` 开头；记得加 ID 校验和 `isUnderClaudeRoot` 校验；前端在 `web/src/lib/api.ts` 加 fetcher，在 `query-keys.ts` 登记 key。
+- **改 `~/.claude/` 的 layout 假设** → 改 `PATHS` 一处即可；如果是新增一类相关文件，记得把它纳入 `delete.ts` 的级联清理 + `fs-size.ts` 的 `relatedBytes` 统计，否则会出现"删了但磁盘没变小"。
+- **production 模式** (`npm run start`) 要求 `dist/` 已 build，否则 Hono 的 `serveStatic` 中间件不会挂载，但 API 仍可用。dev 模式无需 build。
