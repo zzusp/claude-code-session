@@ -41,6 +41,7 @@ const DICT = {
     'common.failedSession': 'Failed to load',
     'common.failed': 'Failed',
     'common.searchPlaceholder': 'Search this session…',
+    'common.loadEarlier': 'Load earlier (+{{n}})',
 
     'projects.eyebrow': 'Workspace',
     'projects.title': 'Projects',
@@ -95,6 +96,7 @@ const DICT = {
     'tool.result': 'tool result',
     'tool.error': 'tool error',
     'tool.thinking': 'thinking',
+    'tool.thinkingEncrypted': 'Content is encrypted, no readable text.',
     'tool.image': 'image',
 
     'status.live': 'live · pid {{pid}}',
@@ -184,6 +186,7 @@ const DICT = {
     'common.failedSession': '加载失败',
     'common.failed': '失败',
     'common.searchPlaceholder': '在此会话中搜索…',
+    'common.loadEarlier': '加载更早 (+{{n}})',
 
     'projects.eyebrow': '工作区',
     'projects.title': '项目',
@@ -236,6 +239,7 @@ const DICT = {
     'tool.result': '工具返回',
     'tool.error': '工具错误',
     'tool.thinking': '思考',
+    'tool.thinkingEncrypted': '内容被加密，无可读文本。',
     'tool.image': '图片',
 
     'status.live': '运行中 · pid {{pid}}',

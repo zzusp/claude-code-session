@@ -84,6 +84,7 @@ export function ThinkingBlock({
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const hasText = block.text.trim() !== '';
   return (
     <div className="overflow-hidden rounded-md border border-dashed border-[var(--color-hairline-strong)] bg-[var(--color-sunken)] text-sm text-[var(--color-fg-secondary)]">
       <button
@@ -97,9 +98,15 @@ export function ThinkingBlock({
         <Caret open={open} />
       </button>
       {open && (
-        <pre className="overflow-x-auto whitespace-pre-wrap break-words border-t border-dashed border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-2 font-mono text-[11.5px] italic text-[var(--color-fg-secondary)]">
-          <HighlightedText text={block.text} query={query} />
-        </pre>
+        hasText ? (
+          <div className="whitespace-pre-wrap break-words border-t border-dashed border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] leading-relaxed text-[var(--color-fg-secondary)]">
+            <HighlightedText text={block.text} query={query} />
+          </div>
+        ) : (
+          <p className="border-t border-dashed border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-2 text-[12px] italic text-[var(--color-fg-muted)]">
+            {t('tool.thinkingEncrypted')}
+          </p>
+        )
       )}
     </div>
   );

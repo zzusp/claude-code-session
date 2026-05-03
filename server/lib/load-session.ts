@@ -62,6 +62,8 @@ export async function loadSessionDetail(
     if (msg) messages.push(msg);
   }
 
+  messages.sort((a, b) => (a.ts ?? '').localeCompare(b.ts ?? ''));
+
   meta.messageCount = messages.length;
   return { meta, messages, truncated };
 }
