@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Block } from '../lib/api.ts';
+import { useT } from '../lib/i18n.ts';
 import HighlightedText from './HighlightedText.tsx';
 
 const PREVIEW_CHARS = 280;
@@ -14,19 +15,19 @@ export function ToolUseBlock({
   const [open, setOpen] = useState(false);
   const inputJson = JSON.stringify(block.input, null, 2);
   return (
-    <div className="rounded-md border border-blue-200 bg-blue-50/40 text-sm">
+    <div className="overflow-hidden rounded-md border border-[var(--color-hairline)] bg-[var(--color-sunken)] text-sm">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left"
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition hover:bg-[var(--color-canvas)]"
       >
-        <span className="font-mono text-xs font-medium text-blue-800">
-          ⚙ {block.name}
+        <span className="flex items-center gap-2 font-mono text-[11.5px] font-medium uppercase tracking-[0.06em] text-[var(--color-fg-secondary)]">
+          <Glyph kind="tool" /> {block.name}
         </span>
-        <span className="text-xs text-blue-600">{open ? 'collapse' : 'expand'}</span>
+        <Caret open={open} />
       </button>
       {open && (
-        <pre className="overflow-x-auto border-t border-blue-200 px-3 py-2 font-mono text-xs text-neutral-800">
+        <pre className="overflow-x-auto border-t border-[var(--color-hairline)] bg-[var(--color-surface)] px-3 py-2 font-mono text-[11.5px] text-[var(--color-fg-primary)]">
           <HighlightedText text={inputJson} query={query} />
         </pre>
       )}
@@ -41,31 +42,33 @@ export function ToolResultBlock({
   block: Extract<Block, { type: 'tool_result' }>;
   query: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const long = block.content.length > PREVIEW_CHARS;
   const visible = open || !long ? block.content : block.content.slice(0, PREVIEW_CHARS) + '…';
 
   const tone = block.isError
-    ? 'border-red-300 bg-red-50/60 text-red-900'
-    : 'border-emerald-200 bg-emerald-50/40 text-neutral-800';
+    ? 'border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] text-[var(--color-danger)]'
+    : 'border-[var(--color-hairline)] bg-[var(--color-sunken)] text-[var(--color-fg-primary)]';
 
   return (
-    <div className={`rounded-md border text-sm ${tone}`}>
-      <div className="flex items-center justify-between gap-2 px-3 py-1.5">
-        <span className="font-mono text-xs font-medium">
-          {block.isError ? '⚠ tool error' : '↩ tool result'}
+    <div className={`overflow-hidden rounded-md border text-sm ${tone}`}>
+      <div className="flex items-center justify-between gap-2 px-3 py-2">
+        <span className="flex items-center gap-2 font-mono text-[11.5px] font-medium uppercase tracking-[0.06em]">
+          <Glyph kind={block.isError ? 'error' : 'result'} />
+          {block.isError ? t('tool.error') : t('tool.result')}
         </span>
         {long && (
           <button
             type="button"
             onClick={() => setOpen(!open)}
-            className="text-xs underline"
+            className="font-mono text-[10.5px] uppercase tracking-[0.16em] underline-offset-2 hover:underline"
           >
-            {open ? 'collapse' : 'expand'}
+            {open ? t('common.collapse') : t('common.expand')}
           </button>
         )}
       </div>
-      <pre className="overflow-x-auto whitespace-pre-wrap break-words border-t border-current/20 px-3 py-2 font-mono text-xs">
+      <pre className={`overflow-x-auto whitespace-pre-wrap break-words border-t px-3 py-2 font-mono text-[11.5px] ${block.isError ? 'border-[var(--color-danger)]/30' : 'border-[var(--color-hairline)] bg-[var(--color-surface)]'}`}>
         <HighlightedText text={visible} query={query} />
       </pre>
     </div>
@@ -79,22 +82,90 @@ export function ThinkingBlock({
   block: Extract<Block, { type: 'thinking' }>;
   query: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-md border border-neutral-200 bg-neutral-100 text-sm text-neutral-700">
+    <div className="overflow-hidden rounded-md border border-dashed border-[var(--color-hairline-strong)] bg-[var(--color-sunken)] text-sm text-[var(--color-fg-secondary)]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left"
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
       >
-        <span className="font-mono text-xs font-medium">💭 thinking</span>
-        <span className="text-xs text-neutral-500">{open ? 'collapse' : 'expand'}</span>
+        <span className="flex items-center gap-2 font-mono text-[11.5px] font-medium uppercase tracking-[0.06em]">
+          <Glyph kind="thinking" /> {t('tool.thinking')}
+        </span>
+        <Caret open={open} />
       </button>
       {open && (
-        <pre className="overflow-x-auto whitespace-pre-wrap break-words border-t border-neutral-200 px-3 py-2 font-mono text-xs text-neutral-700">
+        <pre className="overflow-x-auto whitespace-pre-wrap break-words border-t border-dashed border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-2 font-mono text-[11.5px] italic text-[var(--color-fg-secondary)]">
           <HighlightedText text={block.text} query={query} />
         </pre>
       )}
     </div>
+  );
+}
+
+function Caret({ open }: { open: boolean }) {
+  return (
+    <svg
+      width="11"
+      height="11"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="text-[var(--color-fg-muted)] transition-transform"
+      style={{ transform: open ? 'rotate(90deg)' : 'rotate(0)' }}
+      aria-hidden
+    >
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+function Glyph({ kind }: { kind: 'tool' | 'result' | 'error' | 'thinking' }) {
+  const common = {
+    width: 11,
+    height: 11,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.8,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    'aria-hidden': true,
+  };
+  if (kind === 'tool') {
+    return (
+      <svg {...common}>
+        <path d="M14.7 5.3a3 3 0 1 0 4 4l-2.5 2.5 5 5-2.7 2.7-5-5-2.5 2.5a3 3 0 1 0-4-4z" />
+      </svg>
+    );
+  }
+  if (kind === 'result') {
+    return (
+      <svg {...common}>
+        <path d="M5 12h13" />
+        <path d="M13 7l5 5-5 5" />
+      </svg>
+    );
+  }
+  if (kind === 'error') {
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 8v4.5" />
+        <path d="M12 16h.01" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...common}>
+      <path d="M9 18h6" />
+      <path d="M10 21h4" />
+      <path d="M12 3a6 6 0 0 0-3.6 10.8c.8.6 1.1 1.6 1.1 2.7v.5h5v-.5c0-1.1.3-2.1 1.1-2.7A6 6 0 0 0 12 3z" />
+    </svg>
   );
 }

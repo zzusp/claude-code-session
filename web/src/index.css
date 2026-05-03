@@ -1,1 +1,200 @@
 @import "tailwindcss";
+
+@import "@fontsource-variable/fraunces/opsz.css";
+@import "@fontsource-variable/fraunces/opsz-italic.css";
+@import "@fontsource-variable/plus-jakarta-sans/wght.css";
+@import "@fontsource-variable/plus-jakarta-sans/wght-italic.css";
+@import "@fontsource-variable/geist-mono/wght.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-display: "Fraunces Variable", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-serif, Georgia, serif;
+  --font-sans: "Plus Jakarta Sans Variable", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", "PingFang SC", ui-monospace, "JetBrains Mono", monospace;
+
+  /* Light theme defaults */
+  --color-canvas: oklch(0.972 0.008 85);
+  --color-surface: oklch(1 0 0);
+  --color-sunken: oklch(0.945 0.010 85);
+  --color-fg-primary: oklch(0.21 0.012 85);
+  --color-fg-secondary: oklch(0.36 0.010 85);
+  --color-fg-muted: oklch(0.52 0.008 85);
+  --color-fg-faint: oklch(0.68 0.008 85);
+  --color-hairline: oklch(0.88 0.010 85);
+  --color-hairline-strong: oklch(0.78 0.012 85);
+  --color-accent: oklch(0.72 0.165 65);
+  --color-accent-ink: oklch(0.32 0.090 60);
+  --color-accent-soft: oklch(0.94 0.058 75);
+  --color-danger: oklch(0.56 0.180 25);
+  --color-danger-soft: oklch(0.94 0.052 30);
+  --color-moss: oklch(0.55 0.068 145);
+  --color-moss-soft: oklch(0.93 0.045 140);
+  --color-iris: oklch(0.55 0.085 240);
+
+  --shadow-rise: 0 1px 0 0 oklch(0.78 0.012 85 / 0.5), 0 12px 32px -16px oklch(0.30 0.012 85 / 0.18);
+  --shadow-pop: 0 4px 14px -6px oklch(0.30 0.012 85 / 0.18), 0 16px 48px -20px oklch(0.30 0.012 85 / 0.20);
+}
+
+.dark {
+  --color-canvas: oklch(0.158 0.006 85);
+  --color-surface: oklch(0.205 0.006 85);
+  --color-sunken: oklch(0.130 0.005 85);
+  --color-fg-primary: oklch(0.945 0.010 85);
+  --color-fg-secondary: oklch(0.82 0.010 85);
+  --color-fg-muted: oklch(0.66 0.010 85);
+  --color-fg-faint: oklch(0.46 0.008 85);
+  --color-hairline: oklch(0.295 0.006 85);
+  --color-hairline-strong: oklch(0.380 0.008 85);
+  --color-accent: oklch(0.78 0.155 70);
+  --color-accent-ink: oklch(0.95 0.045 80);
+  --color-accent-soft: oklch(0.32 0.075 65);
+  --color-danger: oklch(0.68 0.175 25);
+  --color-danger-soft: oklch(0.30 0.090 25);
+  --color-moss: oklch(0.66 0.062 145);
+  --color-moss-soft: oklch(0.28 0.048 145);
+  --color-iris: oklch(0.70 0.080 240);
+
+  --shadow-rise: 0 1px 0 0 oklch(0.380 0.006 85 / 0.7), 0 18px 40px -20px oklch(0 0 0 / 0.55);
+  --shadow-pop: 0 8px 24px -10px oklch(0 0 0 / 0.6), 0 24px 60px -30px oklch(0 0 0 / 0.55);
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    background: var(--color-canvas);
+    color: var(--color-fg-primary);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "ss02", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: var(--color-canvas);
+    color: var(--color-fg-primary);
+    min-height: 100dvh;
+    position: relative;
+  }
+
+  /* Atmospheric grain — fixed, behind everything, never blocks pointer events */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0   0 0 0 0 0   0 0 0 0 0   0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    opacity: 0.045;
+    mix-blend-mode: multiply;
+  }
+
+  .dark body::before {
+    opacity: 0.07;
+    mix-blend-mode: screen;
+  }
+
+  ::selection {
+    background: var(--color-accent-soft);
+    color: var(--color-accent-ink);
+  }
+
+  /* Scrollbar — slim and themed */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-hairline-strong) transparent;
+  }
+
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-hairline);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover { background-color: var(--color-hairline-strong); background-clip: padding-box; }
+
+  /* Display headings default to Fraunces with optical sizing */
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-feature-settings: "ss01", "salt", "liga", "dlig";
+    letter-spacing: -0.012em;
+  }
+
+  /* Tabular figures for any number-y context */
+  .tabular-nums { font-variant-numeric: tabular-nums; }
+}
+
+@layer utilities {
+  /* Eyebrow: small-caps tracked label */
+  .eyebrow {
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-fg-muted);
+  }
+
+  /* Hairline — preferred over shadow boxy borders */
+  .hairline { border-color: var(--color-hairline); }
+  .hairline-strong { border-color: var(--color-hairline-strong); }
+
+  /* Dotted reading rule used as section divider */
+  .rule-dotted {
+    background-image: radial-gradient(circle, var(--color-hairline-strong) 1px, transparent 1.2px);
+    background-size: 6px 1px;
+    background-repeat: repeat-x;
+    background-position: 0 50%;
+    height: 1px;
+  }
+
+  /* Hover ribbon: slides in from the left edge of a row */
+  .ribbon-row {
+    position: relative;
+    isolation: isolate;
+  }
+  .ribbon-row::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--color-accent);
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .ribbon-row:hover::before, .ribbon-row[data-active="true"]::before {
+    transform: scaleY(1);
+  }
+
+  /* Live status pulse (no JS) */
+  .pulse-amber {
+    box-shadow: 0 0 0 0 oklch(0.78 0.155 70 / 0.6);
+    animation: pulse-amber 1.6s cubic-bezier(0.4, 0, 0.4, 1) infinite;
+  }
+
+  /* Stagger fade-up for page-load motion (CSS-only fallback when no JS) */
+  .stagger-item {
+    opacity: 0;
+    animation: stagger-in 360ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+@keyframes pulse-amber {
+  0%   { box-shadow: 0 0 0 0   oklch(0.78 0.155 70 / 0.55); }
+  70%  { box-shadow: 0 0 0 6px oklch(0.78 0.155 70 / 0); }
+  100% { box-shadow: 0 0 0 0   oklch(0.78 0.155 70 / 0); }
+}
+
+@keyframes stagger-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+}

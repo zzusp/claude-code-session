@@ -1,10 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'motion/react';
 import { useDeferredValue, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import Breadcrumbs from '../components/Breadcrumbs.tsx';
 import MessageBubble from '../components/MessageBubble.tsx';
-import { api, type Block, type Message, type SessionDetail } from '../lib/api.ts';
+import PageHeader, { MetaItem } from '../components/PageHeader.tsx';
+import {
+  api,
+  type Block,
+  type Message,
+  type ProjectSummary,
+  type SessionDetail,
+} from '../lib/api.ts';
 import { MAX_SESSION_MESSAGES } from '../lib/constants.ts';
-import { formatBytes, formatDateTime } from '../lib/format.ts';
+import { formatBytes, formatDateTime, formatRelativeTime } from '../lib/format.ts';
+import { useT } from '../lib/i18n.ts';
+import { fadeUpItem, staggerParent } from '../lib/motion.ts';
 import { queryKeys } from '../lib/query-keys.ts';
 
 interface IndexedMessage {
@@ -13,6 +24,7 @@ interface IndexedMessage {
 }
 
 export default function SessionDetailRoute() {
+  const t = useT();
   const { projectId, sessionId } = useParams<{ projectId: string; sessionId: string }>();
   const pid = projectId ?? '';
   const sid = sessionId ?? '';
@@ -29,6 +41,15 @@ export default function SessionDetailRoute() {
       ),
     enabled: !!pid && !!sid,
   });
+
+  const projectsQuery = useQuery({
+    queryKey: queryKeys.projects(),
+    queryFn: () => api<ProjectSummary[]>('/api/projects'),
+  });
+  const project = useMemo(
+    () => projectsQuery.data?.find((p) => p.id === pid),
+    [projectsQuery.data, pid],
+  );
 
   const indexed: IndexedMessage[] = useMemo(() => {
     if (!data) return [];
@@ -48,87 +69,142 @@ export default function SessionDetailRoute() {
     return list;
   }, [indexed, showMeta, deferredQuery]);
 
+  const projectTail = useMemo(() => {
+    const cwd = project?.decodedCwd;
+    if (!cwd) return pid.slice(-12);
+    const parts = cwd.split(/[\\/]+/).filter(Boolean);
+    return parts.at(-1) ?? cwd;
+  }, [project, pid]);
+
+  const sessionTitle = useMemo(() => {
+    if (!data) return null;
+    return findSessionTitle(data.messages) ?? sid.slice(0, 8);
+  }, [data, sid]);
+
+  const taglineBranchPart = data?.meta.gitBranch
+    ? t('session.tagline.branch', { branch: data.meta.gitBranch })
+    : '';
+
   return (
     <section>
-      <Link
-        to={`/projects/${encodeURIComponent(pid)}`}
-        className="text-sm text-neutral-500 hover:text-neutral-800"
-      >
-        ← Back to project
-      </Link>
+      <Breadcrumbs
+        items={[
+          { label: t('session.crumbProjects'), to: '/' },
+          { label: projectTail, to: `/projects/${encodeURIComponent(pid)}`, mono: true },
+          { label: sessionTitle ?? sid.slice(0, 8), mono: !sessionTitle },
+        ]}
+      />
 
       {data && (
-        <header className="mt-2">
-          <h1 className="font-mono text-base text-neutral-900 break-all">{sid}</h1>
-          <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-xs text-neutral-600">
-            <dt className="text-neutral-500">cwd</dt>
-            <dd className="font-mono text-neutral-800">{data.meta.cwd ?? '—'}</dd>
-            <dt className="text-neutral-500">git</dt>
-            <dd className="font-mono text-neutral-800">{data.meta.gitBranch ?? '—'}</dd>
-            <dt className="text-neutral-500">version</dt>
-            <dd className="font-mono text-neutral-800">{data.meta.version ?? '—'}</dd>
-            <dt className="text-neutral-500">started</dt>
-            <dd className="font-mono text-neutral-800">{formatDateTime(data.meta.firstAt)}</dd>
-            <dt className="text-neutral-500">last</dt>
-            <dd className="font-mono text-neutral-800">{formatDateTime(data.meta.lastAt)}</dd>
-            <dt className="text-neutral-500">size</dt>
-            <dd className="font-mono text-neutral-800">
-              {formatBytes(data.meta.bytes)} · {data.meta.messageCount} messages
-            </dd>
-          </dl>
-        </header>
+        <div className="mt-4">
+          <PageHeader
+            eyebrow={
+              <span className="font-mono normal-case tracking-[0.05em] text-[var(--color-fg-faint)]">
+                {sid}
+              </span>
+            }
+            title={sessionTitle ?? <span className="font-mono">{sid.slice(0, 12)}…</span>}
+            tagline={t('session.tagline', {
+              started: formatRelativeTime(data.meta.firstAt),
+              lastTouched: formatRelativeTime(data.meta.lastAt),
+              branchPart: taglineBranchPart,
+            })}
+            meta={
+              <>
+                <MetaItem label={t('session.meta.messages')} value={data.meta.messageCount.toLocaleString()} />
+                <MetaItem label={t('session.meta.size')} value={formatBytes(data.meta.bytes)} />
+                {data.meta.version && (
+                  <MetaItem label={t('session.meta.version')} value={data.meta.version} />
+                )}
+                <MetaItem label={t('session.meta.started')} value={formatDateTime(data.meta.firstAt)} />
+              </>
+            }
+          />
+        </div>
       )}
 
-      <div className="sticky top-0 -mx-4 mt-4 border-b border-neutral-200 bg-neutral-50/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-neutral-50/70">
+      <div className="sticky top-0 z-30 -mx-5 sm:-mx-8 lg:-mx-12 mt-6 border-y border-[var(--color-hairline)] bg-[var(--color-canvas)]/85 px-5 sm:px-8 lg:px-12 py-3 backdrop-blur">
         <div className="flex flex-wrap items-center gap-3">
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search this session…"
-            className="flex-1 min-w-[12rem] rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none"
-          />
-          <label className="inline-flex items-center gap-1.5 text-xs text-neutral-600">
+          <div className="relative flex-1 min-w-[12rem]">
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-fg-muted)]" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t('common.searchPlaceholder')}
+              className="w-full rounded-md border border-[var(--color-hairline)] bg-[var(--color-surface)] py-1.5 pl-9 pr-3 text-sm text-[var(--color-fg-primary)] placeholder:text-[var(--color-fg-faint)] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-soft)]"
+            />
+          </div>
+          <label className="inline-flex items-center gap-2 text-xs text-[var(--color-fg-secondary)]">
             <input
               type="checkbox"
               checked={showMeta}
               onChange={(e) => setShowMeta(e.target.checked)}
+              className="h-3.5 w-3.5 cursor-pointer accent-[var(--color-accent)]"
             />
-            show system messages
+            <span className="font-mono uppercase tracking-[0.14em] text-[var(--color-fg-muted)]">
+              {t('common.system')}
+            </span>
           </label>
           {data && (
-            <span className="text-xs text-neutral-500">
-              {visibleMessages.length} / {data.messages.length} shown
+            <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
+              {t('session.shown', {
+                shown: visibleMessages.length,
+                total: data.messages.length,
+              })}
             </span>
           )}
         </div>
       </div>
 
-      <div className="mt-4 space-y-3">
-        {isLoading && <p className="text-sm text-neutral-500">Loading session…</p>}
+      <div className="mt-6 space-y-4">
+        {isLoading && (
+          <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
+            {t('common.loadingSession')}
+          </p>
+        )}
         {error && (
-          <p className="text-sm text-red-600">
-            Failed to load: {(error as Error).message}
+          <p className="rounded-md border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-danger)]">
+            {t('common.failedSession')}: {(error as Error).message}
           </p>
         )}
         {data?.truncated && (
-          <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            Session truncated to first {MAX_SESSION_MESSAGES} messages.
+          <p className="rounded-[10px] border border-[var(--color-accent)]/40 bg-[var(--color-accent-soft)] px-4 py-2.5 text-xs text-[var(--color-accent-ink)] dark:text-[var(--color-fg-primary)]">
+            {t('session.truncated', { n: MAX_SESSION_MESSAGES.toLocaleString() })}
           </p>
         )}
-        {visibleMessages.map((m, i) => (
-          <MessageBubble
-            key={m.message.uuid || m.message.ts || String(i)}
-            message={m.message}
-            query={deferredQuery}
-          />
-        ))}
+        <motion.div
+          key={visibleMessages.length === 0 ? 'empty' : 'list'}
+          initial="hidden"
+          animate="show"
+          variants={staggerParent}
+          className="space-y-4"
+        >
+          {visibleMessages.map((m, i) => (
+            <motion.div key={m.message.uuid || m.message.ts || String(i)} variants={fadeUpItem}>
+              <MessageBubble message={m.message} query={deferredQuery} />
+            </motion.div>
+          ))}
+        </motion.div>
         {data && visibleMessages.length === 0 && (
-          <p className="text-sm text-neutral-500">No messages match.</p>
+          <p className="text-sm text-[var(--color-fg-muted)]">{t('common.noMessagesMatch')}</p>
         )}
       </div>
     </section>
   );
+}
+
+function findSessionTitle(messages: Message[]): string | null {
+  for (const m of messages) {
+    if (m.type !== 'user' || m.isMeta) continue;
+    for (const block of m.blocks) {
+      if (block.type === 'text' && block.text.trim()) {
+        const line = block.text.trim().split('\n')[0] ?? '';
+        return line.length > 80 ? line.slice(0, 80) + '…' : line;
+      }
+    }
+  }
+  return null;
 }
 
 function indexMessage(message: Message): string {
@@ -149,4 +225,23 @@ function blockText(block: Block): string {
     default:
       return JSON.stringify(block.raw);
   }
+}
+
+function SearchIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      className={className}
+      aria-hidden
+    >
+      <circle cx="11" cy="11" r="6.2" />
+      <path d="M20 20l-4.3-4.3" />
+    </svg>
+  );
 }
