@@ -43,7 +43,6 @@ export default function SessionDetailRoute() {
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
-  const lastScrolledSid = useRef<string | null>(null);
 
   useEffect(() => {
     setWindowSize(INITIAL_WINDOW);
@@ -57,19 +56,6 @@ export default function SessionDetailRoute() {
       ),
     enabled: !!pid && !!sid,
   });
-
-  // Double-rAF so the (taller) masthead has flushed layout before we measure.
-  useEffect(() => {
-    if (!data) return;
-    if (lastScrolledSid.current === sid) return;
-    lastScrolledSid.current = sid;
-    if (deferredQuery) return;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'auto' });
-      });
-    });
-  }, [sid, data, deferredQuery]);
 
   const projectsQuery = useQuery({
     queryKey: queryKeys.projects(),
@@ -147,7 +133,7 @@ export default function SessionDetailRoute() {
       />
 
       {data && (
-        <div className="mt-4">
+        <div className="surface-card mt-4 p-6">
           <SessionMasthead
             sid={sid}
             title={sessionTitle}
@@ -281,7 +267,7 @@ function SessionMasthead({
 
   return (
     <header className="relative">
-      <div className="flex items-center justify-between gap-4 border-y border-[var(--color-hairline-strong)] py-2">
+      <div className="flex items-center justify-between gap-4 border-b border-[var(--color-hairline)] pb-3">
         <div className="flex min-w-0 items-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-fg-muted)]">
           <span className="text-[var(--color-accent)]">●</span>
           <span>§ SESSION</span>
@@ -301,7 +287,7 @@ function SessionMasthead({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-x-10 gap-y-6 pt-8 pb-2 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-x-10 gap-y-6 pt-5 pb-2 lg:grid-cols-12">
         <div className="lg:col-span-8">
           <TitleSlot
             title={title ?? sid.slice(0, 12) + '…'}
@@ -486,7 +472,7 @@ function FilterLedger({
 }) {
   const t = useT();
   return (
-    <div className="sticky top-0 z-30 -mx-5 sm:-mx-8 lg:-mx-12 mt-6 border-y border-[var(--color-hairline-strong)] bg-[var(--color-canvas)]/85 px-5 sm:px-8 lg:px-12 py-2.5 backdrop-blur">
+    <div className="sticky top-2 z-30 mt-6 rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 sm:px-5 py-2.5 shadow-[var(--shadow-rise)]">
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex flex-1 min-w-[14rem] items-center gap-2 border-b border-[var(--color-hairline)] py-1 transition focus-within:border-[var(--color-accent)]">
           <SearchIcon className="text-[var(--color-fg-muted)]" />
