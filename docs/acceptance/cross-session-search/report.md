@@ -75,4 +75,12 @@
 ## Round 章节
 
 - **Round-1**：22 项一次通过（含修复期间 4 个真问题，全部当轮修复 + 重跑）。证据完整。
-- **Round-2**：未触发。
+- **Round-2**：用户反馈"没有可见入口"——补加桌面 sidebar 触发条 + 移动 topbar 图标按钮。新增 3 项验收（#34 / #34.1 / #34.3），全部通过；同时回归原 22 项。证据：[`round-2/verdict.json`](round-2/verdict.json) + [`round-2/screenshots/`](round-2/screenshots/)（新增 `34-sidebar-entry.png` / `34-mobile-topbar.png`）。
+
+### Round-2 新增项
+
+| # | 项 | 实测 |
+|---|---|---|
+| 34 | 桌面 sidebar 触发条点击 → modal 唤起 + input focus | ✅ `triggers=1 inputFocused=true` |
+| 34.1 | 触发条显示平台快捷键 hint | ✅ `kbd="⌘K"` |
+| 34.3 | 移动 topbar 搜索图标按钮 → modal 唤起 | ✅ |

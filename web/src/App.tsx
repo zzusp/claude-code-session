@@ -13,12 +13,13 @@ const DiskUsage = lazy(() => import('./routes/DiskUsage.tsx'));
 export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const toggleSearch = useCallback(() => setSearchOpen((v) => !v), []);
+  const openSearch = useCallback(() => setSearchOpen(true), []);
   const closeSearch = useCallback(() => setSearchOpen(false), []);
   useGlobalHotkey('mod+k', toggleSearch);
 
   return (
     <div className="flex min-h-dvh">
-      <Sidebar />
+      <Sidebar onSearchOpen={openSearch} />
       <main className="flex-1 min-w-0">
         <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 lg:px-12">
           <Routes>

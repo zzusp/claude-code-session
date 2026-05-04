@@ -16,7 +16,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROUND_DIR = path.resolve(__dirname, '../round-1');
+const ROUND = process.env.ROUND || 'round-1';
+const ROUND_DIR = path.resolve(__dirname, '..', ROUND);
 const SHOTS_DIR = path.join(ROUND_DIR, 'screenshots');
 const BASE = 'http://127.0.0.1:3131';
 const ROBUST_QUERY = 'claude-paths'; // known to hit > 5 in one session
@@ -54,6 +55,7 @@ async function main() {
   });
 
   await runAll(page);
+  await runEntryPoint(page);
 
   await browser.close();
 
@@ -362,6 +364,63 @@ async function runAll(page) {
   } else {
     record(28, 'meta-focus auto-shows showMeta', 'warn', 'no meta message present in the first few sessions');
   }
+}
+
+async function runEntryPoint(page) {
+  // ── 34: visible search entry in sidebar opens the modal
+  await page.goto(BASE);
+  await page.waitForSelector('aside button[aria-label]', { state: 'visible' });
+  // The desktop trigger is the surface-sunk button containing a <kbd>.
+  const trigger = page.locator('aside button:has(kbd)').first();
+  const triggerCount = await trigger.count();
+  if (triggerCount === 0) {
+    record(34, 'sidebar entry exists', 'fail', 'no aside button with <kbd> found');
+    return;
+  }
+  await shot(page, '34-sidebar-entry');
+  await trigger.click();
+  const modal = page.locator('[role="dialog"][aria-modal="true"]');
+  await modal.waitFor({ state: 'visible', timeout: 2000 });
+  const inputFocused = await page
+    .waitForFunction(() => document.activeElement?.tagName === 'INPUT', null, { timeout: 1500 })
+    .then(() => true)
+    .catch(() => false);
+  record(34, 'sidebar entry opens modal + input focused',
+    inputFocused ? 'pass' : 'fail',
+    `triggers=${triggerCount} inputFocused=${inputFocused}`);
+  // Ensure kbd shows the platform hint
+  const kbdText = await page.locator('aside button:has(kbd) kbd').first().innerText();
+  record(34.1, 'sidebar trigger shows ⌘K / Ctrl+K hint',
+    /⌘K|Ctrl\+K/.test(kbdText) ? 'pass' : 'fail', `kbd="${kbdText}"`);
+  await page.keyboard.press('Escape');
+
+  // ── 34.2: mobile topbar search icon (lg:hidden becomes visible at narrow widths)
+  await page.setViewportSize({ width: 600, height: 900 });
+  await page.waitForTimeout(150);
+  const mobileTrigger = page.locator('div.topbar-glass button[aria-label]').first();
+  // The first aria-label button in the topbar should be the search trigger
+  // (we put it before the hamburger).
+  const ariaLabels = await page.locator('div.topbar-glass button[aria-label]').all();
+  let mobileSearchFound = false;
+  for (const btn of ariaLabels) {
+    const label = await btn.getAttribute('aria-label');
+    if (label && (label.includes('Search') || label.includes('搜索'))) {
+      mobileSearchFound = true;
+      await btn.click();
+      break;
+    }
+  }
+  if (mobileSearchFound) {
+    await modal.waitFor({ state: 'visible', timeout: 2000 });
+    record(34.3, 'mobile topbar search icon opens modal', 'pass');
+    await page.keyboard.press('Escape');
+  } else {
+    record(34.3, 'mobile topbar search icon opens modal', 'fail',
+      `topbar buttons aria-labels: ${(await Promise.all(ariaLabels.map((b) => b.getAttribute('aria-label')))).join(', ')}`);
+  }
+  await shot(page, '34-mobile-topbar');
+  // Restore viewport
+  await page.setViewportSize({ width: 1400, height: 900 });
 }
 
 async function pressMod(page, key) {
