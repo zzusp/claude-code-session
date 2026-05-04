@@ -81,13 +81,13 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
                 onSearchOpen();
               }}
               aria-label={t('search.action.open')}
-              className="surface-sunk flex w-full items-center gap-2.5 px-3 py-2 text-left transition hover:border-[var(--color-hairline-strong)]"
+              className="surface-card is-interactive flex w-full items-center gap-2.5 px-3 py-2 text-left"
             >
               <SearchIcon className="text-[var(--color-fg-muted)]" />
               <span className="flex-1 truncate text-[13px] text-[var(--color-fg-muted)]">
                 {t('search.action.open')}
               </span>
-              <kbd className="rounded border border-[var(--color-hairline)] bg-[var(--color-surface)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--color-fg-faint)]">
+              <kbd className="rounded border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--color-fg-faint)]">
                 {HOTKEY_HINT}
               </kbd>
             </button>

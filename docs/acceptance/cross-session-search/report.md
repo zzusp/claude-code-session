@@ -76,6 +76,7 @@
 
 - **Round-1**：22 项一次通过（含修复期间 4 个真问题，全部当轮修复 + 重跑）。证据完整。
 - **Round-2**：用户反馈"没有可见入口"——补加桌面 sidebar 触发条 + 移动 topbar 图标按钮。新增 3 项验收（#34 / #34.1 / #34.3），全部通过；同时回归原 22 项。证据：[`round-2/verdict.json`](round-2/verdict.json) + [`round-2/screenshots/`](round-2/screenshots/)（新增 `34-sidebar-entry.png` / `34-mobile-topbar.png`）。
+- **Round-3**：用户反馈触发条颜色不显眼——根因是 `surface-sunk`（`--color-sunken` 背景）和侧栏 aside 的 `bg-[var(--color-sunken)]` 同色，仅靠 1px hairline 区隔。改为 `surface-card is-interactive`（`--color-surface` 白卡 + 抬升阴影 + hover 上移），并把内嵌 `<kbd>` 背景反转为 `--color-sunken` 以维持对比。回归 e2e 25/25 通过。证据：[`round-3/`](round-3/)。
 
 ### Round-2 新增项
 
