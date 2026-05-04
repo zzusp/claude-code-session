@@ -80,9 +80,23 @@ export default function SearchModal({
       setActiveIndex(0);
       return;
     }
-    const id = window.setTimeout(() => inputRef.current?.focus(), 30);
-    return () => window.clearTimeout(id);
-  }, [open]);
+    // Focus input on open. requestAnimationFrame ensures the dialog is in the DOM.
+    let raf = 0;
+    raf = requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+    function onWindowKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    }
+    window.addEventListener('keydown', onWindowKey);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('keydown', onWindowKey);
+    };
+  }, [open, onClose]);
 
   const runSearch = useCallback((q: string) => {
     controllerRef.current?.abort();
@@ -130,11 +144,7 @@ export default function SearchModal({
   );
 
   function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onClose();
-      return;
-    }
+    // Escape is handled at window level (works regardless of focus).
     if (flatItems.length === 0) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -187,6 +197,7 @@ export default function SearchModal({
           <input
             ref={inputRef}
             type="search"
+            autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('search.placeholder')}

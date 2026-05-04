@@ -130,8 +130,9 @@ export default function SessionDetailRoute() {
       );
       if (!el) return;
       el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      el.classList.add('flash-focus');
-      window.setTimeout(() => el.classList.remove('flash-focus'), 1300);
+      const flashTarget = el.closest('li') ?? el;
+      flashTarget.classList.add('flash-focus');
+      window.setTimeout(() => flashTarget.classList.remove('flash-focus'), 1300);
     });
     return () => cancelAnimationFrame(rafId);
   }, [urlFocus, renderList, data, sid]);
