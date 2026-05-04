@@ -15,7 +15,7 @@ export function ToolUseBlock({
   const [open, setOpen] = useState(false);
   const inputJson = JSON.stringify(block.input, null, 2);
   return (
-    <div className="overflow-hidden rounded-md border border-[var(--color-hairline)] bg-[var(--color-sunken)] text-sm">
+    <div className="overflow-hidden rounded-xl border border-[var(--color-hairline)] bg-[var(--color-sunken)] text-sm">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -52,7 +52,7 @@ export function ToolResultBlock({
     : 'border-[var(--color-hairline)] bg-[var(--color-sunken)] text-[var(--color-fg-primary)]';
 
   return (
-    <div className={`overflow-hidden rounded-md border text-sm ${tone}`}>
+    <div className={`overflow-hidden rounded-xl border text-sm ${tone}`}>
       <div className="flex items-center justify-between gap-2 px-3 py-2">
         <span className="flex items-center gap-2 font-mono text-[11.5px] font-medium uppercase tracking-[0.06em]">
           <Glyph kind={block.isError ? 'error' : 'result'} />
@@ -86,7 +86,7 @@ export function ThinkingBlock({
   const [open, setOpen] = useState(false);
   const hasText = block.text.trim() !== '';
   return (
-    <div className="overflow-hidden rounded-md border border-dashed border-[var(--color-hairline-strong)] bg-[var(--color-sunken)] text-sm text-[var(--color-fg-secondary)]">
+    <div className="overflow-hidden rounded-xl border border-[var(--color-hairline-strong)] bg-[var(--color-sunken)] text-sm text-[var(--color-fg-secondary)]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -99,11 +99,11 @@ export function ThinkingBlock({
       </button>
       {open && (
         hasText ? (
-          <div className="whitespace-pre-wrap break-words border-t border-dashed border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] leading-relaxed text-[var(--color-fg-secondary)]">
+          <div className="whitespace-pre-wrap break-words border-t border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] leading-relaxed text-[var(--color-fg-secondary)]">
             <HighlightedText text={block.text} query={query} />
           </div>
         ) : (
-          <p className="border-t border-dashed border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-2 text-[12px] italic text-[var(--color-fg-muted)]">
+          <p className="border-t border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-2 text-[12px] italic text-[var(--color-fg-muted)]">
             {t('tool.thinkingEncrypted')}
           </p>
         )

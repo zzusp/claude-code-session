@@ -395,9 +395,7 @@ function Card({
   className?: string;
 }) {
   return (
-    <section
-      className={`rounded-[14px] border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5 ${className}`}
-    >
+    <section className={`surface-card p-5 ${className}`}>
       <header className="mb-4 flex items-baseline justify-between gap-3">
         <h3 className="font-display text-lg font-light tracking-tight text-[var(--color-fg-primary)]">
           {title}

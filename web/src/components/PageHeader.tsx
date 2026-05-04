@@ -140,7 +140,7 @@ function TitleSlot({
         onClick={startEdit}
         aria-label="Rename"
         title="Rename"
-        className="flex-shrink-0 rounded-md p-1.5 text-[var(--color-fg-muted)] opacity-0 transition hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)] focus:opacity-100 group-hover:opacity-100"
+        className="flex-shrink-0 rounded-xl p-1.5 text-[var(--color-fg-muted)] opacity-0 transition hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)] focus:opacity-100 group-hover:opacity-100"
       >
         <PencilIcon />
       </button>

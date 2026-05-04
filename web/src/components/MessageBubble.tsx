@@ -179,7 +179,7 @@ function Blocks({ blocks, query }: { blocks: Block[]; query: string }) {
             return (
               <div
                 key={i}
-                className="rounded-md border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-3 py-2 font-mono text-[11px] text-[var(--color-fg-muted)]"
+                className="rounded-xl border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-3 py-2 font-mono text-[11px] text-[var(--color-fg-muted)]"
               >
                 {t('tool.image')}{block.mediaType ? ` · ${block.mediaType}` : ''}
               </div>
@@ -188,7 +188,7 @@ function Blocks({ blocks, query }: { blocks: Block[]; query: string }) {
             return (
               <pre
                 key={i}
-                className="overflow-x-auto rounded-md border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-3 py-2 font-mono text-xs text-[var(--color-fg-secondary)]"
+                className="overflow-x-auto rounded-xl border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-3 py-2 font-mono text-xs text-[var(--color-fg-secondary)]"
               >
                 {JSON.stringify(block.raw, null, 2)}
               </pre>

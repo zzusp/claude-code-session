@@ -28,13 +28,13 @@ export default function Sidebar() {
 
   return (
     <>
-      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-[var(--color-hairline)] bg-[var(--color-canvas)]/85 px-4 py-3 backdrop-blur lg:hidden">
+      <div className="topbar-glass sticky top-0 z-40 flex items-center justify-between border-b border-[var(--color-hairline)] px-4 py-3 lg:hidden">
         <Brand />
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-label={t('nav.toggleNav')}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[var(--color-hairline)] text-[var(--color-fg-secondary)] hover:border-[var(--color-hairline-strong)]"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--color-hairline)] text-[var(--color-fg-secondary)] hover:border-[var(--color-hairline-strong)]"
         >
           <MenuIcon open={open} />
         </button>
@@ -51,17 +51,17 @@ export default function Sidebar() {
 
       <aside
         className={
-          'fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] transition-transform duration-300 lg:sticky lg:top-0 lg:h-dvh lg:translate-x-0 ' +
+          'fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-sunken)] transition-transform duration-300 lg:sticky lg:top-0 lg:h-dvh lg:translate-x-0 ' +
           (open ? 'translate-x-0' : '-translate-x-full')
         }
       >
-        <div className="flex h-16 items-center border-b border-[var(--color-hairline)] px-5">
+        <div className="flex h-[68px] items-center px-5">
           <Brand />
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-5">
+        <nav className="flex-1 overflow-y-auto px-4 py-3">
           <p className="eyebrow px-2 pb-2">{t('nav.workspace')}</p>
-          <ul className="space-y-0.5">
+          <ul className="space-y-1">
             {NAV.map((item) => (
               <li key={item.to}>
                 <NavLink
@@ -69,22 +69,22 @@ export default function Sidebar() {
                   end={item.end}
                   onClick={() => setOpen(false)}
                   className={({ isActive }) =>
-                    'group relative flex items-center gap-3 rounded-md px-2 py-2 text-sm transition ' +
+                    'group flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition ' +
                     (isActive
-                      ? 'bg-[var(--color-sunken)] text-[var(--color-fg-primary)]'
-                      : 'text-[var(--color-fg-secondary)] hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)]')
+                      ? 'border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-fg-primary)] shadow-[var(--shadow-rise)]'
+                      : 'border-transparent text-[var(--color-fg-secondary)] hover:bg-[color-mix(in_oklch,var(--color-surface)_60%,transparent)] hover:text-[var(--color-fg-primary)]')
                   }
                 >
                   {({ isActive }) => (
                     <>
                       <span
-                        aria-hidden
                         className={
-                          'absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-r-sm bg-[var(--color-accent)] transition-transform duration-200 origin-top ' +
-                          (isActive ? 'scale-y-100' : 'scale-y-0 group-hover:scale-y-100')
+                          'transition-colors ' +
+                          (isActive
+                            ? 'text-[var(--color-accent)]'
+                            : 'text-[var(--color-fg-muted)] group-hover:text-[var(--color-accent)]')
                         }
-                      />
-                      <span className="text-[var(--color-fg-muted)] group-hover:text-[var(--color-accent)]">
+                      >
                         {item.icon}
                       </span>
                       <span className="font-medium tracking-tight">{t(item.labelKey)}</span>
@@ -96,7 +96,7 @@ export default function Sidebar() {
           </ul>
         </nav>
 
-        <div className="space-y-3 border-t border-[var(--color-hairline)] px-5 py-4">
+        <div className="surface-card mx-4 mb-4 space-y-3 p-4">
           <div className="flex items-center justify-between">
             <span className="eyebrow">{t('nav.language')}</span>
             <LocaleToggle />
@@ -120,7 +120,7 @@ function Brand() {
     <div className="flex items-center gap-2.5">
       <span
         aria-hidden
-        className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] border border-[var(--color-hairline-strong)] bg-[var(--color-sunken)] text-[var(--color-accent)]"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-accent)] shadow-[var(--shadow-rise)]"
       >
         <Glyph />
       </span>
