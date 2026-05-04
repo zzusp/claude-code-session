@@ -242,6 +242,18 @@
     backdrop-filter: blur(14px) saturate(140%);
     -webkit-backdrop-filter: blur(14px) saturate(140%);
   }
+
+  /* One-shot focus flash for messages deep-linked from cross-session search. */
+  .flash-focus {
+    animation: flash-focus 1.2s cubic-bezier(0.16, 1, 0.3, 1) 1;
+    border-radius: var(--radius-control);
+  }
+}
+
+@keyframes flash-focus {
+  0%   { background-color: var(--color-accent-soft); }
+  60%  { background-color: color-mix(in oklch, var(--color-accent-soft) 60%, transparent); }
+  100% { background-color: transparent; }
 }
 
 @keyframes pulse-amber {
