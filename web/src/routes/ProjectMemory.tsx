@@ -135,6 +135,7 @@ export default function ProjectMemoryRoute() {
   const cwd = project?.decodedCwd ?? id;
   const parts = cwd.split(/[\\/]+/).filter(Boolean);
   const tail = parts.at(-1) ?? cwd;
+  const head = parts.slice(0, -1).join('/');
   const totalEntries = entries.length;
   const indexAvailable = !!data?.index;
   const hasContent = totalEntries > 0 || indexAvailable;
@@ -149,9 +150,17 @@ export default function ProjectMemoryRoute() {
         ]}
       />
 
-      <div className="mt-4">
+      <div className="surface-card mt-6 p-6">
         <PageHeader
-          eyebrow={t('memory.action.open')}
+          eyebrow={
+            <span className="inline-flex items-center gap-2">
+              {head ? (
+                <span className="font-mono normal-case tracking-normal">{head}/</span>
+              ) : (
+                t('memory.action.open')
+              )}
+            </span>
+          }
           title={t('memory.title')}
           meta={
             data ? <MetaItem label={t('memory.meta.entries')} value={totalEntries} /> : null
@@ -160,18 +169,18 @@ export default function ProjectMemoryRoute() {
       </div>
 
       {memoryQuery.isLoading && (
-        <p className="mt-10 font-mono text-xs uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
+        <p className="mt-6 font-mono text-xs uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
           {t('memory.loading')}
         </p>
       )}
       {memoryQuery.error && (
-        <p className="mt-10 rounded-md border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-danger)]">
+        <p className="mt-6 rounded-md border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-danger)]">
           {t('common.failedMemory')}: {(memoryQuery.error as Error).message}
         </p>
       )}
 
       {data && !hasContent && (
-        <p className="mt-10 text-sm text-[var(--color-fg-muted)]">{t('memory.empty')}</p>
+        <p className="mt-6 text-sm text-[var(--color-fg-muted)]">{t('memory.empty')}</p>
       )}
 
       {data && hasContent && (
@@ -186,31 +195,35 @@ export default function ProjectMemoryRoute() {
             onSortMode={setSortMode}
           />
 
-          <div className="mt-6 md:grid md:gap-8 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+          <div className="mt-6 md:grid md:gap-6 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
             <aside className={(selectedKey !== null ? 'hidden ' : '') + 'md:block'}>
-              <EntryList
-                indexAvailable={indexAvailable}
-                visibleEntries={visibleEntries}
-                totalEntries={totalEntries}
-                selectedKey={effectiveKey}
-                hookByFilename={hookByFilename}
-                onSelect={setSelected}
-              />
+              <div className="surface-card p-6">
+                <EntryList
+                  indexAvailable={indexAvailable}
+                  visibleEntries={visibleEntries}
+                  totalEntries={totalEntries}
+                  selectedKey={effectiveKey}
+                  hookByFilename={hookByFilename}
+                  onSelect={setSelected}
+                />
+              </div>
             </aside>
 
             <main className={(selectedKey === null ? 'hidden ' : '') + 'md:block'}>
-              <ReaderPane
-                isIndex={isIndexSelected}
-                entry={selectedEntry}
-                indexLines={indexLines}
-                indexAvailable={indexAvailable}
-                knownFilenames={knownFilenames}
-                hookForSelected={
-                  selectedEntry ? hookByFilename.get(selectedEntry.filename) ?? null : null
-                }
-                onSelect={setSelected}
-                onBack={() => setSelected(null)}
-              />
+              <div className="surface-card p-6">
+                <ReaderPane
+                  isIndex={isIndexSelected}
+                  entry={selectedEntry}
+                  indexLines={indexLines}
+                  indexAvailable={indexAvailable}
+                  knownFilenames={knownFilenames}
+                  hookForSelected={
+                    selectedEntry ? hookByFilename.get(selectedEntry.filename) ?? null : null
+                  }
+                  onSelect={setSelected}
+                  onBack={() => setSelected(null)}
+                />
+              </div>
             </main>
           </div>
         </>
@@ -248,41 +261,43 @@ function Toolbar({
   const pills = allPills.filter((p) => p.key === 'all' || counts[p.key] > 0);
 
   return (
-    <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3">
-      <div className="flex flex-1 min-w-[14rem] items-center gap-2 border-b border-[var(--color-hairline)] py-1 transition focus-within:border-[var(--color-accent)]">
-        <SearchIcon className="text-[var(--color-fg-muted)]" />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => onQuery(e.target.value)}
-          placeholder={t('memory.search.placeholder')}
-          className="w-full bg-transparent text-sm text-[var(--color-fg-primary)] placeholder:text-[var(--color-fg-faint)] focus:outline-none"
-        />
-      </div>
+    <div className="sticky top-2 z-30 mt-6 rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 sm:px-5 py-2.5 shadow-[var(--shadow-rise)]">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+        <div className="flex flex-1 min-w-[14rem] items-center gap-2 border-b border-[var(--color-hairline)] py-1 transition focus-within:border-[var(--color-accent)]">
+          <SearchIcon className="text-[var(--color-fg-muted)]" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => onQuery(e.target.value)}
+            placeholder={t('memory.search.placeholder')}
+            className="w-full bg-transparent text-sm text-[var(--color-fg-primary)] placeholder:text-[var(--color-fg-faint)] focus:outline-none"
+          />
+        </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        {pills.map((p) => {
-          const active = typeFilter === p.key;
-          return (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => onTypeFilter(p.key)}
-              className={
-                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] transition ' +
-                (active
-                  ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]'
-                  : 'border-[var(--color-hairline)] text-[var(--color-fg-secondary)] hover:border-[var(--color-hairline-strong)]')
-              }
-            >
-              <span>{p.label}</span>
-              <span className="font-mono text-[10px] tabular-nums opacity-70">{counts[p.key]}</span>
-            </button>
-          );
-        })}
-      </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {pills.map((p) => {
+            const active = typeFilter === p.key;
+            return (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => onTypeFilter(p.key)}
+                className={
+                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] transition ' +
+                  (active
+                    ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]'
+                    : 'border-[var(--color-hairline)] text-[var(--color-fg-secondary)] hover:border-[var(--color-hairline-strong)]')
+                }
+              >
+                <span>{p.label}</span>
+                <span className="font-mono text-[10px] tabular-nums opacity-70">{counts[p.key]}</span>
+              </button>
+            );
+          })}
+        </div>
 
-      <SortMenu value={sortMode} onChange={onSortMode} />
+        <SortMenu value={sortMode} onChange={onSortMode} />
+      </div>
     </div>
   );
 }
@@ -307,13 +322,13 @@ function EntryList({
   const indexActive = selectedKey === PSEUDO_INDEX;
 
   return (
-    <div className="md:sticky md:top-6 md:max-h-[calc(100dvh-3rem)] md:overflow-y-auto md:pr-1">
+    <div>
       {indexAvailable && (
         <button
           type="button"
           onClick={() => onSelect(PSEUDO_INDEX)}
           data-active={indexActive ? 'true' : undefined}
-          className="ribbon-row -mx-3 block w-[calc(100%+1.5rem)] rounded-sm px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-sunken)] focus:bg-[var(--color-sunken)] focus:outline-none data-[active=true]:bg-[var(--color-sunken)]"
+          className="ribbon-row -mx-6 block w-[calc(100%+3rem)] px-6 py-2.5 text-left transition-colors hover:bg-[var(--color-sunken)] focus:bg-[var(--color-sunken)] focus:outline-none data-[active=true]:bg-[var(--color-sunken)]"
         >
           <div className="flex items-baseline justify-between gap-3">
             <span className="font-display text-[14px] font-medium tracking-tight text-[var(--color-fg-primary)]">
@@ -353,7 +368,7 @@ function EntryList({
                   type="button"
                   onClick={() => onSelect(e.filename)}
                   data-active={active ? 'true' : undefined}
-                  className="ribbon-row -mx-3 block w-[calc(100%+1.5rem)] rounded-sm px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-sunken)] focus:bg-[var(--color-sunken)] focus:outline-none data-[active=true]:bg-[var(--color-sunken)]"
+                  className="ribbon-row -mx-6 block w-[calc(100%+3rem)] px-6 py-2.5 text-left transition-colors hover:bg-[var(--color-sunken)] focus:bg-[var(--color-sunken)] focus:outline-none data-[active=true]:bg-[var(--color-sunken)]"
                 >
                   <div className="flex items-baseline justify-between gap-3">
                     <span className="min-w-0 truncate font-display text-[14px] font-medium tracking-tight text-[var(--color-fg-primary)]">
@@ -483,7 +498,7 @@ function IndexBody({
               <button
                 type="button"
                 onClick={() => onSelect(link.href)}
-                className="-mx-2 block w-[calc(100%+1rem)] rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-[var(--color-sunken)] focus:bg-[var(--color-sunken)] focus:outline-none"
+                className="-mx-6 block w-[calc(100%+3rem)] px-6 py-1.5 text-left transition-colors hover:bg-[var(--color-sunken)] focus:bg-[var(--color-sunken)] focus:outline-none"
               >
                 <div className="text-[14px] font-medium text-[var(--color-fg-primary)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]">
                   {link.title}
@@ -528,7 +543,7 @@ function EntryBody({
         <p className="mt-3 text-[14px] text-[var(--color-fg-secondary)]">{entry.description}</p>
       )}
       {hookFromIndex && (
-        <div className="mt-5 rounded-md border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-3 py-2">
+        <div className="mt-5 rounded-md bg-[var(--color-sunken)] px-3 py-2">
           <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--color-fg-muted)]">
             {t('memory.reader.appearsAs')}
           </div>
@@ -538,7 +553,7 @@ function EntryBody({
         </div>
       )}
       <div className="rule-dotted mt-6" aria-hidden />
-      <pre className="mt-5 overflow-x-auto whitespace-pre-wrap break-words rounded-md border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-4 py-3 font-mono text-[12.5px] text-[var(--color-fg-primary)]">
+      <pre className="mt-5 overflow-x-auto whitespace-pre-wrap break-words rounded-md bg-[var(--color-sunken)] px-4 py-3 font-mono text-[12.5px] text-[var(--color-fg-primary)]">
         {entry.body.trim() || '—'}
       </pre>
     </div>
