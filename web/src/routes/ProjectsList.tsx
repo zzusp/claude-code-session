@@ -31,37 +31,23 @@ export default function ProjectsList() {
 
   return (
     <section>
-      <Masthead
-        title={t('projects.title')}
-        tagline={t('projects.tagline')}
-        stats={
-          list.length > 0
-            ? { totalBytes, totalSessions, projectCount: list.length, lastActive }
-            : null
-        }
-      />
+      <div className="surface-card p-6">
+        <Masthead
+          title={t('projects.title')}
+          tagline={t('projects.tagline')}
+          stats={
+            list.length > 0
+              ? { totalBytes, totalSessions, projectCount: list.length, lastActive }
+              : null
+          }
+        />
+      </div>
 
       {health.data && !health.data.claudeRootExists && (
         <Admonition tone="warn" className="mt-6">
           {t('projects.warn.rootMissing', { root: health.data.claudeRoot })}
         </Admonition>
       )}
-
-      <div className="mt-10 flex items-baseline justify-between gap-4">
-        <h2 className="font-display text-[26px] font-light leading-none tracking-[-0.012em] text-[var(--color-fg-primary)]">
-          {t('projects.indexHeading')}
-          <span className="ml-2 align-[0.18em] font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-fg-faint)]">
-            §
-          </span>
-        </h2>
-        <div className="flex flex-1 items-center gap-3 px-4">
-          <span className="rule-dotted h-px flex-1" aria-hidden />
-        </div>
-        <span className="font-mono text-[11px] uppercase tracking-[0.2em] tabular-nums text-[var(--color-fg-muted)]">
-          {String(list.length).padStart(2, '0')}{' '}
-          {list.length === 1 ? t('common.entry') : t('common.entries')}
-        </span>
-      </div>
 
       {projects.isLoading && (
         <p className="mt-10 font-mono text-xs uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
@@ -77,7 +63,21 @@ export default function ProjectsList() {
         <p className="mt-10 text-sm text-[var(--color-fg-muted)]">{t('common.noProjects')}</p>
       )}
 
-      {list.length > 0 && <Ledger projects={list} />}
+      {list.length > 0 && (
+        <div className="surface-card mt-6 p-6">
+          <div className="flex items-baseline justify-between">
+            <h2 className="font-display text-xl font-light tracking-tight text-[var(--color-fg-primary)]">
+              {t('projects.indexHeading')}
+            </h2>
+            <span className="font-mono text-[11px] uppercase tracking-[0.16em] tabular-nums text-[var(--color-fg-muted)]">
+              {String(list.length).padStart(2, '0')}{' '}
+              {list.length === 1 ? t('common.entry') : t('common.entries')}
+            </span>
+          </div>
+          <div className="rule-dotted mt-3" aria-hidden />
+          <Ledger projects={list} />
+        </div>
+      )}
     </section>
   );
 }
@@ -134,11 +134,11 @@ function Ledger({ projects }: { projects: ProjectSummary[] }) {
       initial="hidden"
       animate="show"
       variants={staggerParent}
-      className="mt-8 border-t border-[var(--color-hairline-strong)]"
+      className="mt-4"
     >
       <li
         aria-hidden
-        className="grid grid-cols-[2.5rem_minmax(0,1fr)_5rem_5.5rem_5rem_1.5rem] items-center gap-x-4 border-b border-[var(--color-hairline)] py-2 sm:grid-cols-[3rem_minmax(0,1fr)_6rem_6rem_6rem_2rem]"
+        className="grid grid-cols-[2.5rem_minmax(0,1fr)_5rem_5.5rem_5rem_1.5rem] items-center gap-x-4 border-b border-[var(--color-hairline)] py-3 sm:grid-cols-[3rem_minmax(0,1fr)_6rem_6rem_6rem_2rem]"
       >
         <span className="eyebrow text-right">№</span>
         <span className="eyebrow">{t('projects.card.eyebrow')}</span>
@@ -167,7 +167,7 @@ function LedgerRow({ project, index }: { project: ProjectSummary; index: number 
   return (
     <Link
       to={`/projects/${encodeURIComponent(project.id)}`}
-      className="ribbon-row group relative grid grid-cols-[2.5rem_minmax(0,1fr)_5rem_5.5rem_5rem_1.5rem] items-center gap-x-4 border-b border-[var(--color-hairline)] py-4 pl-3 transition-colors hover:bg-[var(--color-sunken)] sm:grid-cols-[3rem_minmax(0,1fr)_6rem_6rem_6rem_2rem]"
+      className="ribbon-row group relative grid grid-cols-[2.5rem_minmax(0,1fr)_5rem_5.5rem_5rem_1.5rem] items-center gap-x-4 border-b border-[var(--color-hairline)] py-3 pl-3 transition-colors hover:bg-[var(--color-sunken)] sm:grid-cols-[3rem_minmax(0,1fr)_6rem_6rem_6rem_2rem]"
     >
       <span className="text-right font-mono text-[11px] uppercase tracking-[0.16em] tabular-nums text-[var(--color-fg-faint)] group-hover:text-[var(--color-accent)]">
         {String(index + 1).padStart(2, '0')}
@@ -188,13 +188,13 @@ function LedgerRow({ project, index }: { project: ProjectSummary; index: number 
         </div>
       </div>
 
-      <span className="text-right font-mono text-[18px] font-light leading-none tabular-nums text-[var(--color-fg-primary)]">
-        {project.sessionCount}
+      <span className="text-right font-mono text-sm tabular-nums text-[var(--color-fg-primary)]">
+        {project.sessionCount.toLocaleString()}
       </span>
-      <span className="text-right font-mono text-[18px] font-light leading-none tabular-nums text-[var(--color-fg-secondary)]">
+      <span className="text-right font-mono text-sm tabular-nums text-[var(--color-fg-secondary)]">
         {formatBytes(project.totalBytes)}
       </span>
-      <span className="text-right font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
+      <span className="text-right font-mono text-[12.5px] tabular-nums text-[var(--color-fg-secondary)]">
         {formatRelativeTime(project.lastActiveAt)}
       </span>
 
