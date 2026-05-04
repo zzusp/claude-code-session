@@ -1,6 +1,8 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useCallback, useState } from 'react';
 import { Route, Routes } from 'react-router-dom';
+import SearchModal from './components/SearchModal.tsx';
 import Sidebar from './components/Sidebar.tsx';
+import { useGlobalHotkey } from './lib/hotkeys.ts';
 import ProjectDetail from './routes/ProjectDetail.tsx';
 import ProjectMemory from './routes/ProjectMemory.tsx';
 import ProjectsList from './routes/ProjectsList.tsx';
@@ -9,6 +11,11 @@ import SessionDetail from './routes/SessionDetail.tsx';
 const DiskUsage = lazy(() => import('./routes/DiskUsage.tsx'));
 
 export default function App() {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const toggleSearch = useCallback(() => setSearchOpen((v) => !v), []);
+  const closeSearch = useCallback(() => setSearchOpen(false), []);
+  useGlobalHotkey('mod+k', toggleSearch);
+
   return (
     <div className="flex min-h-dvh">
       <Sidebar />
@@ -33,6 +40,7 @@ export default function App() {
           </Routes>
         </div>
       </main>
+      <SearchModal open={searchOpen} onClose={closeSearch} />
     </div>
   );
 }

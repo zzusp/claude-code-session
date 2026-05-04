@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs.tsx';
 import MessageBubble from '../components/MessageBubble.tsx';
 import {
@@ -35,14 +35,19 @@ const LOAD_STEP = 50;
 export default function SessionDetailRoute() {
   const t = useT();
   const { projectId, sessionId } = useParams<{ projectId: string; sessionId: string }>();
+  const [searchParams] = useSearchParams();
   const pid = projectId ?? '';
   const sid = sessionId ?? '';
+  const urlFocus = searchParams.get('focus');
+  const urlQuery = searchParams.get('q');
 
   const [showMeta, setShowMeta] = useState(false);
   const [onlyUser, setOnlyUser] = useState(false);
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
+  const urlAppliedRef = useRef<string | null>(null);
+  const flashedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     setWindowSize(INITIAL_WINDOW);
@@ -92,6 +97,44 @@ export default function SessionDetailRoute() {
   }, [visibleMessages, skipWindowing, windowSize]);
 
   const hasMoreEarlier = !skipWindowing && renderList.length < visibleMessages.length;
+
+  useEffect(() => {
+    if (!data) return;
+    const key = `${sid}|${urlFocus ?? ''}|${urlQuery ?? ''}`;
+    if (urlAppliedRef.current === key) return;
+    urlAppliedRef.current = key;
+    if (urlQuery) setQuery(urlQuery);
+    if (urlFocus) {
+      const target = data.messages.find((m) => m.uuid === urlFocus);
+      if (target?.isMeta) setShowMeta(true);
+    }
+  }, [data, sid, urlFocus, urlQuery]);
+
+  useEffect(() => {
+    if (!urlFocus || !data || skipWindowing) return;
+    const idx = visibleMessages.findIndex((m) => m.message.uuid === urlFocus);
+    if (idx === -1) return;
+    const needed = visibleMessages.length - idx;
+    if (needed > windowSize) setWindowSize(needed);
+  }, [urlFocus, visibleMessages, windowSize, skipWindowing, data]);
+
+  useEffect(() => {
+    if (!urlFocus || !data) return;
+    const key = `${sid}|${urlFocus}`;
+    if (flashedKeyRef.current === key) return;
+    if (!renderList.some((m) => m.message.uuid === urlFocus)) return;
+    flashedKeyRef.current = key;
+    const rafId = requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(
+        `[data-uuid="${CSS.escape(urlFocus)}"]`,
+      );
+      if (!el) return;
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.classList.add('flash-focus');
+      window.setTimeout(() => el.classList.remove('flash-focus'), 1300);
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [urlFocus, renderList, data, sid]);
 
   const projectTail = useMemo(() => {
     const cwd = project?.decodedCwd;

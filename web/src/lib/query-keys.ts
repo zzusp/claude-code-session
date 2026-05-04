@@ -6,4 +6,5 @@ export const queryKeys = {
   session: (projectId: string, sessionId: string) =>
     ['session', projectId, sessionId] as const,
   diskUsage: () => ['disk-usage'] as const,
+  search: (query: string) => ['search', query] as const,
 };

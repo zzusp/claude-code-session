@@ -148,3 +148,38 @@ export interface HealthResponse {
   node: string;
   pid: number;
 }
+
+export type SearchBlockKind = 'text' | 'tool_use' | 'tool_result' | 'thinking';
+
+export interface SearchSnippet {
+  uuid: string;
+  ts: string | null;
+  role: 'user' | 'assistant';
+  blockKind: SearchBlockKind;
+  before: string;
+  match: string;
+  after: string;
+}
+
+export interface SearchSessionHit {
+  type: 'session';
+  projectId: string;
+  sessionId: string;
+  projectDecodedCwd: string;
+  title: string;
+  customTitle: string | null;
+  lastAt: string | null;
+  /** True if the per-session snippet cap was hit; UI shows "+more". */
+  hasMore: boolean;
+  snippets: SearchSnippet[];
+}
+
+export interface SearchDone {
+  type: 'done';
+  scanned: number;
+  matched: number;
+  durationMs: number;
+  truncated: boolean;
+}
+
+export type SearchEvent = SearchSessionHit | SearchDone;
