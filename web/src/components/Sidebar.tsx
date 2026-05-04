@@ -81,7 +81,7 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
                 onSearchOpen();
               }}
               aria-label={t('search.action.open')}
-              className="surface-card is-interactive flex w-full items-center gap-2.5 px-3 py-2 text-left"
+              className="surface-card is-interactive flex w-full items-center gap-2.5 px-3 py-3 text-left"
               style={{ borderRadius: '1rem' }}
             >
               <SearchIcon className="text-[var(--color-fg-muted)]" />
