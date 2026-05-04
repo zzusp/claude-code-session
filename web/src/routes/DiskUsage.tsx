@@ -278,7 +278,7 @@ export default function DiskUsageRoute() {
             </Card>
           </div>
 
-          <div className="mt-12">
+          <div className="surface-card mt-12 p-6">
             <div className="flex items-baseline justify-between">
               <h2 className="font-display text-xl font-light tracking-tight text-[var(--color-fg-primary)]">
                 {t('disk.heaviest.title')}
@@ -293,7 +293,7 @@ export default function DiskUsageRoute() {
             {data.topSessions.length === 0 ? (
               <Empty className="mt-6" />
             ) : (
-              <div className="mt-4 -mx-2 overflow-x-auto">
+              <div className="mt-4 -mx-6 overflow-x-auto px-6">
                 <table className="w-full table-fixed text-sm">
                   <colgroup>
                     <col className="w-10" />
