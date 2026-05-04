@@ -73,7 +73,7 @@ export default function ProjectDetail() {
         ]}
       />
 
-      <div className="mt-4">
+      <div className="surface-card mt-6 p-6">
         <PageHeader
           eyebrow={
             <span className="inline-flex items-center gap-2">
@@ -151,7 +151,7 @@ export default function ProjectDetail() {
       )}
 
       {sessions.length > 0 && (
-        <div className="mt-10">
+        <div className="surface-card mt-6 p-6">
           <div className="flex items-baseline justify-between">
             <h2 className="font-display text-xl font-light tracking-tight text-[var(--color-fg-primary)]">
               {t('project.heading')}
@@ -166,7 +166,7 @@ export default function ProjectDetail() {
           </div>
           <div className="rule-dotted mt-3" aria-hidden />
 
-          <div className="mt-4 -mx-2 overflow-x-auto">
+          <div className="mt-4 -mx-6 overflow-x-auto px-6">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left">
