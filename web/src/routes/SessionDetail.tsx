@@ -330,7 +330,7 @@ function SessionMasthead({
 }
 
 const MASTHEAD_TITLE_CLASS =
-  'font-display text-[clamp(2.4rem,6.5vw,4.6rem)] font-light leading-[0.98] tracking-[-0.028em] text-[var(--color-fg-primary)]';
+  'font-display text-[clamp(1.5rem,3vw,2rem)] font-light leading-[1.15] tracking-[-0.018em] text-[var(--color-fg-primary)]';
 
 function TitleSlot({
   title,
@@ -681,7 +681,7 @@ function ScrollToEdges() {
   if (!showTop && !showBottom) return null;
 
   const buttonClass =
-    'rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] p-2.5 text-[var(--color-fg-secondary)] shadow-[var(--shadow-rise)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]';
+    'rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] p-2.5 text-[var(--color-fg-secondary)] shadow-[var(--shadow-pop)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent)]';
 
   return (
     <div className="fixed bottom-6 right-6 z-30 flex flex-col gap-2">

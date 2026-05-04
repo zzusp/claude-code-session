@@ -26,7 +26,7 @@ export default function StatCard({ label, value, unit, trail, accent }: Props) {
       )}
       <div className="eyebrow">{label}</div>
       <div className="mt-3 flex items-baseline gap-1.5">
-        <span className="font-display text-4xl font-light leading-none tracking-[-0.02em] tabular-nums text-[var(--color-fg-primary)]">
+        <span className="font-mono text-4xl font-light leading-none tracking-[-0.02em] tabular-nums text-[var(--color-fg-primary)]">
           {value}
         </span>
         {unit && (

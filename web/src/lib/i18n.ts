@@ -47,7 +47,6 @@ const DICT = {
     'common.scrollToTop': 'Jump to top',
     'common.scrollToBottom': 'Jump to bottom',
 
-    'projects.eyebrow': 'Workspace',
     'projects.title': 'Projects',
     'projects.tagline':
       "Every directory you've touched with Claude Code, sorted by recency. Open one to inspect or prune its sessions.",
@@ -55,9 +54,6 @@ const DICT = {
     'projects.stat.projects': 'Projects',
     'projects.stat.sessions': 'Sessions',
     'projects.stat.onDisk': 'On disk',
-    'projects.stat.resolved': '{{n}} resolved on disk',
-    'projects.stat.acrossProjects': 'across all projects',
-    'projects.stat.lastTouch': 'last touch {{ago}}',
     'projects.card.eyebrow': 'project',
     'projects.card.sessions': 'Sessions',
     'projects.card.onDisk': 'On disk',
@@ -66,9 +62,7 @@ const DICT = {
       "Claude root {{root}} doesn't exist on this machine — nothing to display.",
 
     'project.eyebrow': 'Project',
-    'project.tagline.default': 'Session history captured for this working directory.',
-    'project.tagline.missing':
-      'This directory no longer exists on disk — sessions remain archived.',
+    'project.warn.missingDir': 'Directory missing on disk',
     'project.action.delete': 'Delete · {{n}}',
     'project.meta.sessions': 'Sessions',
     'project.meta.onDisk': 'On disk',
@@ -113,8 +107,6 @@ const DICT = {
 
     'disk.eyebrow': 'Forensics',
     'disk.title': 'Disk usage',
-    'disk.tagline':
-      'Where the bytes live: which projects swell, which months were busiest, which sessions are heaviest.',
     'disk.meta.total': 'Total',
     'disk.meta.projects': 'Projects',
     'disk.meta.sessions': 'Sessions',
@@ -137,8 +129,6 @@ const DICT = {
     'disk.col.size': 'Size',
 
     'memory.title': 'Memory',
-    'memory.tagline':
-      "What Claude has remembered for this project across sessions.",
     'memory.empty': 'No memory recorded yet for this project.',
     'memory.heading.index': 'Index (MEMORY.md)',
     'memory.heading.entries': 'Entries',
@@ -212,7 +202,6 @@ const DICT = {
     'common.scrollToTop': '回到顶部',
     'common.scrollToBottom': '回到底部',
 
-    'projects.eyebrow': '工作区',
     'projects.title': '项目',
     'projects.tagline':
       '所有曾用 Claude Code 的工作目录，按最近活跃度排序。点击进入查看或清理其会话。',
@@ -220,9 +209,6 @@ const DICT = {
     'projects.stat.projects': '项目数',
     'projects.stat.sessions': '会话数',
     'projects.stat.onDisk': '占用',
-    'projects.stat.resolved': '{{n}} 个目录仍存在',
-    'projects.stat.acrossProjects': '所有项目合计',
-    'projects.stat.lastTouch': '最近活动 {{ago}}',
     'projects.card.eyebrow': '项目',
     'projects.card.sessions': '会话',
     'projects.card.onDisk': '占用',
@@ -231,8 +217,7 @@ const DICT = {
       'Claude 根目录 {{root}} 在本机不存在 — 无可显示内容。',
 
     'project.eyebrow': '项目',
-    'project.tagline.default': '该工作目录下捕获的会话历史。',
-    'project.tagline.missing': '此目录已从磁盘删除 — 会话仍保留为归档。',
+    'project.warn.missingDir': '目录已从磁盘删除',
     'project.action.delete': '删除 · {{n}}',
     'project.meta.sessions': '会话',
     'project.meta.onDisk': '占用',
@@ -276,7 +261,6 @@ const DICT = {
 
     'disk.eyebrow': '取证',
     'disk.title': '磁盘占用',
-    'disk.tagline': '字节都在哪儿：哪些项目膨胀、哪些月份最忙、哪些会话最沉。',
     'disk.meta.total': '总计',
     'disk.meta.projects': '项目',
     'disk.meta.sessions': '会话',
@@ -299,7 +283,6 @@ const DICT = {
     'disk.col.size': '大小',
 
     'memory.title': '记忆',
-    'memory.tagline': 'Claude 在该项目中跨会话记住的内容。',
     'memory.empty': '该项目尚未沉淀任何记忆。',
     'memory.heading.index': '索引 (MEMORY.md)',
     'memory.heading.entries': '条目',

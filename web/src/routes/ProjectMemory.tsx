@@ -73,7 +73,6 @@ export default function ProjectMemoryRoute() {
         <PageHeader
           eyebrow={t('memory.action.open')}
           title={t('memory.title')}
-          tagline={t('memory.tagline')}
           meta={
             memoryQuery.data ? (
               <MetaItem label={t('memory.meta.entries')} value={totalEntries} />

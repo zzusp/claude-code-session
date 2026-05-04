@@ -13,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import PageHeader, { MetaItem } from '../components/PageHeader.tsx';
+import PageHeader, { MetaItem, Sep } from '../components/PageHeader.tsx';
 import StatCard from '../components/StatCard.tsx';
 import { api, type DiskUsage } from '../lib/api.ts';
 import { formatBytes, formatRelativeTime } from '../lib/format.ts';
@@ -98,12 +98,13 @@ export default function DiskUsageRoute() {
             <span className="text-[var(--color-accent)]">.</span>
           </>
         }
-        tagline={t('disk.tagline')}
         meta={
           data ? (
             <>
               <MetaItem label={t('disk.meta.total')} value={formatBytes(data.totalBytes)} />
+              <Sep />
               <MetaItem label={t('disk.meta.projects')} value={data.byProject.length} />
+              <Sep />
               <MetaItem label={t('disk.meta.sessions')} value={data.totalSessions.toLocaleString()} />
             </>
           ) : null
@@ -200,7 +201,7 @@ export default function DiskUsageRoute() {
                     </ResponsiveContainer>
                     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
                       <span className="eyebrow">{t('disk.composition.total')}</span>
-                      <span className="mt-1 font-display text-2xl font-light tabular-nums text-[var(--color-fg-primary)]">
+                      <span className="mt-1 font-mono text-2xl font-light tabular-nums text-[var(--color-fg-primary)]">
                         {formatBytes(data.totalBytes)}
                       </span>
                     </div>

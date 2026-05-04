@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs.tsx';
 import DeleteDialog from '../components/DeleteDialog.tsx';
-import PageHeader, { MetaItem } from '../components/PageHeader.tsx';
+import PageHeader, { MetaItem, Sep } from '../components/PageHeader.tsx';
 import StatusDot from '../components/StatusDot.tsx';
 import { api, type ProjectSummary, type SessionSummary } from '../lib/api.ts';
 import { formatBytes, formatRelativeTime } from '../lib/format.ts';
@@ -76,18 +76,21 @@ export default function ProjectDetail() {
       <div className="mt-4">
         <PageHeader
           eyebrow={
-            head ? (
-              <span className="font-mono normal-case tracking-normal">{head}/</span>
-            ) : (
-              t('project.eyebrow')
-            )
+            <span className="inline-flex items-center gap-2">
+              {head ? (
+                <span className="font-mono normal-case tracking-normal">{head}/</span>
+              ) : (
+                t('project.eyebrow')
+              )}
+              {project?.cwdResolved === false && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--color-danger)]">
+                  <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--color-danger)]" />
+                  {t('project.warn.missingDir')}
+                </span>
+              )}
+            </span>
           }
           title={<span className="font-mono">{tail}</span>}
-          tagline={
-            project?.cwdResolved === false
-              ? t('project.tagline.missing')
-              : t('project.tagline.default')
-          }
           actions={
             <>
               <Link
@@ -110,7 +113,9 @@ export default function ProjectDetail() {
             sessions.length > 0 ? (
               <>
                 <MetaItem label={t('project.meta.sessions')} value={sessions.length} />
+                <Sep />
                 <MetaItem label={t('project.meta.onDisk')} value={formatBytes(projectBytes)} />
+                <Sep />
                 <MetaItem
                   label={t('project.meta.live')}
                   value={
@@ -123,6 +128,7 @@ export default function ProjectDetail() {
                     )
                   }
                 />
+                <Sep />
                 <MetaItem label={t('project.meta.recent')} value={recentCount} />
               </>
             ) : null

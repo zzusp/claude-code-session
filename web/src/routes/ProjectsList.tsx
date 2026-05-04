@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
+import { MetaItem, Sep } from '../components/PageHeader.tsx';
 import { api, type HealthResponse, type ProjectSummary } from '../lib/api.ts';
 import { formatBytes, formatRelativeTime } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
@@ -22,7 +23,6 @@ export default function ProjectsList() {
   const list = projects.data ?? [];
   const totalBytes = list.reduce((acc, p) => acc + p.totalBytes, 0);
   const totalSessions = list.reduce((acc, p) => acc + p.sessionCount, 0);
-  const resolvedCount = list.filter((p) => p.cwdResolved).length;
   const lastActive = list
     .map((p) => p.lastActiveAt)
     .filter((x): x is string => !!x)
@@ -32,30 +32,22 @@ export default function ProjectsList() {
   return (
     <section>
       <Masthead
-        platform={health.data?.platform ?? null}
-        nodeVersion={health.data?.node ?? null}
         title={t('projects.title')}
-        eyebrow={t('projects.eyebrow')}
         tagline={t('projects.tagline')}
+        stats={
+          list.length > 0
+            ? { totalBytes, totalSessions, projectCount: list.length, lastActive }
+            : null
+        }
       />
 
       {health.data && !health.data.claudeRootExists && (
-        <Admonition tone="warn" className="mt-8">
+        <Admonition tone="warn" className="mt-6">
           {t('projects.warn.rootMissing', { root: health.data.claudeRoot })}
         </Admonition>
       )}
 
-      {list.length > 0 && (
-        <HeroFigures
-          totalBytes={totalBytes}
-          totalSessions={totalSessions}
-          projectCount={list.length}
-          resolvedCount={resolvedCount}
-          lastActive={lastActive}
-        />
-      )}
-
-      <div className="mt-16 flex items-baseline justify-between gap-4">
+      <div className="mt-10 flex items-baseline justify-between gap-4">
         <h2 className="font-display text-[26px] font-light leading-none tracking-[-0.012em] text-[var(--color-fg-primary)]">
           {t('projects.indexHeading')}
           <span className="ml-2 align-[0.18em] font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-fg-faint)]">
@@ -93,165 +85,43 @@ export default function ProjectsList() {
 /* ─────────────────────────────────────────────────────────────────── */
 
 function Masthead({
-  platform,
-  nodeVersion,
   title,
-  eyebrow,
   tagline,
+  stats,
 }: {
-  platform: string | null;
-  nodeVersion: string | null;
   title: string;
-  eyebrow: string;
   tagline: string;
-}) {
-  const today = new Date();
-  const dateline = today
-    .toLocaleDateString('en-GB', {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    })
-    .toUpperCase()
-    .replace(/,/g, ' ·');
-
-  const sigil =
-    platform && nodeVersion
-      ? `${platform.toUpperCase()} / ${nodeVersion}`
-      : platform
-        ? platform.toUpperCase()
-        : '—';
-
-  return (
-    <header className="relative">
-      <div className="flex items-center justify-between gap-4 border-y border-[var(--color-hairline-strong)] py-2">
-        <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-fg-muted)]">
-          <span className="text-[var(--color-accent)]">●</span>
-          <span>VOL · 0.1</span>
-          <span className="hidden h-3 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
-          <span className="hidden sm:inline">{eyebrow.toUpperCase()}</span>
-          <span className="hidden h-3 w-px bg-[var(--color-hairline-strong)] md:inline-block" />
-          <span className="hidden md:inline tabular-nums">{sigil}</span>
-        </div>
-        <div className="font-mono text-[10px] uppercase tracking-[0.22em] tabular-nums text-[var(--color-fg-muted)]">
-          {dateline}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-x-10 gap-y-6 pt-10 pb-2 lg:grid-cols-12">
-        <motion.h1
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="font-display text-[clamp(3.4rem,9vw,6.5rem)] font-light leading-[0.95] tracking-[-0.035em] text-[var(--color-fg-primary)] lg:col-span-8"
-        >
-          {title}
-          <span className="text-[var(--color-accent)]">.</span>
-        </motion.h1>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
-          className="lg:col-span-4 lg:pt-3"
-        >
-          <p className="border-l-2 border-[var(--color-accent)] pl-4 font-display text-[15px] italic leading-[1.55] text-[var(--color-fg-secondary)]">
-            {tagline}
-          </p>
-        </motion.div>
-      </div>
-    </header>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────── */
-
-function HeroFigures({
-  totalBytes,
-  totalSessions,
-  projectCount,
-  resolvedCount,
-  lastActive,
-}: {
-  totalBytes: number;
-  totalSessions: number;
-  projectCount: number;
-  resolvedCount: number;
-  lastActive: string | null;
+  stats: {
+    totalBytes: number;
+    totalSessions: number;
+    projectCount: number;
+    lastActive: string | null;
+  } | null;
 }) {
   const t = useT();
-  const formatted = formatBytes(totalBytes);
-  const [diskValue, diskUnit] = formatted.split(' ');
-
   return (
-    <motion.section
-      initial="hidden"
-      animate="show"
-      variants={staggerParent}
-      className="mt-12 grid grid-cols-1 gap-y-8 border-t border-[var(--color-hairline-strong)] pt-10 lg:grid-cols-12 lg:gap-x-10 lg:gap-y-0"
-      aria-label="Workspace summary"
-    >
-      <motion.div
-        variants={fadeUpItem}
-        className="relative lg:col-span-7 lg:border-r lg:border-[var(--color-hairline)] lg:pr-10"
-      >
-        <span
-          aria-hidden
-          className="pointer-events-none absolute -left-6 -top-6 h-40 w-40 rounded-full bg-[var(--color-accent-soft)] opacity-60 blur-3xl"
-        />
-        <div className="eyebrow flex items-center gap-3">
-          <span>{t('projects.stat.onDisk')}</span>
-          <span className="h-px w-8 bg-[var(--color-hairline-strong)]" />
-          <span className="font-mono lowercase tracking-[0.05em] text-[var(--color-fg-faint)]">
-            ~/.claude
-          </span>
-        </div>
-        <div className="mt-4 flex items-end gap-3">
-          <span className="font-display text-[clamp(4.5rem,12vw,8rem)] font-light leading-[0.85] tracking-[-0.04em] tabular-nums text-[var(--color-fg-primary)]">
-            {diskValue}
-          </span>
-          <span className="pb-3 font-mono text-sm uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
-            {diskUnit}
-          </span>
-        </div>
-        <p className="mt-4 max-w-md font-display text-[14px] italic leading-snug text-[var(--color-fg-muted)]">
-          {t('projects.stat.lastTouch', { ago: formatRelativeTime(lastActive) })}.
+    <header className="relative">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <h1 className="font-display text-[clamp(1.75rem,3.5vw,2.25rem)] font-light leading-[1.1] tracking-[-0.02em] text-[var(--color-fg-primary)]">
+          {title}
+          <span className="text-[var(--color-accent)]">.</span>
+        </h1>
+        <p className="min-w-0 flex-1 font-display text-[13px] italic leading-snug text-[var(--color-fg-muted)]">
+          {tagline}
         </p>
-      </motion.div>
-
-      <div className="grid grid-cols-2 gap-6 lg:col-span-5 lg:grid-cols-1 lg:gap-y-8">
-        <motion.div variants={fadeUpItem}>
-          <div className="eyebrow">{t('projects.stat.projects')}</div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-display text-[clamp(2.5rem,5vw,3.6rem)] font-light leading-[0.9] tracking-[-0.02em] tabular-nums text-[var(--color-fg-primary)]">
-              {projectCount}
-            </span>
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-fg-faint)]">
-              ct
-            </span>
-          </div>
-          <p className="mt-2 font-mono text-[11px] text-[var(--color-fg-muted)]">
-            {t('projects.stat.resolved', { n: resolvedCount })}
-          </p>
-        </motion.div>
-
-        <motion.div variants={fadeUpItem}>
-          <div className="eyebrow">{t('projects.stat.sessions')}</div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-display text-[clamp(2.5rem,5vw,3.6rem)] font-light leading-[0.9] tracking-[-0.02em] tabular-nums text-[var(--color-fg-primary)]">
-              {totalSessions.toLocaleString()}
-            </span>
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--color-fg-faint)]">
-              ct
-            </span>
-          </div>
-          <p className="mt-2 font-mono text-[11px] text-[var(--color-fg-muted)]">
-            {t('projects.stat.acrossProjects')}
-          </p>
-        </motion.div>
       </div>
-    </motion.section>
+      {stats && (
+        <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
+          <MetaItem label={t('projects.stat.onDisk')} value={formatBytes(stats.totalBytes)} />
+          <Sep />
+          <MetaItem label={t('projects.stat.projects')} value={stats.projectCount} />
+          <Sep />
+          <MetaItem label={t('projects.stat.sessions')} value={stats.totalSessions.toLocaleString()} />
+          <Sep />
+          <MetaItem label={t('projects.card.lastSeen')} value={formatRelativeTime(stats.lastActive)} />
+        </div>
+      )}
+    </header>
   );
 }
 
@@ -318,10 +188,10 @@ function LedgerRow({ project, index }: { project: ProjectSummary; index: number 
         </div>
       </div>
 
-      <span className="text-right font-display text-[18px] font-light leading-none tabular-nums text-[var(--color-fg-primary)]">
+      <span className="text-right font-mono text-[18px] font-light leading-none tabular-nums text-[var(--color-fg-primary)]">
         {project.sessionCount}
       </span>
-      <span className="text-right font-display text-[18px] font-light leading-none tabular-nums text-[var(--color-fg-secondary)]">
+      <span className="text-right font-mono text-[18px] font-light leading-none tabular-nums text-[var(--color-fg-secondary)]">
         {formatBytes(project.totalBytes)}
       </span>
       <span className="text-right font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
