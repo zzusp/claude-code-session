@@ -76,7 +76,7 @@ export default function DeleteDialog({ projectId, selected, onClose }: Props) {
         initial={{ y: 8, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-2xl overflow-hidden rounded-[14px] border border-[var(--color-hairline)] bg-[var(--color-surface)] shadow-[var(--shadow-pop)]"
+        className="w-full max-w-2xl overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-hairline)] bg-[var(--color-surface)] shadow-[var(--shadow-pop)]"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-4 border-b border-[var(--color-hairline)] px-6 py-5">
@@ -102,7 +102,7 @@ export default function DeleteDialog({ projectId, selected, onClose }: Props) {
             onClick={onClose}
             disabled={mutation.isPending}
             aria-label={t('delete.close')}
-            className="rounded-md p-1.5 text-[var(--color-fg-muted)] hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)] disabled:opacity-50"
+            className="rounded-xl p-1.5 text-[var(--color-fg-muted)] hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)] disabled:opacity-50"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
               <path d="M6 6l12 12M18 6L6 18" />
@@ -183,7 +183,7 @@ export default function DeleteDialog({ projectId, selected, onClose }: Props) {
                 type="button"
                 onClick={onClose}
                 disabled={mutation.isPending}
-                className="rounded-md border border-[var(--color-hairline-strong)] px-4 py-1.5 text-sm text-[var(--color-fg-secondary)] hover:bg-[var(--color-sunken)] disabled:opacity-50"
+                className="rounded-xl border border-[var(--color-hairline-strong)] px-4 py-1.5 text-sm text-[var(--color-fg-secondary)] hover:bg-[var(--color-sunken)] disabled:opacity-50"
               >
                 {t('common.cancel')}
               </button>
@@ -195,7 +195,7 @@ export default function DeleteDialog({ projectId, selected, onClose }: Props) {
                   )
                 }
                 disabled={mutation.isPending || willDelete.length === 0}
-                className="rounded-md bg-[var(--color-danger)] px-4 py-1.5 text-sm font-medium text-white shadow-[var(--shadow-rise)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl bg-[var(--color-danger)] px-4 py-1.5 text-sm font-medium text-white shadow-[var(--shadow-rise)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {mutation.isPending
                   ? t('delete.btn.confirmPending')
@@ -212,7 +212,7 @@ export default function DeleteDialog({ projectId, selected, onClose }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md bg-[var(--color-fg-primary)] px-4 py-1.5 text-sm font-medium text-[var(--color-canvas)] hover:opacity-90"
+              className="rounded-xl bg-[var(--color-fg-primary)] px-4 py-1.5 text-sm font-medium text-[var(--color-canvas)] hover:opacity-90"
             >
               {t('common.done')}
             </button>

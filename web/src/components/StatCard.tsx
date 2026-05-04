@@ -12,10 +12,8 @@ export default function StatCard({ label, value, unit, trail, accent }: Props) {
   return (
     <div
       className={
-        'group relative overflow-hidden rounded-[14px] border bg-[var(--color-surface)] p-5 transition ' +
-        (accent
-          ? 'border-[var(--color-accent)]/40'
-          : 'border-[var(--color-hairline)] hover:border-[var(--color-hairline-strong)]')
+        'surface-card is-interactive group relative overflow-hidden p-5 ' +
+        (accent ? 'border-[var(--color-accent)]/40 hover:border-[var(--color-accent)]/60' : '')
       }
     >
       {accent && (
