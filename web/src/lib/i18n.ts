@@ -105,7 +105,8 @@ const DICT = {
     'status.tooltip.recent': 'jsonl modified within the last {{n}} minutes',
     'status.tooltip.idle': 'idle — safe to delete',
 
-    'disk.eyebrow': 'Forensics',
+    'disk.tagline':
+      "How `~/.claude/` is using your disk: which projects carry the most weight, and which sessions are heaviest.",
     'disk.title': 'Disk usage',
     'disk.meta.total': 'Total',
     'disk.meta.projects': 'Projects',
@@ -273,7 +274,8 @@ const DICT = {
     'status.tooltip.recent': 'jsonl 在过去 {{n}} 分钟内被修改',
     'status.tooltip.idle': '空闲 — 可安全删除',
 
-    'disk.eyebrow': '取证',
+    'disk.tagline':
+      '`~/.claude/` 占用磁盘的全貌：哪些项目最沉，哪些会话最大。',
     'disk.title': '磁盘占用',
     'disk.meta.total': '总计',
     'disk.meta.projects': '项目',
