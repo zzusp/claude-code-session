@@ -72,6 +72,10 @@
     font-feature-settings: "ss01", "ss02", "cv11";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* Pin native form controls (checkbox/radio/scrollbar) to the page theme,
+       otherwise they inherit the OS color-scheme and render dark on a light
+       page when the user's system is in dark mode. .dark overrides below. */
+    color-scheme: light;
   }
 
   body {
@@ -238,6 +242,18 @@
     backdrop-filter: blur(14px) saturate(140%);
     -webkit-backdrop-filter: blur(14px) saturate(140%);
   }
+
+  /* One-shot focus flash for messages deep-linked from cross-session search. */
+  .flash-focus {
+    animation: flash-focus 1.2s cubic-bezier(0.16, 1, 0.3, 1) 1;
+    border-radius: var(--radius-control);
+  }
+}
+
+@keyframes flash-focus {
+  0%   { background-color: var(--color-accent-soft); }
+  60%  { background-color: color-mix(in oklch, var(--color-accent-soft) 60%, transparent); }
+  100% { background-color: transparent; }
 }
 
 @keyframes pulse-amber {

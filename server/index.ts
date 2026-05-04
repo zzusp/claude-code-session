@@ -8,6 +8,7 @@ import { PATHS } from './lib/claude-paths.ts';
 import { findAvailablePort } from './lib/port.ts';
 import { diskRoute } from './routes/disk.ts';
 import { projectsRoute } from './routes/projects.ts';
+import { searchRoute } from './routes/search.ts';
 import { sessionsRoute } from './routes/sessions.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -42,6 +43,7 @@ app.get('/api/health', (c) =>
 app.route('/api/projects', projectsRoute);
 app.route('/api/sessions', sessionsRoute);
 app.route('/api/disk-usage', diskRoute);
+app.route('/api/search', searchRoute);
 
 if (fs.existsSync(distDir)) {
   app.use('/*', serveStatic({ root: path.relative(process.cwd(), distDir) || '.' }));

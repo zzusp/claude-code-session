@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { HOTKEY_HINT } from '../lib/hotkeys.ts';
 import { useT } from '../lib/i18n.ts';
 import LocaleToggle from './LocaleToggle.tsx';
 import ThemeToggle from './ThemeToggle.tsx';
@@ -26,7 +27,7 @@ const NAV: NavItem[] = [
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void }) {
   const t = useT();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
@@ -41,14 +42,26 @@ export default function Sidebar() {
     <>
       <div className="topbar-glass sticky top-0 z-40 flex items-center justify-between border-b border-[var(--color-hairline)] px-4 py-3 lg:hidden">
         <Brand />
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-label={t('nav.toggleNav')}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--color-hairline)] text-[var(--color-fg-secondary)] hover:border-[var(--color-hairline-strong)]"
-        >
-          <MenuIcon open={open} />
-        </button>
+        <div className="flex items-center gap-2">
+          {onSearchOpen && (
+            <button
+              type="button"
+              onClick={onSearchOpen}
+              aria-label={t('search.action.open')}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--color-hairline)] text-[var(--color-fg-secondary)] hover:border-[var(--color-hairline-strong)] hover:text-[var(--color-accent)]"
+            >
+              <SearchIcon />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-label={t('nav.toggleNav')}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--color-hairline)] text-[var(--color-fg-secondary)] hover:border-[var(--color-hairline-strong)]"
+          >
+            <MenuIcon open={open} />
+          </button>
+        </div>
       </div>
 
       {open && (
@@ -69,6 +82,29 @@ export default function Sidebar() {
         <div className="flex h-[68px] items-center px-5">
           <Brand />
         </div>
+
+        {onSearchOpen && (
+          <div className="px-4 pb-2">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onSearchOpen();
+              }}
+              aria-label={t('search.action.open')}
+              className="surface-card is-interactive flex w-full items-center gap-2.5 px-3 py-3 text-left"
+              style={{ borderRadius: '1rem' }}
+            >
+              <SearchIcon className="text-[var(--color-fg-muted)]" />
+              <span className="flex-1 truncate text-[13px] text-[var(--color-fg-muted)]">
+                {t('search.action.open')}
+              </span>
+              <kbd className="rounded border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--color-fg-faint)]">
+                {HOTKEY_HINT}
+              </kbd>
+            </button>
+          </div>
+        )}
 
         <nav className="flex-1 overflow-y-auto px-4 py-3">
           <p className="eyebrow px-2 pb-2">{t('nav.workspace')}</p>
@@ -169,6 +205,25 @@ function DiskIcon() {
       <ellipse cx="12" cy="6.5" rx="8" ry="2.5" />
       <path d="M4 6.5v5c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-5" />
       <path d="M4 11.5v5c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-5" />
+    </svg>
+  );
+}
+
+function SearchIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      className={className}
+      aria-hidden
+    >
+      <circle cx="11" cy="11" r="6.2" />
+      <path d="M20 20l-4.3-4.3" />
     </svg>
   );
 }

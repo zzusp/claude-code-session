@@ -1,0 +1,155 @@
+{
+  "at": "2026-05-04T09:20:12.538Z",
+  "results": [
+    {
+      "item": 13,
+      "name": "mod+k opens modal + input focused",
+      "status": "pass",
+      "note": "modal=true inputFocused=true"
+    },
+    {
+      "item": 14,
+      "name": "mod+k toggles close",
+      "status": "pass",
+      "note": ""
+    },
+    {
+      "item": 15,
+      "name": "ESC closes",
+      "status": "pass",
+      "note": ""
+    },
+    {
+      "item": 16,
+      "name": "overlay click closes",
+      "status": "pass",
+      "note": ""
+    },
+    {
+      "item": 17,
+      "name": "streaming results render in groups",
+      "status": "pass",
+      "note": "groups=5"
+    },
+    {
+      "item": 18,
+      "name": "matches highlighted via <mark>",
+      "status": "pass",
+      "note": "marks=18 bg=oklch(0.94 0.058 75)"
+    },
+    {
+      "item": 19,
+      "name": "\"+more in this session\" present for hasMore session",
+      "status": "pass",
+      "note": "count=2"
+    },
+    {
+      "item": 20,
+      "name": "footer shows session/scanned/ms summary",
+      "status": "pass",
+      "note": "⌘K TO OPEN · ESC TO CLOSE 5 SESSION(S) · SCANNED 24 · 913MS"
+    },
+    {
+      "item": 22,
+      "name": "ArrowDown moves activeIndex",
+      "status": "pass",
+      "note": "activeButton=2"
+    },
+    {
+      "item": 23,
+      "name": "hover updates activeIndex",
+      "status": "pass",
+      "note": "hovered data-flat-index=17"
+    },
+    {
+      "item": 24,
+      "name": "click snippet → URL with ?focus & ?q",
+      "status": "pass",
+      "note": "focus=b1f52e4f… q=claude-paths"
+    },
+    {
+      "item": 25,
+      "name": "focus target scrolled to center + flash-focus applied",
+      "status": "pass",
+      "note": "flash=true centered=true"
+    },
+    {
+      "item": 27,
+      "name": "?q prefills in-page search",
+      "status": "pass",
+      "note": "value=\"claude-paths\""
+    },
+    {
+      "item": 27.1,
+      "name": "in-page <mark> highlights present after ?q",
+      "status": "pass",
+      "note": "marks=2"
+    },
+    {
+      "item": 26,
+      "name": "focus target is rendered (window expansion if needed)",
+      "status": "pass",
+      "note": ""
+    },
+    {
+      "item": 29,
+      "name": "1-char query shows refineQuery hint",
+      "status": "pass",
+      "note": "Type a longer query to refine the search.\n\n⌘K TO OPEN · ESC TO CLOSE"
+    },
+    {
+      "item": 30,
+      "name": "no-results state",
+      "status": "pass",
+      "note": "No matches. ⌘K TO OPEN · ESC TO CLOSE"
+    },
+    {
+      "item": 31,
+      "name": "i18n: zh placeholder applied",
+      "status": "pass",
+      "note": "placeholder=\"在所有会话中搜索…\""
+    },
+    {
+      "item": 32,
+      "name": "dark theme: mark bg via OKLCH (no raw hex)",
+      "status": "pass",
+      "note": "dark bg=oklch(0.32 0.075 65)"
+    },
+    {
+      "item": 33,
+      "name": "modal close cleans up streaming fetch",
+      "status": "pass",
+      "note": "requests-completed-during-close=0 (heuristic; AbortController in code)"
+    },
+    {
+      "item": 21,
+      "name": "maxSessions=1 → done.truncated=true (API contract)",
+      "status": "pass",
+      "note": "{\"type\":\"done\",\"scanned\":1,\"matched\":1,\"durationMs\":25,\"truncated\":true}"
+    },
+    {
+      "item": 28,
+      "name": "meta-focus auto-enables showMeta",
+      "status": "pass",
+      "note": "target rendered=true"
+    },
+    {
+      "item": 34,
+      "name": "sidebar entry opens modal + input focused",
+      "status": "pass",
+      "note": "triggers=1 inputFocused=true"
+    },
+    {
+      "item": 34.1,
+      "name": "sidebar trigger shows ⌘K / Ctrl+K hint",
+      "status": "pass",
+      "note": "kbd=\"⌘K\""
+    },
+    {
+      "item": 34.3,
+      "name": "mobile topbar search icon opens modal",
+      "status": "pass",
+      "note": ""
+    }
+  ]
+}

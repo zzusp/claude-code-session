@@ -13,7 +13,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import PageHeader, { MetaItem, Sep } from '../components/PageHeader.tsx';
+import { MetaItem, Sep } from '../components/PageHeader.tsx';
 import StatCard from '../components/StatCard.tsx';
 import { api, type DiskUsage } from '../lib/api.ts';
 import { formatBytes, formatRelativeTime } from '../lib/format.ts';
@@ -90,26 +90,21 @@ export default function DiskUsageRoute() {
 
   return (
     <section>
-      <PageHeader
-        eyebrow={t('disk.eyebrow')}
-        title={
-          <>
-            {t('disk.title')}
-            <span className="text-[var(--color-accent)]">.</span>
-          </>
-        }
-        meta={
-          data ? (
-            <>
-              <MetaItem label={t('disk.meta.total')} value={formatBytes(data.totalBytes)} />
-              <Sep />
-              <MetaItem label={t('disk.meta.projects')} value={data.byProject.length} />
-              <Sep />
-              <MetaItem label={t('disk.meta.sessions')} value={data.totalSessions.toLocaleString()} />
-            </>
-          ) : null
-        }
-      />
+      <div className="surface-card p-6">
+        <Masthead
+          title={t('disk.title')}
+          tagline={t('disk.tagline')}
+          stats={
+            data
+              ? {
+                  totalBytes: data.totalBytes,
+                  projectCount: data.byProject.length,
+                  totalSessions: data.totalSessions,
+                }
+              : null
+          }
+        />
+      </div>
 
       {isLoading && (
         <p className="mt-10 font-mono text-xs uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
@@ -357,6 +352,44 @@ export default function DiskUsageRoute() {
         </>
       )}
     </section>
+  );
+}
+
+function Masthead({
+  title,
+  tagline,
+  stats,
+}: {
+  title: string;
+  tagline: string;
+  stats: {
+    totalBytes: number;
+    projectCount: number;
+    totalSessions: number;
+  } | null;
+}) {
+  const t = useT();
+  return (
+    <header className="relative">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <h1 className="font-display text-[clamp(1.75rem,3.5vw,2.25rem)] font-light leading-[1.1] tracking-[-0.02em] text-[var(--color-fg-primary)]">
+          {title}
+          <span className="text-[var(--color-accent)]">.</span>
+        </h1>
+        <p className="min-w-0 flex-1 font-display text-[13px] italic leading-snug text-[var(--color-fg-muted)]">
+          {tagline}
+        </p>
+      </div>
+      {stats && (
+        <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
+          <MetaItem label={t('disk.meta.total')} value={formatBytes(stats.totalBytes)} />
+          <Sep />
+          <MetaItem label={t('disk.meta.projects')} value={stats.projectCount} />
+          <Sep />
+          <MetaItem label={t('disk.meta.sessions')} value={stats.totalSessions.toLocaleString()} />
+        </div>
+      )}
+    </header>
   );
 }
 
