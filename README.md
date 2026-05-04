@@ -9,9 +9,13 @@ A local web UI to view and clean up Claude Code session history stored under `~/
 | Page | What you can do |
 |---|---|
 | **Projects** (`/`) | See every Claude Code project (one per `cwd`) with session count, total bytes on disk, last-activity time. |
-| **Project detail** (`/projects/:id`) | Browse all sessions in one project. Multi-select + cascade-delete. Each row shows title, message count, byte breakdown, and a status badge (`live · pid N` / `recently active` / `idle`). |
+| **Project detail** (`/projects/:id`) | Browse all sessions in one project. Multi-select + cascade-delete. Each row shows title, message count, byte breakdown, and a status badge (`live · pid N` / `recently active` / `idle`). Inline rename appends a `custom-title` record to the session's `.jsonl` (refused while a live PID owns the session). |
 | **Session detail** (`/projects/:id/sessions/:sid`) | Full message timeline: text, tool calls (collapsible), tool results, thinking blocks. Sticky search bar with client-side highlight. Toggle to show or hide system messages (`<command-name>` etc.). |
+| **Project memory** (`/projects/:id/memory`) | Two-pane reader for `~/.claude/projects/<encoded-cwd>/memory/`: searchable file list (sort by index / recent / name / size) on the left, rendered Markdown on the right, with `MEMORY.md` pinned as the index. |
 | **Disk usage** (`/disk`) | Pie chart by project, monthly bar chart, top-20 largest sessions with deep links. |
+| **Cross-session search** (⌘K / Ctrl+K) | Global modal that streams matches from every project as you type. Searches text, tool calls, and thinking blocks; each result deep-links into the session at the matched message. |
+
+The persistent sidebar carries the search trigger plus locale (zh / en) and theme (light / dark) toggles. The HTTP listener exposes the same content as a single SPA, so deep links like `/projects/:id/sessions/:sid?q=foo` are sharable between browser tabs on the same machine.
 
 ## Quick start
 
@@ -63,13 +67,33 @@ The UI's confirmation dialog shows the exact files and bytes that will be remove
 shared/         Wire types + constants imported by BOTH server and web.
 server/         Hono + @hono/node-server backend, all filesystem operations.
   lib/          claude-paths, encode-cwd, scan, parse-jsonl, load-session,
-                active-sessions, delete, disk-usage, fs-size, safe-id, …
-  routes/       projects, sessions, disk
+                load-memory, rename-session, search-all, search-session,
+                active-sessions, delete, disk-usage, fs-size, safe-id,
+                system-tags, port, …
+  routes/       projects, sessions, disk, search
 web/            React 19 + Vite + Tailwind v4 SPA.
-  src/routes/   ProjectsList, ProjectDetail, SessionDetail, DiskUsage (lazy)
-  src/components, src/lib
+  src/routes/   ProjectsList, ProjectDetail, SessionDetail,
+                ProjectMemory, DiskUsage (lazy)
+  src/components  Sidebar, SearchModal, PageHeader, MessageBubble,
+                  ToolBlock, DeleteDialog, HighlightedText, …
+  src/lib       api, query-keys, i18n, theme, hotkeys, format
 docs/spec/      Design notes (start here before refactoring).
+docs/acceptance/  Per-feature e2e plans, round evidence, retrospectives.
 ```
+
+### HTTP API
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/health` | `claudeRoot`, platform, pid — used by the UI's empty-state banner. |
+| `GET` | `/api/projects` | Project summaries (one per `cwd`). |
+| `GET` | `/api/projects/:id/sessions` | Session list for a project. |
+| `GET` | `/api/projects/:id/memory` | Memory file index + content for the two-pane reader. |
+| `GET` | `/api/sessions/:projectId/:sessionId` | Full parsed message timeline. |
+| `PATCH` | `/api/sessions/:projectId/:sessionId` | Rename a session by appending a `custom-title` record to the `.jsonl`. |
+| `DELETE` | `/api/sessions` | Cascade-delete one or more sessions; CSRF-checked via `Origin`. |
+| `GET` | `/api/disk-usage` | Per-project totals + monthly buckets + top-N sessions. |
+| `GET` | `/api/search?q=...` | NDJSON stream of matches across every project. |
 
 | Layer | Tech |
 |---|---|
@@ -108,9 +132,10 @@ Decoding a project id back to a real path uses each session's own `cwd` field (r
 This tool is intended for a single user on their own machine. It is *not* hardened for multi-user / shared environments.
 
 - The HTTP listener binds to `127.0.0.1` only.
-- Mutating endpoints (`DELETE /api/sessions`) require an `Origin` header matching `http(s)://(localhost|127.0.0.1):*`. This blocks other web pages your browser opens from triggering deletes via CSRF, but cannot stop another local process running as the same user.
+- Mutating endpoints (`DELETE /api/sessions`, `PATCH /api/sessions/:projectId/:sessionId`) require an `Origin` header matching `http(s)://(localhost|127.0.0.1):*`. This blocks other web pages your browser opens from triggering writes via CSRF, but cannot stop another local process running as the same user.
 - All filesystem paths are validated with `path.resolve(...).startsWith(claudeRoot)` (Windows-aware case-folded) before any read or write.
 - IDs from URL params are rejected if they contain `/`, `\`, `..`, or start with `.`.
+- The cross-session search endpoint streams NDJSON and aborts when the client disconnects, so a closed browser tab stops the scan immediately.
 
 There is no authentication. If you're paranoid, run behind a firewall rule or only invoke the tool when needed.
 
@@ -121,6 +146,8 @@ There is no authentication. If you're paranoid, run behind a firewall rule or on
 - `docs/screenshots/projects.png` — landing page (project cards + totals)
 - `docs/screenshots/project-detail.png` — session table with multi-select and badges
 - `docs/screenshots/session-detail.png` — message timeline with a search hit highlighted
+- `docs/screenshots/project-memory.png` — two-pane memory reader (list + rendered Markdown)
+- `docs/screenshots/search-modal.png` — ⌘K cross-session search streaming results
 - `docs/screenshots/delete-dialog.png` — confirmation dialog showing breakdown + skipped sessions
 - `docs/screenshots/disk-usage.png` — pie + bar + top-20 table
 
