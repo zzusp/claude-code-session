@@ -1,7 +1,5 @@
 @import "tailwindcss";
 
-@import "@fontsource-variable/fraunces/opsz.css";
-@import "@fontsource-variable/fraunces/opsz-italic.css";
 @import "@fontsource-variable/plus-jakarta-sans/wght.css";
 @import "@fontsource-variable/plus-jakarta-sans/wght-italic.css";
 @import "@fontsource-variable/geist-mono/wght.css";
@@ -9,8 +7,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-display: "Fraunces Variable", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-serif, Georgia, serif;
   --font-sans: "Plus Jakarta Sans Variable", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-sans);
   --font-mono: "Geist Mono Variable", "PingFang SC", ui-monospace, "JetBrains Mono", monospace;
 
   /* Light theme defaults */
@@ -115,10 +113,8 @@
   }
   *::-webkit-scrollbar-thumb:hover { background-color: var(--color-hairline-strong); background-clip: padding-box; }
 
-  /* Display headings default to Fraunces with optical sizing */
   h1, h2, h3 {
-    font-family: var(--font-display);
-    font-feature-settings: "ss01", "salt", "liga", "dlig";
+    font-family: var(--font-sans);
     letter-spacing: -0.012em;
   }
 
