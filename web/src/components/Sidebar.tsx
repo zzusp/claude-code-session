@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { HOTKEY_HINT } from '../lib/hotkeys.ts';
 import { useT } from '../lib/i18n.ts';
 import LocaleToggle from './LocaleToggle.tsx';
@@ -8,17 +8,28 @@ import ThemeToggle from './ThemeToggle.tsx';
 interface NavItem {
   to: string;
   labelKey: 'nav.projects' | 'nav.disk';
-  end?: boolean;
   icon: ReactNode;
+  match: (pathname: string) => boolean;
 }
 
 const NAV: NavItem[] = [
-  { to: '/', end: true, labelKey: 'nav.projects', icon: <FolderIcon /> },
-  { to: '/disk', labelKey: 'nav.disk', icon: <DiskIcon /> },
+  {
+    to: '/',
+    labelKey: 'nav.projects',
+    icon: <FolderIcon />,
+    match: (p) => p === '/' || p.startsWith('/projects/'),
+  },
+  {
+    to: '/disk',
+    labelKey: 'nav.disk',
+    icon: <DiskIcon />,
+    match: (p) => p === '/disk' || p.startsWith('/disk/'),
+  },
 ];
 
 export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void }) {
   const t = useT();
+  const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -98,37 +109,36 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
         <nav className="flex-1 overflow-y-auto px-4 py-3">
           <p className="eyebrow px-2 pb-2">{t('nav.workspace')}</p>
           <ul className="space-y-1">
-            {NAV.map((item) => (
-              <li key={item.to}>
-                <NavLink
-                  to={item.to}
-                  end={item.end}
-                  onClick={() => setOpen(false)}
-                  className={({ isActive }) =>
-                    'group flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition ' +
-                    (isActive
-                      ? 'border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-fg-primary)] shadow-[var(--shadow-rise)]'
-                      : 'border-transparent text-[var(--color-fg-secondary)] hover:bg-[color-mix(in_oklch,var(--color-surface)_60%,transparent)] hover:text-[var(--color-fg-primary)]')
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <span
-                        className={
-                          'transition-colors ' +
-                          (isActive
-                            ? 'text-[var(--color-accent)]'
-                            : 'text-[var(--color-fg-muted)] group-hover:text-[var(--color-accent)]')
-                        }
-                      >
-                        {item.icon}
-                      </span>
-                      <span className="font-medium tracking-tight">{t(item.labelKey)}</span>
-                    </>
-                  )}
-                </NavLink>
-              </li>
-            ))}
+            {NAV.map((item) => {
+              const isActive = item.match(pathname);
+              return (
+                <li key={item.to}>
+                  <Link
+                    to={item.to}
+                    aria-current={isActive ? 'page' : undefined}
+                    onClick={() => setOpen(false)}
+                    className={
+                      'group flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition ' +
+                      (isActive
+                        ? 'border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-fg-primary)] shadow-[var(--shadow-rise)]'
+                        : 'border-transparent text-[var(--color-fg-secondary)] hover:bg-[color-mix(in_oklch,var(--color-surface)_60%,transparent)] hover:text-[var(--color-fg-primary)]')
+                    }
+                  >
+                    <span
+                      className={
+                        'transition-colors ' +
+                        (isActive
+                          ? 'text-[var(--color-accent)]'
+                          : 'text-[var(--color-fg-muted)] group-hover:text-[var(--color-accent)]')
+                      }
+                    >
+                      {item.icon}
+                    </span>
+                    <span className="font-medium tracking-tight">{t(item.labelKey)}</span>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </nav>
 
