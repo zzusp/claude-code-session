@@ -66,6 +66,10 @@
     font-feature-settings: "ss01", "ss02", "cv11";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    /* Pin native form controls (checkbox/radio/scrollbar) to the page theme,
+       otherwise they inherit the OS color-scheme and render dark on a light
+       page when the user's system is in dark mode. .dark overrides below. */
+    color-scheme: light;
   }
 
   body {
