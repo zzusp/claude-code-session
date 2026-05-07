@@ -17,9 +17,10 @@ interface Props {
   projectId: string;
   selected: SessionSummary[];
   onClose: () => void;
+  onDeleted?: (deletedSessionIds: string[]) => void;
 }
 
-export default function DeleteDialog({ projectId, selected, onClose }: Props) {
+export default function DeleteDialog({ projectId, selected, onClose, onDeleted }: Props) {
   const t = useT();
   const { locale } = useLocale();
   const queryClient = useQueryClient();
@@ -42,10 +43,13 @@ export default function DeleteDialog({ projectId, selected, onClose }: Props) {
         method: 'DELETE',
         body: JSON.stringify({ items }),
       }),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects() });
       queryClient.invalidateQueries({ queryKey: queryKeys.projectSessions(projectId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.diskUsage() });
+      if (data.deleted.length > 0) {
+        onDeleted?.(data.deleted.map((d) => d.sessionId));
+      }
     },
   });
 

@@ -8,8 +8,9 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Breadcrumbs from '../components/Breadcrumbs.tsx';
+import DeleteDialog from '../components/DeleteDialog.tsx';
 import MessageBubble from '../components/MessageBubble.tsx';
 import {
   api,
@@ -17,6 +18,7 @@ import {
   type Message,
   type ProjectSummary,
   type SessionDetail,
+  type SessionSummary,
 } from '../lib/api.ts';
 import { MAX_SESSION_MESSAGES } from '../lib/constants.ts';
 import { formatBytes, formatDateTime, formatRelativeTime } from '../lib/format.ts';
@@ -34,6 +36,7 @@ const LOAD_STEP = 50;
 
 export default function SessionDetailRoute() {
   const t = useT();
+  const navigate = useNavigate();
   const { projectId, sessionId } = useParams<{ projectId: string; sessionId: string }>();
   const [searchParams] = useSearchParams();
   const pid = projectId ?? '';
@@ -46,6 +49,7 @@ export default function SessionDetailRoute() {
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const urlAppliedRef = useRef<string | null>(null);
   const flashedKeyRef = useRef<string | null>(null);
 
@@ -70,6 +74,21 @@ export default function SessionDetailRoute() {
     () => projectsQuery.data?.find((p) => p.id === pid),
     [projectsQuery.data, pid],
   );
+
+  const projectSessionsQuery = useQuery({
+    queryKey: queryKeys.projectSessions(pid),
+    queryFn: () => api<SessionSummary[]>(`/api/projects/${encodeURIComponent(pid)}/sessions`),
+    enabled: !!pid,
+  });
+  const currentSummary = useMemo(
+    () => projectSessionsQuery.data?.find((s) => s.id === sid) ?? null,
+    [projectSessionsQuery.data, sid],
+  );
+  const deleteTooltip = !currentSummary
+    ? projectSessionsQuery.isLoading
+      ? t('common.loading')
+      : t('session.action.deleteTooltipBlocked')
+    : undefined;
 
   const indexed: IndexedMessage[] = useMemo(() => {
     if (!data) return [];
@@ -195,8 +214,26 @@ export default function SessionDetailRoute() {
             onTitleEdit={async (next) => {
               await renameMutation.mutateAsync(next);
             }}
+            onDelete={currentSummary ? () => setShowDeleteDialog(true) : undefined}
+            deleteDisabled={!currentSummary}
+            deleteTooltip={deleteTooltip}
+            deleteLabel={t('session.action.delete')}
           />
         </div>
+      )}
+
+      {showDeleteDialog && currentSummary && (
+        <DeleteDialog
+          projectId={pid}
+          selected={[currentSummary]}
+          onClose={() => setShowDeleteDialog(false)}
+          onDeleted={(deletedIds) => {
+            if (deletedIds.includes(sid)) {
+              setShowDeleteDialog(false);
+              navigate(`/projects/${encodeURIComponent(pid)}`, { replace: true });
+            }
+          }}
+        />
       )}
 
       <FilterLedger
@@ -294,6 +331,10 @@ function SessionMasthead({
   branch,
   editableValue,
   onTitleEdit,
+  onDelete,
+  deleteDisabled,
+  deleteTooltip,
+  deleteLabel,
 }: {
   sid: string;
   title: string | null;
@@ -305,6 +346,10 @@ function SessionMasthead({
   branch: string | null;
   editableValue: string;
   onTitleEdit: (next: string) => Promise<void>;
+  onDelete?: () => void;
+  deleteDisabled?: boolean;
+  deleteTooltip?: string;
+  deleteLabel?: string;
 }) {
   const t = useT();
   const dateline = formatDateline(firstAt);
@@ -326,8 +371,22 @@ function SessionMasthead({
             </>
           )}
         </div>
-        <div className="shrink-0 font-mono text-[10px] uppercase tracking-[0.22em] tabular-nums text-[var(--color-fg-muted)]">
-          {dateline}
+        <div className="flex shrink-0 items-center gap-3">
+          <div className="font-mono text-[10px] uppercase tracking-[0.22em] tabular-nums text-[var(--color-fg-muted)]">
+            {dateline}
+          </div>
+          {(onDelete || deleteDisabled) && (
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={deleteDisabled || !onDelete}
+              title={deleteTooltip}
+              aria-label={deleteLabel}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-danger)] transition hover:border-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <TrashIcon /> {deleteLabel}
+            </button>
+          )}
         </div>
       </div>
 
@@ -654,6 +713,26 @@ function SearchIcon({ className = '' }: { className?: string }) {
     >
       <circle cx="11" cy="11" r="6.2" />
       <path d="M20 20l-4.3-4.3" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
+      <path d="M5.5 6l1.1 13.2A1.5 1.5 0 0 0 8.1 20.5h7.8a1.5 1.5 0 0 0 1.5-1.3L18.5 6" />
     </svg>
   );
 }
