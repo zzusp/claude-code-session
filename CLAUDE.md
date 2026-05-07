@@ -78,7 +78,7 @@ docs/
 
 | Script | 用途 |
 |---|---|
-| `npm run dev` | 并发启动 backend (`tsx watch server/index.ts`，端口 3131–3140) + Vite dev server (5173)。Vite 把 `/api/*` 代理到 backend。 |
+| `npm run dev` | 并发启动 backend (`node --import tsx --watch server/index.ts`，端口 3131–3140) + Vite dev server (5173)。`dev:web` 先跑 `scripts/wait-for-server.mjs` 等 backend 听到 3131 再起 vite，避开冷启动期间的 `ECONNREFUSED → 500`。Vite 把 `/api/*` 代理到 backend。 |
 | `npm run dev:server` / `npm run dev:web` | 单独启动其中一边。 |
 | `npm run build` | 用 Vite 把 SPA 构建到 `dist/`。 |
 | `npm run start` | 单进程生产模式：Hono 同时托管 `dist/` 静态资源和 API。 |

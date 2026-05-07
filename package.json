@@ -9,8 +9,8 @@
   },
   "scripts": {
     "dev": "concurrently -k -n server,web -c blue,magenta \"npm:dev:server\" \"npm:dev:web\"",
-    "dev:server": "tsx watch server/index.ts",
-    "dev:web": "vite",
+    "dev:server": "node --import tsx --watch server/index.ts",
+    "dev:web": "node scripts/wait-for-server.mjs && vite",
     "build": "vite build",
     "start": "tsx server/index.ts",
     "typecheck": "tsc -b"
