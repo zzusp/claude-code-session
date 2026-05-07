@@ -76,6 +76,8 @@ const DICT = {
     'project.col.status': 'Status',
 
     'session.crumbProjects': 'Projects',
+    'session.action.delete': 'Delete',
+    'session.action.deleteTooltipBlocked': 'Session metadata not available yet',
     'session.tagline':
       'Started {{started}} · last touched {{lastTouched}}{{branchPart}}',
     'session.tagline.branch': ' · branch {{branch}}',
@@ -265,6 +267,8 @@ const DICT = {
     'project.col.status': '状态',
 
     'session.crumbProjects': '项目',
+    'session.action.delete': '删除',
+    'session.action.deleteTooltipBlocked': '暂无法获取该会话状态',
     'session.tagline': '开始于 {{started}} · 最后触达 {{lastTouched}}{{branchPart}}',
     'session.tagline.branch': ' · 分支 {{branch}}',
     'session.meta.messages': '消息数',

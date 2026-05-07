@@ -10,7 +10,7 @@ A local web UI to view and clean up Claude Code session history stored under `~/
 |---|---|
 | **Projects** (`/`) | See every Claude Code project (one per `cwd`) with session count, total bytes on disk, last-activity time. |
 | **Project detail** (`/projects/:id`) | Browse all sessions in one project. Multi-select + cascade-delete. Each row shows title, message count, byte breakdown, and a status badge (`live · pid N` / `recently active` / `idle`). Inline rename appends a `custom-title` record to the session's `.jsonl` (refused while a live PID owns the session). |
-| **Session detail** (`/projects/:id/sessions/:sid`) | Full message timeline: text, tool calls (collapsible), tool results, thinking blocks. Sticky search bar with client-side highlight. Toggle to show or hide system messages (`<command-name>` etc.). |
+| **Session detail** (`/projects/:id/sessions/:sid`) | Full message timeline: text, tool calls (collapsible), tool results, thinking blocks. Sticky search bar with client-side highlight. Toggle to show or hide system messages (`<command-name>` etc.). Inline *Delete* (top-right of the masthead) removes the current session and returns to the project list. |
 | **Project memory** (`/projects/:id/memory`) | Two-pane reader for `~/.claude/projects/<encoded-cwd>/memory/`: searchable file list (sort by index / recent / name / size) on the left, rendered Markdown on the right, with `MEMORY.md` pinned as the index. |
 | **Disk usage** (`/disk`) | Pie chart by project, monthly bar chart, top-20 largest sessions with deep links. |
 | **Cross-session search** (⌘K / Ctrl+K) | Global modal that streams matches from every project as you type. Searches text, tool calls, and thinking blocks; each result deep-links into the session at the matched message. |
