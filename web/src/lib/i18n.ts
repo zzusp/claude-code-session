@@ -176,6 +176,24 @@ const DICT = {
     'delete.label.sessions': 'sessions',
     'delete.close': 'Close',
 
+    'deleteProject.row.action': 'Delete project',
+    'deleteProject.eyebrow.confirm': 'Confirm deletion',
+    'deleteProject.eyebrow.result': 'Result',
+    'deleteProject.title.confirm': 'Delete project',
+    'deleteProject.title.result': 'Project removed',
+    'deleteProject.summary':
+      '{{n}} session(s) · ~{{free}} to free · directory will be removed',
+    'deleteProject.warning':
+      'This removes every session in {{cwd}} along with its history.jsonl entries. Cannot be undone.',
+    'deleteProject.blocked.heading':
+      '{{n}} session(s) are live or were modified in the last 5 minutes — nothing will be deleted. Try again later.',
+    'deleteProject.success':
+      'Removed {{n}} session(s) and the project directory. {{free}} freed · {{lines}} history lines removed',
+    'deleteProject.successKept':
+      'Removed {{n}} session(s). {{free}} freed · {{lines}} history lines removed · directory kept',
+    'deleteProject.btn.confirm': 'Delete project',
+    'deleteProject.btn.confirmPending': 'Deleting…',
+
     'search.action.open': 'Search sessions',
     'search.placeholder': 'Search across all sessions…',
     'search.empty': 'Type at least 2 characters to search across every session on disk.',
@@ -363,6 +381,23 @@ const DICT = {
     'delete.label.session': '个会话',
     'delete.label.sessions': '个会话',
     'delete.close': '关闭',
+
+    'deleteProject.row.action': '删除项目',
+    'deleteProject.eyebrow.confirm': '确认删除',
+    'deleteProject.eyebrow.result': '结果',
+    'deleteProject.title.confirm': '删除项目',
+    'deleteProject.title.result': '项目已删除',
+    'deleteProject.summary': '{{n}} 个会话 · 约释放 {{free}} · 项目目录将被删除',
+    'deleteProject.warning':
+      '将删除 {{cwd}} 下的全部会话及其在 history.jsonl 的记录，操作不可撤销。',
+    'deleteProject.blocked.heading':
+      '{{n}} 个会话正在运行或最近 5 分钟内被修改 — 本次不会删除任何内容，请稍后再试。',
+    'deleteProject.success':
+      '已删除 {{n}} 个会话及项目目录。释放 {{free}} · 清理 {{lines}} 条历史记录',
+    'deleteProject.successKept':
+      '已删除 {{n}} 个会话。释放 {{free}} · 清理 {{lines}} 条历史记录 · 项目目录已保留',
+    'deleteProject.btn.confirm': '删除项目',
+    'deleteProject.btn.confirmPending': '删除中…',
 
     'search.action.open': '搜索会话',
     'search.placeholder': '在所有会话中搜索…',
