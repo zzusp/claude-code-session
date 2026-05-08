@@ -4,6 +4,25 @@ A local web UI to view and clean up Claude Code session history stored under `~/
 
 > **Read-only on disk by default.** The only write the server performs is when you explicitly click *Delete* in the UI. Active sessions (with a live PID or recent activity) are skipped automatically.
 
+## Screenshots
+
+> See [`docs/screenshots/README.md`](docs/screenshots/README.md) for the capture recipe (Windows / macOS / Linux) if you want to refresh these.
+
+<p align="center">
+  <a href="docs/screenshots/project-detail.png"><img src="docs/screenshots/project-detail.png" alt="Project detail — session table with multi-select and live/idle badges" width="720"></a>
+  <br><sub><b>Project detail</b> — sessions in one project, multi-select, status badges</sub>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/session-detail.png"><img src="docs/screenshots/session-detail.png" alt="Session detail — message timeline with a highlighted search hit" width="720"></a>
+  <br><sub><b>Session detail</b> — full message timeline with search highlight</sub>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/disk-usage.png"><img src="docs/screenshots/disk-usage.png" alt="Disk usage — pie chart, monthly bar chart, top-20 sessions table" width="720"></a>
+  <br><sub><b>Disk usage</b> — pie + monthly bars + top-20 table</sub>
+</p>
+
 ## Features
 
 | Page | What you can do |
@@ -138,18 +157,6 @@ This tool is intended for a single user on their own machine. It is *not* harden
 - The cross-session search endpoint streams NDJSON and aborts when the client disconnects, so a closed browser tab stops the scan immediately.
 
 There is no authentication. If you're paranoid, run behind a firewall rule or only invoke the tool when needed.
-
-## Screenshots
-
-> Not committed yet — capture them locally. Suggested names go in `docs/screenshots/`. See `docs/screenshots/README.md` for the recipe.
-
-- `docs/screenshots/projects.png` — landing page (project cards + totals)
-- `docs/screenshots/project-detail.png` — session table with multi-select and badges
-- `docs/screenshots/session-detail.png` — message timeline with a search hit highlighted
-- `docs/screenshots/project-memory.png` — two-pane memory reader (list + rendered Markdown)
-- `docs/screenshots/search-modal.png` — ⌘K cross-session search streaming results
-- `docs/screenshots/delete-dialog.png` — confirmation dialog showing breakdown + skipped sessions
-- `docs/screenshots/disk-usage.png` — pie + bar + top-20 table
 
 ## Project layout
 

@@ -1,33 +1,41 @@
 # Capturing screenshots
 
-The repo doesn't ship screenshots — they go stale and bloat git history. Generate them locally when needed.
+The committed PNGs in this folder are referenced by the main `README.md`. Use this recipe when you want to refresh them — keep filenames identical so the `<img>` tags in `README.md` keep working.
 
-## Quickest path (macOS)
+## Setup
 
 ```bash
-npm run dev   # starts both servers; open http://localhost:5173
+npm run dev   # starts both servers
 ```
 
-Then for each page:
+Open <http://localhost:5173>. Resize the browser to **1280×800** (matches the `max-w-6xl` content area, gives consistent crops across screenshots).
 
-1. Resize the browser to a clean width (1280×800 works well, matches the `max-w-6xl` content area).
-2. Hit **Cmd+Shift+5**, choose *Capture Selected Window*, click the browser window.
-3. Save as the filename listed in the main `README.md` *Screenshots* section, into this directory.
+## Capture
 
-## Pages worth capturing
+| OS | How |
+|---|---|
+| **Windows** | `Win+Shift+S` → *Rectangle* → drag over the browser viewport → it copies to clipboard, then click the toast (or open *Snipping Tool*) → *Save As* → PNG |
+| **macOS** | `Cmd+Shift+5` → *Capture Selected Window* → click the browser window |
+| **Linux** | GNOME: `Shift+PrtScn` (area). KDE: Spectacle `PrtScn`. |
+
+Save each PNG into **this directory** (`docs/screenshots/`) with the exact filename in the table below — the README's `<img src="…">` tags reference these paths verbatim.
+
+## Pages to capture
+
+The main `README.md` only embeds three screenshots — capture exactly these three filenames:
 
 | File | URL | What to show |
 |---|---|---|
-| `projects.png` | `/` | Project cards + totals header |
-| `project-detail.png` | `/projects/<encoded-cwd>` | Session table with at least one row checked + visible status badges |
-| `session-detail.png` | `/projects/<encoded-cwd>/sessions/<sid>` | Message timeline, search box with a typed query, a highlighted hit |
-| `delete-dialog.png` | (open from project detail) | Confirmation dialog with both delete and skip groups |
-| `disk-usage.png` | `/disk` | Pie + monthly bar + top-N table |
+| `project-detail.png` | `/projects/<encoded-cwd>` | Session table with at least one row checked, visible status badges (`live` / `idle`) |
+| `session-detail.png` | `/projects/<encoded-cwd>/sessions/<sid>?q=...` | Timeline + search box with a typed query and a highlighted hit |
+| `disk-usage.png` | `/disk` | Pie + monthly bar + top-N table all in one frame |
 
 ## Preparing demo data
 
-If `~/.claude/` is empty, capture screenshots from a different machine that has actively used Claude Code, or use the test fixture pattern documented in `docs/spec/session-manager-design.md` § 7 (Verification → Delete smoke).
+If `~/.claude/` is empty on this machine, capture from a machine that has actually used Claude Code, or follow the test fixture pattern in `docs/spec/session-manager-design.md` § 7 (Verification → Delete smoke).
 
-## Don't commit large screenshots
+## Keep them small
 
-Keep each PNG under ~150 KB. Crop tightly. If you need to share a higher-res version, link to a gist or external host rather than committing it.
+- Aim for **≤ 150 KB per PNG**. Crop tightly — don't include the OS chrome / taskbar.
+- If a high-res version is genuinely needed, link to a gist or external host instead of committing it.
+- Light theme tends to compress better than dark; if both are interesting, capture light by default and keep dark variants out of git unless they show something light can't.
