@@ -175,7 +175,15 @@ export default function SessionDetailRoute() {
         `/api/sessions/${encodeURIComponent(pid)}/${encodeURIComponent(sid)}`,
         { method: 'PATCH', body: JSON.stringify({ customTitle: next }) },
       ),
-    onSuccess: () => {
+    onSuccess: ({ customTitle }) => {
+      // Patch caches synchronously so the read-only title doesn't flash the
+      // pre-rename value while the background refetch is in flight.
+      queryClient.setQueryData<SessionDetail>(queryKeys.session(pid, sid), (prev) =>
+        prev ? { ...prev, meta: { ...prev.meta, customTitle } } : prev,
+      );
+      queryClient.setQueryData<SessionSummary[]>(queryKeys.projectSessions(pid), (prev) =>
+        prev?.map((s) => (s.id === sid ? { ...s, customTitle } : s)),
+      );
       void queryClient.invalidateQueries({ queryKey: queryKeys.session(pid, sid) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projectSessions(pid) });
     },
