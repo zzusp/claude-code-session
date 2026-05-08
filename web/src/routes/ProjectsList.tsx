@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import DeleteProjectDialog from '../components/DeleteProjectDialog.tsx';
 import { MetaItem, Sep } from '../components/PageHeader.tsx';
 import { api, type HealthResponse, type ProjectSummary } from '../lib/api.ts';
 import { formatBytes, formatRelativeTime } from '../lib/format.ts';
@@ -10,6 +12,7 @@ import { queryKeys } from '../lib/query-keys.ts';
 
 export default function ProjectsList() {
   const t = useT();
+  const [pendingDelete, setPendingDelete] = useState<ProjectSummary | null>(null);
   const health = useQuery({
     queryKey: queryKeys.health(),
     queryFn: () => api<HealthResponse>('/api/health'),
@@ -75,8 +78,15 @@ export default function ProjectsList() {
             </span>
           </div>
           <div className="rule-dotted mt-3" aria-hidden />
-          <Ledger projects={list} />
+          <Ledger projects={list} onRequestDelete={(p) => setPendingDelete(p)} />
         </div>
+      )}
+
+      {pendingDelete && (
+        <DeleteProjectDialog
+          project={pendingDelete}
+          onClose={() => setPendingDelete(null)}
+        />
       )}
     </section>
   );
@@ -127,7 +137,13 @@ function Masthead({
 
 /* ─────────────────────────────────────────────────────────────────── */
 
-function Ledger({ projects }: { projects: ProjectSummary[] }) {
+function Ledger({
+  projects,
+  onRequestDelete,
+}: {
+  projects: ProjectSummary[];
+  onRequestDelete: (p: ProjectSummary) => void;
+}) {
   const t = useT();
   return (
     <motion.ol
@@ -138,7 +154,7 @@ function Ledger({ projects }: { projects: ProjectSummary[] }) {
     >
       <li
         aria-hidden
-        className="grid grid-cols-[2.5rem_minmax(0,1fr)_5rem_5.5rem_5rem_1.5rem] items-center gap-x-4 border-b border-[var(--color-hairline)] py-3 sm:grid-cols-[3rem_minmax(0,1fr)_6rem_6rem_6rem_2rem]"
+        className="grid grid-cols-[2.5rem_minmax(0,1fr)_5rem_5.5rem_5rem_3.5rem] items-center gap-x-4 border-b border-[var(--color-hairline)] py-3 sm:grid-cols-[3rem_minmax(0,1fr)_6rem_6rem_6rem_4rem]"
       >
         <span className="eyebrow text-right">№</span>
         <span className="eyebrow">{t('projects.card.eyebrow')}</span>
@@ -150,14 +166,22 @@ function Ledger({ projects }: { projects: ProjectSummary[] }) {
 
       {projects.map((p, i) => (
         <motion.li key={p.id} variants={fadeUpItem}>
-          <LedgerRow project={p} index={i} />
+          <LedgerRow project={p} index={i} onRequestDelete={onRequestDelete} />
         </motion.li>
       ))}
     </motion.ol>
   );
 }
 
-function LedgerRow({ project, index }: { project: ProjectSummary; index: number }) {
+function LedgerRow({
+  project,
+  index,
+  onRequestDelete,
+}: {
+  project: ProjectSummary;
+  index: number;
+  onRequestDelete: (p: ProjectSummary) => void;
+}) {
   const t = useT();
   const cwd = project.decodedCwd;
   const parts = cwd.split(/[\\/]+/).filter(Boolean);
@@ -165,15 +189,20 @@ function LedgerRow({ project, index }: { project: ProjectSummary; index: number 
   const head = parts.slice(0, -2).join('/');
 
   return (
-    <Link
-      to={`/projects/${encodeURIComponent(project.id)}`}
-      className="ribbon-row group relative grid grid-cols-[2.5rem_minmax(0,1fr)_5rem_5.5rem_5rem_1.5rem] items-center gap-x-4 border-b border-[var(--color-hairline)] py-3 pl-3 transition-colors hover:bg-[var(--color-sunken)] sm:grid-cols-[3rem_minmax(0,1fr)_6rem_6rem_6rem_2rem]"
-    >
-      <span className="text-right font-mono text-[11px] uppercase tracking-[0.16em] tabular-nums text-[var(--color-fg-faint)] group-hover:text-[var(--color-accent)]">
+    <div className="ribbon-row group relative grid grid-cols-[2.5rem_minmax(0,1fr)_5rem_5.5rem_5rem_3.5rem] items-center gap-x-4 border-b border-[var(--color-hairline)] py-3 pl-3 transition-colors hover:bg-[var(--color-sunken)] sm:grid-cols-[3rem_minmax(0,1fr)_6rem_6rem_6rem_4rem]">
+      <Link
+        to={`/projects/${encodeURIComponent(project.id)}`}
+        aria-label={cwd}
+        className="absolute inset-0 z-[1] rounded-[inherit] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--color-accent)]"
+      >
+        <span className="sr-only">{cwd}</span>
+      </Link>
+
+      <span className="pointer-events-none text-right font-mono text-[11px] uppercase tracking-[0.16em] tabular-nums text-[var(--color-fg-faint)] group-hover:text-[var(--color-accent)]">
         {String(index + 1).padStart(2, '0')}
       </span>
 
-      <div className="min-w-0">
+      <div className="pointer-events-none min-w-0">
         <div
           className="flex items-baseline gap-2 truncate font-mono text-[13px] text-[var(--color-fg-primary)]"
           title={cwd}
@@ -188,23 +217,48 @@ function LedgerRow({ project, index }: { project: ProjectSummary; index: number 
         </div>
       </div>
 
-      <span className="text-right font-mono text-sm tabular-nums text-[var(--color-fg-primary)]">
+      <span className="pointer-events-none text-right font-mono text-sm tabular-nums text-[var(--color-fg-primary)]">
         {project.sessionCount.toLocaleString()}
       </span>
-      <span className="text-right font-mono text-sm tabular-nums text-[var(--color-fg-secondary)]">
+      <span className="pointer-events-none text-right font-mono text-sm tabular-nums text-[var(--color-fg-secondary)]">
         {formatBytes(project.totalBytes)}
       </span>
-      <span className="text-right font-mono text-[12.5px] tabular-nums text-[var(--color-fg-secondary)]">
+      <span className="pointer-events-none text-right font-mono text-[12.5px] tabular-nums text-[var(--color-fg-secondary)]">
         {formatRelativeTime(project.lastActiveAt)}
       </span>
 
-      <span
-        aria-hidden
-        className="text-[var(--color-fg-faint)] transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-[var(--color-accent)]"
-      >
-        <ChevronRight />
-      </span>
-    </Link>
+      <div className="relative z-[2] flex items-center justify-end gap-1 pr-1">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onRequestDelete(project);
+          }}
+          aria-label={t('deleteProject.row.action')}
+          title={t('deleteProject.row.action')}
+          className="rounded-md border border-transparent p-1.5 text-[var(--color-fg-faint)] transition-colors hover:border-[var(--color-danger)]/40 hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-danger)]"
+        >
+          <TrashIcon />
+        </button>
+        <span
+          aria-hidden
+          className="pointer-events-none text-[var(--color-fg-faint)] transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-[var(--color-accent)]"
+        >
+          <ChevronRight />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 6h18" />
+      <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
+      <path d="M5.5 6l1.1 13.2A1.5 1.5 0 0 0 8.1 20.5h7.8a1.5 1.5 0 0 0 1.5-1.3L18.5 6" />
+    </svg>
   );
 }
 

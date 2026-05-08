@@ -93,6 +93,11 @@ export interface DeleteResult {
   historyLinesRemoved: number;
 }
 
+export interface DeleteProjectResult extends DeleteResult {
+  /** True only when the project directory itself was removed (all sessions cleared). */
+  projectDirRemoved: boolean;
+}
+
 export interface DiskUsageProjectRow {
   projectId: string;
   decodedCwd: string;
