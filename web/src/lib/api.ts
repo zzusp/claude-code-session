@@ -7,7 +7,16 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`${res.status} ${res.statusText}${text ? ` — ${text}` : ''}`);
+    let detail = text;
+    if (text) {
+      try {
+        const parsed = JSON.parse(text) as { error?: unknown };
+        if (typeof parsed.error === 'string') detail = parsed.error;
+      } catch {
+        /* keep raw text */
+      }
+    }
+    throw new Error(`${res.status} ${res.statusText}${detail ? ` — ${detail}` : ''}`);
   }
   return res.json() as Promise<T>;
 }
