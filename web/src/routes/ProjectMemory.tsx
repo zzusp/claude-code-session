@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import Breadcrumbs from '../components/Breadcrumbs.tsx';
+import Breadcrumbs, { BreadcrumbFolderIcon } from '../components/Breadcrumbs.tsx';
 import PageHeader, { MetaItem } from '../components/PageHeader.tsx';
 import {
   api,
@@ -145,7 +145,12 @@ export default function ProjectMemoryRoute() {
       <Breadcrumbs
         items={[
           { label: t('session.crumbProjects'), to: '/' },
-          { label: tail, to: `/projects/${encodeURIComponent(id)}`, mono: true },
+          {
+            label: tail,
+            to: `/projects/${encodeURIComponent(id)}`,
+            mono: true,
+            icon: <BreadcrumbFolderIcon />,
+          },
           { label: t('memory.title') },
         ]}
       />

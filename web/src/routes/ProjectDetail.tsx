@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import Breadcrumbs from '../components/Breadcrumbs.tsx';
+import Breadcrumbs, { BreadcrumbFolderIcon } from '../components/Breadcrumbs.tsx';
 import DeleteDialog from '../components/DeleteDialog.tsx';
 import PageHeader, { MetaItem, Sep } from '../components/PageHeader.tsx';
 import StatusDot from '../components/StatusDot.tsx';
@@ -69,7 +69,7 @@ export default function ProjectDetail() {
       <Breadcrumbs
         items={[
           { label: t('session.crumbProjects'), to: '/' },
-          { label: tail, mono: true },
+          { label: tail, mono: true, icon: <BreadcrumbFolderIcon /> },
         ]}
       />
 

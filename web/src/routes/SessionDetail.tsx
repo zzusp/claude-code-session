@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import Breadcrumbs from '../components/Breadcrumbs.tsx';
+import Breadcrumbs, { BreadcrumbFolderIcon } from '../components/Breadcrumbs.tsx';
 import DeleteDialog from '../components/DeleteDialog.tsx';
 import MessageBubble from '../components/MessageBubble.tsx';
 import {
@@ -198,8 +198,17 @@ export default function SessionDetailRoute() {
       <Breadcrumbs
         items={[
           { label: t('session.crumbProjects'), to: '/' },
-          { label: projectTail, to: `/projects/${encodeURIComponent(pid)}`, mono: true },
-          { label: sessionTitle ?? sid.slice(0, 8), mono: !sessionTitle },
+          {
+            label: projectTail,
+            to: `/projects/${encodeURIComponent(pid)}`,
+            mono: true,
+            icon: <BreadcrumbFolderIcon />,
+          },
+          {
+            label: sessionTitle ?? sid.slice(0, 8),
+            mono: !sessionTitle,
+            icon: <BreadcrumbFolderIcon />,
+          },
         ]}
       />
 
