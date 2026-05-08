@@ -78,6 +78,8 @@ const DICT = {
     'session.crumbProjects': 'Projects',
     'session.action.delete': 'Delete',
     'session.action.deleteTooltipBlocked': 'Session metadata not available yet',
+    'session.action.rename': 'Rename',
+    'session.action.renameTooltipLive': 'Live PID {{pid}} owns this session — close the running claude first',
     'session.tagline':
       'Started {{started}} · last touched {{lastTouched}}{{branchPart}}',
     'session.tagline.branch': ' · branch {{branch}}',
@@ -269,6 +271,8 @@ const DICT = {
     'session.crumbProjects': '项目',
     'session.action.delete': '删除',
     'session.action.deleteTooltipBlocked': '暂无法获取该会话状态',
+    'session.action.rename': '重命名',
+    'session.action.renameTooltipLive': '运行中 PID {{pid}} 占用此会话 — 请先关闭对应的 claude',
     'session.tagline': '开始于 {{started}} · 最后触达 {{lastTouched}}{{branchPart}}',
     'session.tagline.branch': ' · 分支 {{branch}}',
     'session.meta.messages': '消息数',

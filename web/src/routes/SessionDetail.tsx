@@ -214,6 +214,14 @@ export default function SessionDetailRoute() {
             onTitleEdit={async (next) => {
               await renameMutation.mutateAsync(next);
             }}
+            renameDisabled={currentSummary?.isLivePid === true}
+            renameTooltip={
+              currentSummary?.isLivePid === true
+                ? t('session.action.renameTooltipLive', {
+                    pid: currentSummary.livePid ?? '?',
+                  })
+                : undefined
+            }
             onDelete={currentSummary ? () => setShowDeleteDialog(true) : undefined}
             deleteDisabled={!currentSummary}
             deleteTooltip={deleteTooltip}
@@ -331,6 +339,8 @@ function SessionMasthead({
   branch,
   editableValue,
   onTitleEdit,
+  renameDisabled,
+  renameTooltip,
   onDelete,
   deleteDisabled,
   deleteTooltip,
@@ -346,6 +356,8 @@ function SessionMasthead({
   branch: string | null;
   editableValue: string;
   onTitleEdit: (next: string) => Promise<void>;
+  renameDisabled?: boolean;
+  renameTooltip?: string;
   onDelete?: () => void;
   deleteDisabled?: boolean;
   deleteTooltip?: string;
@@ -397,6 +409,8 @@ function SessionMasthead({
             editableValue={editableValue}
             onTitleEdit={onTitleEdit}
             isFallback={!title}
+            disabled={renameDisabled}
+            disabledTooltip={renameTooltip}
           />
         </div>
 
@@ -426,11 +440,15 @@ function TitleSlot({
   editableValue,
   onTitleEdit,
   isFallback,
+  disabled,
+  disabledTooltip,
 }: {
   title: ReactNode;
   editableValue: string;
   onTitleEdit: (next: string) => Promise<void>;
   isFallback: boolean;
+  disabled?: boolean;
+  disabledTooltip?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(editableValue);
@@ -477,7 +495,10 @@ function TitleSlot({
           ref={inputRef}
           value={draft}
           disabled={submitting}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            if (error) setError(null);
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
@@ -489,9 +510,8 @@ function TitleSlot({
             }
           }}
           onBlur={() => {
-            if (!submitting) {
+            if (!submitting && !error) {
               setEditing(false);
-              setError(null);
             }
           }}
           maxLength={200}
@@ -515,8 +535,9 @@ function TitleSlot({
         type="button"
         onClick={startEdit}
         aria-label="Rename"
-        title="Rename"
-        className="flex-shrink-0 rounded-md p-1.5 text-[var(--color-fg-muted)] opacity-0 transition hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)] focus:opacity-100 group-hover:opacity-100"
+        title={disabled ? disabledTooltip ?? 'Rename unavailable' : 'Rename'}
+        disabled={disabled}
+        className="flex-shrink-0 rounded-md p-1.5 text-[var(--color-fg-muted)] opacity-0 transition hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)] focus:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[var(--color-fg-muted)] disabled:opacity-40 disabled:group-hover:opacity-40"
       >
         <PencilIcon />
       </button>
