@@ -56,8 +56,7 @@ async function clickTrashFor(page, projectId) {
 }
 
 async function main() {
-  // Use system Chrome to avoid the bundled chromium download (slow on this network).
-  const browser = await chromium.launch({ channel: 'chrome' });
+  const browser = await chromium.launch();
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
   page.on('pageerror', (e) => console.error('PAGE ERROR:', e.message));
@@ -85,16 +84,20 @@ async function main() {
   } else {
     const dialog = page.locator('div[class*="rounded-[var(--radius-panel)]"]').first();
     await dialog.waitFor({ state: 'visible', timeout: 3000 });
-    // Dialog fetches sessions to compute blockers — wait for the confirm
-    // button to settle out of disabled state, or for blocker banner to appear.
-    await page.waitForTimeout(800);
+    const confirmBtn = dialog
+      .locator('footer button:has-text("Delete project"), footer button:has-text("删除项目")')
+      .last();
+    // Dialog fetches sessions on open; the confirm button is disabled while
+    // sessionsQuery is loading. Wait for it to settle (enabled = no blocker;
+    // still disabled after 5s = blocker present, but for an idle project we
+    // expect enabled).
+    await page.waitForFunction((el) => el && !el.disabled, await confirmBtn.elementHandle(), {
+      timeout: 5000,
+    }).catch(() => {});
     const dialogText = await dialog.innerText();
     const hasTitle = /Delete project|删除项目/.test(dialogText);
     const hasWarning = /removes every session|删除 .* 下的全部会话/.test(dialogText);
     const hasBlocker = /are live or were modified|个会话正在运行/.test(dialogText);
-    const confirmBtn = dialog
-      .locator('footer button:has-text("Delete project"), footer button:has-text("删除项目")')
-      .last();
     const confirmEnabled = await confirmBtn.isEnabled();
     await page.screenshot({ path: resolve(ROUND_DIR, 'a02-idle-dialog.png'), fullPage: false });
     a02ok = hasTitle && hasWarning && !hasBlocker && confirmEnabled;
@@ -113,7 +116,11 @@ async function main() {
   } else {
     const dialog = page.locator('div[class*="rounded-[var(--radius-panel)]"]').first();
     await dialog.waitFor({ state: 'visible', timeout: 3000 });
-    await page.waitForTimeout(800);
+    // Wait for the blocker banner to appear (sessionsQuery resolved with a live/recent hit).
+    await dialog
+      .locator('text=/are live or were modified|个会话正在运行/')
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .catch(() => {});
     const dialogText = await dialog.innerText();
     const hasBlocker = /are live or were modified|个会话正在运行/.test(dialogText);
     const confirmBtn = dialog

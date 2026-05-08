@@ -118,7 +118,7 @@ async function main() {
   log(`Pre-check: project visible, sessionCount=${preEntry.sessionCount}`);
 
   // Run DELETE through a real browser so Origin header is set.
-  const browser = await chromium.launch({ channel: 'chrome' });
+  const browser = await chromium.launch();
   const context = await browser.newContext();
   const page = await context.newPage();
   try {

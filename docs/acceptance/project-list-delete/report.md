@@ -4,7 +4,7 @@
 分支：`feature/project-list-delete`
 PR：https://github.com/zzusp/claude-code-session/pull/20
 环境：Windows 11、Node 22、`npm run start`（serving build at http://127.0.0.1:3131）
-浏览器：System Chrome via Playwright `channel: 'chrome'`
+浏览器：Playwright bundled chromium (chromium-headless-shell v1217)
 日期：2026-05-08
 
 ## 自动可验证
@@ -44,6 +44,6 @@ node docs/acceptance/project-list-delete/scripts/verify-destructive.mjs
 
 ## 备注
 
-- Playwright bundled chromium 在国内网络下载受阻；脚本改用 `chromium.launch({ channel: 'chrome' })` 借用系统 Chrome（`C:/Program Files/Google/Chrome/Application/chrome.exe`），避免 ~200MB 下载。其他机器上若没有系统 Chrome，可 `npx playwright install chromium` 后去掉 `channel: 'chrome'`。
+- 首次运行前需 `npx playwright install chromium` 下载 bundled chromium-headless-shell（~111 MiB）。如直连慢可设 `PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright`。
 - A-04 的 live PID 来源于运行本次会话的 Claude Code 自身（`~/.claude/sessions/19060.json`），是天然的 live blocker，无需额外构造。
 - A-03 / A-06 的合成 project 命名以 `D--acceptance--project-list-delete--` 前缀 + 时间戳 token 防撞名；如果脚本中途崩溃漏删，`docs/acceptance/project-list-delete/scripts/verify-destructive.mjs` 内的 `cleanupOnFailure` 会兜底删除项目目录并清理 `history.jsonl` 行。
