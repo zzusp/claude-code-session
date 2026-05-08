@@ -44,6 +44,16 @@ export default function DeleteDialog({ projectId, selected, onClose, onDeleted }
         body: JSON.stringify({ items }),
       }),
     onSuccess: (data) => {
+      // Drop the deleted ids from the cached session list synchronously so the
+      // list under the dialog (or after navigate-back from SessionDetail) doesn't
+      // flash the just-deleted rows while the background refetch is in flight.
+      if (data.deleted.length > 0) {
+        const removed = new Set(data.deleted.map((d) => d.sessionId));
+        queryClient.setQueryData<SessionSummary[]>(
+          queryKeys.projectSessions(projectId),
+          (prev) => prev?.filter((s) => !removed.has(s.id)),
+        );
+      }
       queryClient.invalidateQueries({ queryKey: queryKeys.projects() });
       queryClient.invalidateQueries({ queryKey: queryKeys.projectSessions(projectId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.diskUsage() });

@@ -8,7 +8,6 @@ import { dirSize, fileSize } from './fs-size.ts';
 import { isSafeId } from './safe-id.ts';
 import {
   buildActiveSessionMap,
-  isPidAlive,
   readActivePidEntries,
 } from './active-sessions.ts';
 import type {
@@ -194,7 +193,7 @@ async function rewriteHistoryWithout(sessionIds: Set<string>): Promise<number> {
 function cleanupDeadPidFiles(sessionIds: Set<string>): void {
   for (const entry of readActivePidEntries()) {
     if (!sessionIds.has(entry.sessionId)) continue;
-    if (isPidAlive(entry.pid)) continue;
+    if (entry.alive) continue;
     try {
       fs.rmSync(entry.sourceFile, { force: true });
     } catch {
