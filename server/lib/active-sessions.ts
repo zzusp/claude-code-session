@@ -34,8 +34,32 @@ export function isPidAlive(pid: number): boolean {
   }
 }
 
+/**
+ * Windows: enumerate every running PID with one `tasklist` call.
+ * Each call is ~400-700ms; doing it once instead of per-PID turns the
+ * cost from O(N×tasklist) into O(1×tasklist) for `readActivePidEntries`.
+ */
+function listAlivePidsWindows(): Set<number> {
+  const set = new Set<number>();
+  try {
+    const out = execFileSync('tasklist', ['/NH', '/FO', 'CSV'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    for (const line of out.split(/\r?\n/)) {
+      // Format: "Image Name","PID","Session Name","Session#","Mem Usage"
+      const m = line.match(/^"[^"]*","(\d+)"/);
+      if (m) set.add(Number(m[1]));
+    }
+  } catch {
+    /* return whatever we have; callers treat unknown PIDs as dead */
+  }
+  return set;
+}
+
 export function readActivePidEntries(): ActivePidEntry[] {
   if (!fs.existsSync(PATHS.sessions)) return [];
+  const alivePids = process.platform === 'win32' ? listAlivePidsWindows() : null;
   const entries: ActivePidEntry[] = [];
   for (const name of fs.readdirSync(PATHS.sessions)) {
     if (!name.endsWith('.json')) continue;
@@ -47,11 +71,12 @@ export function readActivePidEntries(): ActivePidEntry[] {
         cwd?: string;
       };
       if (typeof obj.pid !== 'number' || typeof obj.sessionId !== 'string') continue;
+      const alive = alivePids ? alivePids.has(obj.pid) : isPidAlive(obj.pid);
       entries.push({
         pid: obj.pid,
         sessionId: obj.sessionId,
         cwd: typeof obj.cwd === 'string' ? obj.cwd : '',
-        alive: isPidAlive(obj.pid),
+        alive,
         sourceFile: full,
       });
     } catch {
