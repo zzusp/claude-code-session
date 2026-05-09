@@ -14,8 +14,11 @@ export async function loadSessionDetail(
   if (!fs.existsSync(jsonlPath)) return null;
 
   let bytes = 0;
+  let mtimeIso: string | null = null;
   try {
-    bytes = fs.statSync(jsonlPath).size;
+    const stat = fs.statSync(jsonlPath);
+    bytes = stat.size;
+    mtimeIso = stat.mtime.toISOString();
   } catch {
     /* ignore */
   }
@@ -65,6 +68,13 @@ export async function loadSessionDetail(
   }
 
   messages.sort((a, b) => (a.ts ?? '').localeCompare(b.ts ?? ''));
+
+  // Match `parseJsonlMeta`: file mtime advances on untimestamped meta rewrites
+  // (ai-title rotate, rename), so fold it into lastAt to stay in sync with
+  // `claude code resume`.
+  if (mtimeIso && (!meta.lastAt || mtimeIso > meta.lastAt)) {
+    meta.lastAt = mtimeIso;
+  }
 
   meta.messageCount = messages.length;
   meta.title = deriveAutoTitle(messages);

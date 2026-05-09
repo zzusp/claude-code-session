@@ -13,7 +13,8 @@ export interface JsonlMeta {
 }
 
 export async function parseJsonlMeta(filePath: string): Promise<JsonlMeta> {
-  let title = '';
+  let firstUserTitle = '';
+  let aiTitle: string | null = null;
   let customTitle: string | null = null;
   let firstAt: string | null = null;
   let lastAt: string | null = null;
@@ -49,24 +50,35 @@ export async function parseJsonlMeta(filePath: string): Promise<JsonlMeta> {
       customTitle = obj.customTitle;
     }
 
+    // Claude Code rewrites this record every turn; the latest copy is canonical.
+    if (obj.type === 'ai-title' && typeof obj.aiTitle === 'string') {
+      aiTitle = obj.aiTitle;
+    }
+
     if (obj.type === 'user' || obj.type === 'assistant') {
       messageCount += 1;
 
-      if (!title && obj.type === 'user') {
+      if (!firstUserTitle && obj.type === 'user') {
         const msg = obj.message as { content?: unknown } | undefined;
         const candidate = extractUserText(msg?.content);
         if (candidate && !SYSTEM_TAG_RE.test(candidate)) {
-          title = candidate.slice(0, 80).replace(/\s+/g, ' ').trim();
+          firstUserTitle = candidate.slice(0, 80).replace(/\s+/g, ' ').trim();
         }
       }
     }
   }
 
+  // `claude code resume` keys off file mtime, which advances even when Claude Code
+  // rewrites untimestamped meta records (ai-title rotate, custom-title/agent-name on
+  // rename, last-prompt, permission-mode). Reconcile so the UI agrees with resume.
+  const mtimeIso = fs.statSync(filePath).mtime.toISOString();
+  const reconciledLastAt = !lastAt || mtimeIso > lastAt ? mtimeIso : lastAt;
+
   return {
-    title: title || '(untitled)',
+    title: aiTitle || firstUserTitle || '(untitled)',
     customTitle,
     firstAt,
-    lastAt,
+    lastAt: reconciledLastAt,
     messageCount,
     cwdFromMessages,
   };

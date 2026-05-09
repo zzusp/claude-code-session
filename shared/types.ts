@@ -18,11 +18,12 @@ export interface RelatedBytes {
 export interface SessionSummary {
   id: string;
   projectId: string;
-  /** Auto-derived from the first user message; always present as fallback. */
+  /** Auto-derived: latest `ai-title` record, falling back to first user message. */
   title: string;
   /** User-set name (Claude Code's `custom-title` record); null if never renamed. */
   customTitle: string | null;
   firstAt: string | null;
+  /** Last activity: max(latest record timestamp, file mtime) — matches `claude code resume`. */
   lastAt: string | null;
   messageCount: number;
   bytes: number;
@@ -57,10 +58,11 @@ export interface SessionMeta {
   gitBranch: string | null;
   version: string | null;
   firstAt: string | null;
+  /** Last activity: max(latest record timestamp, file mtime) — matches `claude code resume`. */
   lastAt: string | null;
   messageCount: number;
   bytes: number;
-  /** Auto-derived title (first user message, truncated). */
+  /** Auto-derived: latest `ai-title` record, falling back to first user message. */
   title: string;
   /** User-set name; null if never renamed. */
   customTitle: string | null;
