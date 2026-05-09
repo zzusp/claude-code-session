@@ -3,7 +3,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { PATHS } from './claude-paths.ts';
 import { MAX_SESSION_MESSAGES } from './constants.ts';
-import { SYSTEM_TAG_RE } from './system-tags.ts';
+import { SYSTEM_TAG_RE, pickTitleText } from './system-tags.ts';
 import type { Block, Message, SessionDetail, SessionMeta } from '../types.ts';
 
 export async function loadSessionDetail(
@@ -39,6 +39,9 @@ export async function loadSessionDetail(
 
   const messages: Message[] = [];
   let truncated = false;
+  // Latest `ai-title` record wins (Claude rewrites it every turn). Kept off
+  // the wire shape; just used to seed `meta.title` once parsing finishes.
+  let aiTitle: string | null = null;
 
   const rl = readline.createInterface({
     input: fs.createReadStream(jsonlPath, { encoding: 'utf8' }),
@@ -56,6 +59,9 @@ export async function loadSessionDetail(
     }
 
     captureMeta(obj, meta);
+    if (obj.type === 'ai-title' && typeof obj.aiTitle === 'string') {
+      aiTitle = obj.aiTitle;
+    }
 
     if (obj.type !== 'user' && obj.type !== 'assistant') continue;
     if (messages.length >= MAX_SESSION_MESSAGES) {
@@ -77,7 +83,7 @@ export async function loadSessionDetail(
   }
 
   meta.messageCount = messages.length;
-  meta.title = deriveAutoTitle(messages);
+  meta.title = aiTitle || deriveAutoTitle(messages);
   return { meta, messages, truncated };
 }
 
@@ -100,7 +106,9 @@ function deriveAutoTitle(messages: Message[]): string {
     if (m.type !== 'user' || m.isMeta) continue;
     for (const block of m.blocks) {
       if (block.type !== 'text') continue;
-      const line = block.text.trim().split('\n')[0] ?? '';
+      const usable = pickTitleText(block.text);
+      if (!usable) continue;
+      const line = usable.trim().split('\n')[0] ?? '';
       if (!line) continue;
       return line.length > 80 ? line.slice(0, 80) + '…' : line;
     }

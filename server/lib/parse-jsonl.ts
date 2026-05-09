@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import readline from 'node:readline';
-import { SYSTEM_TAG_RE } from './system-tags.ts';
+import { SYSTEM_TAG_RE, pickTitleText } from './system-tags.ts';
 
 export interface JsonlMeta {
   title: string;
@@ -62,7 +62,10 @@ export async function parseJsonlMeta(filePath: string): Promise<JsonlMeta> {
         const msg = obj.message as { content?: unknown } | undefined;
         const candidate = extractUserText(msg?.content);
         if (candidate && !SYSTEM_TAG_RE.test(candidate)) {
-          firstUserTitle = candidate.slice(0, 80).replace(/\s+/g, ' ').trim();
+          const usable = pickTitleText(candidate);
+          if (usable) {
+            firstUserTitle = usable.slice(0, 80).replace(/\s+/g, ' ').trim();
+          }
         }
       }
     }
