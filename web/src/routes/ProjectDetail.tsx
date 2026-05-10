@@ -95,7 +95,7 @@ export default function ProjectDetail() {
             <>
               <Link
                 to={`/projects/${encodeURIComponent(id)}/memory`}
-                className="inline-flex items-center gap-2 rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
+                className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
               >
                 <BrainIcon /> {t('memory.action.open')}
               </Link>
@@ -103,7 +103,7 @@ export default function ProjectDetail() {
                 type="button"
                 onClick={() => setShowDialog(true)}
                 disabled={selected.size === 0}
-                className="inline-flex items-center gap-2 rounded-full border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-[var(--color-danger)] transition hover:border-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-[var(--color-danger)] transition hover:border-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <TrashIcon /> {t('project.action.delete', { n: selected.size })}
               </button>

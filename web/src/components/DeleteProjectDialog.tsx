@@ -176,7 +176,7 @@ export default function DeleteProjectDialog({ project, onClose }: Props) {
                 type="button"
                 onClick={onClose}
                 disabled={mutation.isPending}
-                className="rounded-xl border border-[var(--color-hairline-strong)] px-4 py-1.5 text-sm text-[var(--color-fg-secondary)] hover:bg-[var(--color-sunken)] disabled:opacity-50"
+                className="rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] px-4 py-1.5 text-sm text-[var(--color-fg-secondary)] hover:bg-[var(--color-sunken)] disabled:opacity-50"
               >
                 {t('common.cancel')}
               </button>
@@ -184,7 +184,7 @@ export default function DeleteProjectDialog({ project, onClose }: Props) {
                 type="button"
                 onClick={() => mutation.mutate()}
                 disabled={mutation.isPending || sessionsQuery.isLoading || hasBlockers}
-                className="rounded-xl bg-[var(--color-danger)] px-4 py-1.5 text-sm font-medium text-white shadow-[var(--shadow-rise)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-[var(--radius-control)] bg-[var(--color-danger)] px-4 py-1.5 text-sm font-medium text-white shadow-[var(--shadow-rise)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {mutation.isPending
                   ? t('deleteProject.btn.confirmPending')
@@ -195,7 +195,7 @@ export default function DeleteProjectDialog({ project, onClose }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl bg-[var(--color-fg-primary)] px-4 py-1.5 text-sm font-medium text-[var(--color-canvas)] hover:opacity-90"
+              className="rounded-[var(--radius-control)] bg-[var(--color-fg-primary)] px-4 py-1.5 text-sm font-medium text-[var(--color-canvas)] hover:opacity-90"
             >
               {t('common.done')}
             </button>

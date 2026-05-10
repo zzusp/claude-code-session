@@ -33,9 +33,17 @@
   --shadow-rise: 0 1px 0 0 oklch(0.78 0.012 85 / 0.5), 0 12px 32px -16px oklch(0.30 0.012 85 / 0.18);
   --shadow-pop: 0 4px 14px -6px oklch(0.30 0.012 85 / 0.18), 0 16px 48px -20px oklch(0.30 0.012 85 / 0.20);
 
-  /* Rounded scale — soft-UI surfaces. Smaller/sharper widgets keep their existing
-     local radii (rounded-md / rounded-full); these tokens are for cards & panels. */
-  --radius-control: 0.75rem;   /* 12px — small interactive (buttons, inputs, nav items) */
+  /* Rounded scale. Pick the token by surface size, not by feel —
+     mismatched radii on small elements get clipped to half-height and
+     render as pills (e.g. --radius-card on a 30px button looks fully round).
+       buttons / inputs / nav items / dropdown triggers / modal-footer CTAs → --radius-control
+       cards / callouts                                                      → --radius-card
+       modals / large panels                                                 → --radius-panel
+     Exceptions that keep their own shape:
+       - pill switches (LocaleToggle / ThemeToggle)         → rounded-full
+       - icon-only buttons (≤36×36, e.g. p-1.5 / h-9 w-9)   → rounded-md / rounded-xl / rounded-full
+       - Breadcrumbs (composite container + nested items)   → keep rounded-lg / rounded-xl */
+  --radius-control: 0.75rem;   /* 12px — small interactive */
   --radius-card:    1.25rem;   /* 20px — cards, callouts */
   --radius-panel:   1.75rem;   /* 28px — modals, large panels */
 }

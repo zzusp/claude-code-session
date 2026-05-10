@@ -306,7 +306,7 @@ export default function SessionDetailRoute() {
                   onClick={() =>
                     setWindowSize((w) => Math.min(w + LOAD_STEP, visibleMessages.length))
                   }
-                  className="rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
+                  className="rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
                 >
                   {t('common.loadEarlier', {
                     n: Math.min(LOAD_STEP, visibleMessages.length - renderList.length),
@@ -411,7 +411,7 @@ function SessionMasthead({
               disabled={deleteDisabled || !onDelete}
               title={deleteTooltip}
               aria-label={deleteLabel}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-danger)] transition hover:border-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-danger)] transition hover:border-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-40"
             >
               <TrashIcon /> {deleteLabel}
             </button>

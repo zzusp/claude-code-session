@@ -197,7 +197,7 @@ export default function DeleteDialog({ projectId, selected, onClose, onDeleted }
                 type="button"
                 onClick={onClose}
                 disabled={mutation.isPending}
-                className="rounded-xl border border-[var(--color-hairline-strong)] px-4 py-1.5 text-sm text-[var(--color-fg-secondary)] hover:bg-[var(--color-sunken)] disabled:opacity-50"
+                className="rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] px-4 py-1.5 text-sm text-[var(--color-fg-secondary)] hover:bg-[var(--color-sunken)] disabled:opacity-50"
               >
                 {t('common.cancel')}
               </button>
@@ -209,7 +209,7 @@ export default function DeleteDialog({ projectId, selected, onClose, onDeleted }
                   )
                 }
                 disabled={mutation.isPending || willDelete.length === 0}
-                className="rounded-xl bg-[var(--color-danger)] px-4 py-1.5 text-sm font-medium text-white shadow-[var(--shadow-rise)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-[var(--radius-control)] bg-[var(--color-danger)] px-4 py-1.5 text-sm font-medium text-white shadow-[var(--shadow-rise)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {mutation.isPending
                   ? t('delete.btn.confirmPending')
@@ -226,7 +226,7 @@ export default function DeleteDialog({ projectId, selected, onClose, onDeleted }
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl bg-[var(--color-fg-primary)] px-4 py-1.5 text-sm font-medium text-[var(--color-canvas)] hover:opacity-90"
+              className="rounded-[var(--radius-control)] bg-[var(--color-fg-primary)] px-4 py-1.5 text-sm font-medium text-[var(--color-canvas)] hover:opacity-90"
             >
               {t('common.done')}
             </button>

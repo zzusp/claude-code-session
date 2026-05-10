@@ -288,7 +288,7 @@ function Toolbar({
                 type="button"
                 onClick={() => onTypeFilter(p.key)}
                 className={
-                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] transition ' +
+                  'inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.14em] transition ' +
                   (active
                     ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]'
                     : 'border-[var(--color-hairline)] text-[var(--color-fg-secondary)] hover:border-[var(--color-hairline-strong)]')
@@ -681,7 +681,7 @@ function SortMenu({
         aria-expanded={open}
         aria-label={t('memory.sort.label')}
         title={t('memory.sort.label')}
-        className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] py-1.5 pl-3 pr-2.5 font-mono text-[11px] tracking-[0.02em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-hairline-strong)] hover:text-[var(--color-fg-primary)] focus:border-[var(--color-accent)] focus:outline-none"
+        className="inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] py-1.5 pl-3 pr-2.5 font-mono text-[11px] tracking-[0.02em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-hairline-strong)] hover:text-[var(--color-fg-primary)] focus:border-[var(--color-accent)] focus:outline-none"
       >
         <SortIcon className="text-[var(--color-fg-muted)]" />
         <span>{current.label}</span>
