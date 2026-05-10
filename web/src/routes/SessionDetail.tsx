@@ -613,7 +613,7 @@ function FilterLedger({
 }) {
   const t = useT();
   return (
-    <div className="sticky top-2 z-30 mt-6 rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 sm:px-5 py-2.5 shadow-[var(--shadow-rise)]">
+    <div className="sticky top-2 z-30 mt-6 rounded-[var(--radius-input)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 sm:px-5 py-2.5 shadow-[var(--shadow-rise)]">
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex flex-1 min-w-[14rem] items-center gap-2 border-b border-[var(--color-hairline)] py-1 transition focus-within:border-[var(--color-accent)]">
           <SearchIcon className="text-[var(--color-fg-muted)]" />

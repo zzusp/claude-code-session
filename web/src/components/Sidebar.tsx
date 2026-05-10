@@ -93,7 +93,7 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
               }}
               aria-label={t('search.action.open')}
               className="surface-card is-interactive flex w-full items-center gap-2.5 px-3 py-3 text-left"
-              style={{ borderRadius: 'var(--radius-control)' }}
+              style={{ borderRadius: 'var(--radius-input)' }}
             >
               <SearchIcon className="text-[var(--color-fg-muted)]" />
               <span className="flex-1 truncate text-[13px] text-[var(--color-fg-muted)]">
@@ -118,7 +118,7 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
                     aria-current={isActive ? 'page' : undefined}
                     onClick={() => setOpen(false)}
                     className={
-                      'group flex items-center gap-3 rounded-[var(--radius-control)] border px-4 py-3 text-sm transition ' +
+                      'group flex items-center gap-3 rounded-[var(--radius-input)] border px-4 py-3 text-sm transition ' +
                       (isActive
                         ? 'border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-fg-primary)] shadow-[var(--shadow-rise)]'
                         : 'border-transparent text-[var(--color-fg-secondary)] hover:bg-[color-mix(in_oklch,var(--color-surface)_60%,transparent)] hover:text-[var(--color-fg-primary)]')

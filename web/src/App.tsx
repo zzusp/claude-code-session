@@ -4,11 +4,11 @@ import SearchModal from './components/SearchModal.tsx';
 import Sidebar from './components/Sidebar.tsx';
 import { useGlobalHotkey } from './lib/hotkeys.ts';
 import ProjectDetail from './routes/ProjectDetail.tsx';
-import ProjectMemory from './routes/ProjectMemory.tsx';
 import ProjectsList from './routes/ProjectsList.tsx';
 import SessionDetail from './routes/SessionDetail.tsx';
 
 const DiskUsage = lazy(() => import('./routes/DiskUsage.tsx'));
+const ProjectMemory = lazy(() => import('./routes/ProjectMemory.tsx'));
 
 export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -25,7 +25,14 @@ export default function App() {
           <Routes>
             <Route path="/" element={<ProjectsList />} />
             <Route path="/projects/:projectId" element={<ProjectDetail />} />
-            <Route path="/projects/:projectId/memory" element={<ProjectMemory />} />
+            <Route
+              path="/projects/:projectId/memory"
+              element={
+                <Suspense fallback={<RouteFallback />}>
+                  <ProjectMemory />
+                </Suspense>
+              }
+            />
             <Route
               path="/projects/:projectId/sessions/:sessionId"
               element={<SessionDetail />}

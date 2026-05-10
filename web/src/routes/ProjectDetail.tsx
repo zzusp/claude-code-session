@@ -6,7 +6,7 @@ import Breadcrumbs, { BreadcrumbFolderIcon } from '../components/Breadcrumbs.tsx
 import DeleteDialog from '../components/DeleteDialog.tsx';
 import PageHeader, { MetaItem, Sep } from '../components/PageHeader.tsx';
 import StatusDot from '../components/StatusDot.tsx';
-import { api, type ProjectSummary, type SessionSummary } from '../lib/api.ts';
+import { api, type MemoryResponse, type ProjectSummary, type SessionSummary } from '../lib/api.ts';
 import { formatBytes, formatRelativeTime } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
 import { fadeUpItem, staggerParent } from '../lib/motion.ts';
@@ -29,6 +29,13 @@ export default function ProjectDetail() {
     queryKey: queryKeys.projects(),
     queryFn: () => api<ProjectSummary[]>('/api/projects'),
   });
+
+  const memoryQuery = useQuery({
+    queryKey: queryKeys.projectMemory(id),
+    queryFn: () => api<MemoryResponse>(`/api/projects/${encodeURIComponent(id)}/memory`),
+    enabled: !!id,
+  });
+  const memoryCount = memoryQuery.data?.entries.length ?? 0;
 
   const project = useMemo(
     () => projectsQuery.data?.find((p) => p.id === id),
@@ -97,7 +104,10 @@ export default function ProjectDetail() {
                 to={`/projects/${encodeURIComponent(id)}/memory`}
                 className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
               >
-                <BrainIcon /> {t('memory.action.open')}
+                <BrainIcon />
+                {memoryCount > 0
+                  ? t('memory.action.openCount', { n: memoryCount })
+                  : t('memory.action.open')}
               </Link>
               <button
                 type="button"

@@ -313,7 +313,7 @@ function SessionGroup({
                 onMouseEnter={() => onHover(flat)}
                 onClick={() => onPick(hit, snippet)}
                 className={
-                  'block w-full rounded-[var(--radius-control)] px-3 py-2 text-left transition ' +
+                  'block w-full rounded-[var(--radius-input)] px-3 py-2 text-left transition ' +
                   (active
                     ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent-ink)] dark:text-[var(--color-fg-primary)]'
                     : 'text-[var(--color-fg-secondary)] hover:bg-[var(--color-sunken)]')
