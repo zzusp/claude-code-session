@@ -53,7 +53,8 @@ docs/
 │       ├── plan.md            # 或 e2e-plan.md
 │       ├── report.md          # 全绿才写
 │       ├── retrospective.md   # 可选，复盘归此处不进 spec/
-│       ├── round-N/           # 每轮独立证据，fix-rerun 必须新目录不覆盖
+│       ├── round-N.md         # 每轮验证记录，fix-rerun 新增不覆盖，N是数字
+│       ├── round-N/           # 可选，仅当该轮有独立证据(截图/日志/dump)才建目录存放
 │       ├── scripts/           # 跨轮可复用的测试脚本 / debug 工具
 │       └── fixtures/          # 跨轮复用的静态测试资产(图片/文件/权限 JSON);per-round 数据放 round-N/fixtures.json
 ├── tmp/               # 当前 session 的 ad-hoc 草稿；PR 合入后转走或删除，不得跨特性堆积
