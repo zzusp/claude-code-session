@@ -1,0 +1,60 @@
+{
+  "at": "2026-05-15T07:14:27.583Z",
+  "port": "3133",
+  "results": [
+    {
+      "id": "A-01",
+      "name": "reveal resolved project → 200 path=D:\\project\\claude-code-session",
+      "status": "pass",
+      "note": ""
+    },
+    {
+      "id": "A-02",
+      "name": "reveal without Origin → 403",
+      "status": "pass",
+      "note": "status=403"
+    },
+    {
+      "id": "A-03",
+      "name": "reveal with foreign Origin → 403",
+      "status": "pass",
+      "note": "status=403"
+    },
+    {
+      "id": "A-04",
+      "name": "reveal unknown id → 404 project not found",
+      "status": "pass",
+      "note": "status=404 body={\"error\":\"project not found\"}"
+    },
+    {
+      "id": "A-05",
+      "name": "reveal cwdResolved=false (D--project-claude-novel--claude-worktree…) → 404 directory missing",
+      "status": "pass",
+      "note": "status=404 body={\"error\":\"directory missing on disk\"}"
+    },
+    {
+      "id": "A-06",
+      "name": "project list has ≥1 cwdResolved=false fixture",
+      "status": "pass",
+      "note": ""
+    },
+    {
+      "id": "U-01",
+      "name": "resolved project shows enabled \"Open folder\" (title=D:\\project\\claude-code-session)",
+      "status": "pass",
+      "note": ""
+    },
+    {
+      "id": "U-02",
+      "name": "cwdResolved=false project shows disabled \"Open folder\"",
+      "status": "pass",
+      "note": ""
+    },
+    {
+      "id": "U-03",
+      "name": "zh locale renders \"打开目录\"",
+      "status": "pass",
+      "note": ""
+    }
+  ]
+}
