@@ -36,6 +36,26 @@ function decodeProjectId(encoded: string, sampleCwd: string | null): {
   return { decoded, resolved };
 }
 
+export async function resolveProjectCwd(
+  projectId: string,
+): Promise<{ decoded: string; resolved: boolean } | null> {
+  const projectDir = path.join(PATHS.projects, projectId);
+  if (!fs.existsSync(projectDir)) return null;
+
+  const sessionIds = listSessionIdsInProject(projectDir);
+  let sampleCwd: string | null = null;
+  for (const id of sessionIds) {
+    const jsonlPath = path.join(projectDir, `${id}${JSONL_EXT}`);
+    if (!fs.existsSync(jsonlPath)) continue;
+    const meta = await parseJsonlMeta(jsonlPath);
+    if (meta.cwdFromMessages) {
+      sampleCwd = meta.cwdFromMessages;
+      break;
+    }
+  }
+  return decodeProjectId(projectId, sampleCwd);
+}
+
 export async function listProjects(): Promise<ProjectSummary[]> {
   if (!fs.existsSync(PATHS.projects)) return [];
   const result: ProjectSummary[] = [];
