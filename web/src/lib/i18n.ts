@@ -63,6 +63,9 @@ const DICT = {
 
     'project.eyebrow': 'Project',
     'project.warn.missingDir': 'Directory missing on disk',
+    'project.action.openFolder': 'Open folder',
+    'project.action.openFolderTooltipMissing': 'Directory no longer exists on disk',
+    'project.action.openFolderFailed': 'Failed to open folder: {{msg}}',
     'project.action.delete': 'Delete · {{n}}',
     'project.meta.sessions': 'Sessions',
     'project.meta.onDisk': 'On disk',
@@ -290,6 +293,9 @@ const DICT = {
 
     'project.eyebrow': '项目',
     'project.warn.missingDir': '目录已从磁盘删除',
+    'project.action.openFolder': '打开目录',
+    'project.action.openFolderTooltipMissing': '目录已不在本机磁盘上',
+    'project.action.openFolderFailed': '打开目录失败：{{msg}}',
     'project.action.delete': '删除 · {{n}}',
     'project.meta.sessions': '会话',
     'project.meta.onDisk': '占用',

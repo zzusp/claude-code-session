@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -6,7 +6,13 @@ import Breadcrumbs, { BreadcrumbFolderIcon } from '../components/Breadcrumbs.tsx
 import DeleteDialog from '../components/DeleteDialog.tsx';
 import PageHeader, { MetaItem, Sep } from '../components/PageHeader.tsx';
 import StatusDot from '../components/StatusDot.tsx';
-import { api, type MemoryResponse, type ProjectSummary, type SessionSummary } from '../lib/api.ts';
+import {
+  api,
+  type MemoryResponse,
+  type ProjectSummary,
+  type RevealProjectResult,
+  type SessionSummary,
+} from '../lib/api.ts';
 import { formatBytes, formatRelativeTime } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
 import { fadeUpItem, staggerParent } from '../lib/motion.ts';
@@ -36,6 +42,16 @@ export default function ProjectDetail() {
     enabled: !!id,
   });
   const memoryCount = memoryQuery.data?.entries.length ?? 0;
+
+  const revealMutation = useMutation({
+    mutationFn: () =>
+      api<RevealProjectResult>(`/api/projects/${encodeURIComponent(id)}/reveal`, {
+        method: 'POST',
+      }),
+    onError: (err: Error) => {
+      window.alert(t('project.action.openFolderFailed', { msg: err.message }));
+    },
+  });
 
   const project = useMemo(
     () => projectsQuery.data?.find((p) => p.id === id),
@@ -100,6 +116,22 @@ export default function ProjectDetail() {
           title={<span className="font-mono">{tail}</span>}
           actions={
             <>
+              <button
+                type="button"
+                onClick={() => revealMutation.mutate()}
+                disabled={
+                  revealMutation.isPending || project?.cwdResolved === false
+                }
+                title={
+                  project?.cwdResolved === false
+                    ? t('project.action.openFolderTooltipMissing')
+                    : cwd
+                }
+                className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-[var(--color-accent)]"
+              >
+                <FolderOpenIcon />
+                {t('project.action.openFolder')}
+              </button>
               <Link
                 to={`/projects/${encodeURIComponent(id)}/memory`}
                 className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
@@ -289,6 +321,15 @@ function TrashIcon() {
       <path d="M3 6h18" />
       <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
       <path d="M5.5 6l1.1 13.2A1.5 1.5 0 0 0 8.1 20.5h7.8a1.5 1.5 0 0 0 1.5-1.3L18.5 6" />
+    </svg>
+  );
+}
+
+function FolderOpenIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.4a1.5 1.5 0 0 1 1.06.44l1.1 1.1a1.5 1.5 0 0 0 1.06.44H19.5A1.5 1.5 0 0 1 21 9.48" />
+      <path d="M3.2 9.5h17.6a1 1 0 0 1 .98 1.2l-1.5 7.5a1.5 1.5 0 0 1-1.47 1.2H5.2a1.5 1.5 0 0 1-1.47-1.2l-1.5-7.5A1 1 0 0 1 3.2 9.5z" />
     </svg>
   );
 }

@@ -100,6 +100,11 @@ export interface DeleteProjectResult extends DeleteResult {
   projectDirRemoved: boolean;
 }
 
+export interface RevealProjectResult {
+  ok: true;
+  path: string;
+}
+
 export interface DiskUsageProjectRow {
   projectId: string;
   decodedCwd: string;
