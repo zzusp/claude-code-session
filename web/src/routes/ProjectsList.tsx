@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import DeleteProjectDialog from '../components/DeleteProjectDialog.tsx';
+import { Loading } from '../components/Loading.tsx';
 import { MetaItem, Sep } from '../components/PageHeader.tsx';
 import { api, type HealthResponse, type ProjectSummary } from '../lib/api.ts';
 import { formatBytes, formatRelativeTime } from '../lib/format.ts';
@@ -52,11 +53,7 @@ export default function ProjectsList() {
         </Admonition>
       )}
 
-      {projects.isLoading && (
-        <p className="mt-10 font-mono text-xs uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
-          {t('common.scanning')}
-        </p>
-      )}
+      {projects.isLoading && <Loading label={t('common.scanning')} className="mt-10" />}
       {projects.error && (
         <Admonition tone="danger" className="mt-6">
           {t('common.failedProjects')}: {(projects.error as Error).message}

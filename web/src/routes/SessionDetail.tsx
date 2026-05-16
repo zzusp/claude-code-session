@@ -11,6 +11,7 @@ import {
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Breadcrumbs, { BreadcrumbFolderIcon } from '../components/Breadcrumbs.tsx';
 import DeleteDialog from '../components/DeleteDialog.tsx';
+import { Loading } from '../components/Loading.tsx';
 import MessageBubble from '../components/MessageBubble.tsx';
 import {
   api,
@@ -280,11 +281,7 @@ export default function SessionDetailRoute() {
           </Admonition>
         )}
 
-        {isLoading && (
-          <p className="font-mono text-xs uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
-            {t('common.loadingSession')}
-          </p>
-        )}
+        {isLoading && <Loading label={t('common.loadingSession')} />}
         {error && (
           <Admonition tone="danger">
             {t('common.failedSession')}: {(error as Error).message}

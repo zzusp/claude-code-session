@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Breadcrumbs, { BreadcrumbFolderIcon } from '../components/Breadcrumbs.tsx';
 import DeleteDialog from '../components/DeleteDialog.tsx';
+import { Loading } from '../components/Loading.tsx';
 import PageHeader, { MetaItem, Sep } from '../components/PageHeader.tsx';
 import StatusDot from '../components/StatusDot.tsx';
 import {
@@ -178,11 +179,7 @@ export default function ProjectDetail() {
         />
       </div>
 
-      {sessionsQuery.isLoading && (
-        <p className="mt-10 font-mono text-xs uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
-          {t('common.readingSessions')}
-        </p>
-      )}
+      {sessionsQuery.isLoading && <Loading label={t('common.readingSessions')} className="mt-10" />}
       {sessionsQuery.error && (
         <p className="mt-10 rounded-md border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-danger)]">
           {t('common.failedSessions')}: {(sessionsQuery.error as Error).message}

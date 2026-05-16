@@ -1,8 +1,10 @@
 import { lazy, Suspense, useCallback, useState } from 'react';
 import { Route, Routes } from 'react-router-dom';
+import { Loading } from './components/Loading.tsx';
 import SearchModal from './components/SearchModal.tsx';
 import Sidebar from './components/Sidebar.tsx';
 import { useGlobalHotkey } from './lib/hotkeys.ts';
+import { useT } from './lib/i18n.ts';
 import ProjectDetail from './routes/ProjectDetail.tsx';
 import ProjectsList from './routes/ProjectsList.tsx';
 import SessionDetail from './routes/SessionDetail.tsx';
@@ -54,9 +56,10 @@ export default function App() {
 }
 
 function RouteFallback() {
+  const t = useT();
   return (
-    <div className="flex h-40 items-center justify-center text-xs uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
-      loading
+    <div className="flex h-40 items-center justify-center">
+      <Loading label={t('common.loading')} className="items-center" />
     </div>
   );
 }

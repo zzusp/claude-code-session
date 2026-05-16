@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import Breadcrumbs, { BreadcrumbFolderIcon } from '../components/Breadcrumbs.tsx';
+import { Loading } from '../components/Loading.tsx';
 import PageHeader, { MetaItem, Sep } from '../components/PageHeader.tsx';
 import {
   api,
@@ -200,11 +201,7 @@ export default function ProjectMemoryRoute() {
         />
       </div>
 
-      {memoryQuery.isLoading && (
-        <p className="mt-6 font-mono text-xs uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
-          {t('memory.loading')}
-        </p>
-      )}
+      {memoryQuery.isLoading && <Loading label={t('memory.loading')} className="mt-6" />}
       {memoryQuery.error && (
         <p className="mt-6 rounded-md border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-danger)]">
           {t('common.failedMemory')}: {(memoryQuery.error as Error).message}

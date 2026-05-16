@@ -6,6 +6,7 @@ import {
   useState,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { LoadingDots } from './Loading.tsx';
 import type { SearchBlockKind, SearchDone, SearchSessionHit, SearchSnippet } from '../lib/api.ts';
 import { formatRelativeTime } from '../lib/format.ts';
 import { HOTKEY_HINT } from '../lib/hotkeys.ts';
@@ -204,8 +205,9 @@ export default function SearchModal({
             className="flex-1 bg-transparent text-[15px] text-[var(--color-fg-primary)] placeholder:text-[var(--color-fg-faint)] focus:outline-none"
           />
           {loading && (
-            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
+            <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
               {t('search.scanning')}
+              <LoadingDots />
             </span>
           )}
         </header>
