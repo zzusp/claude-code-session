@@ -69,7 +69,7 @@ docs/
 
 ## 项目概览
 
-**Claude Code Session Manager** —— 一个本地 Web UI，用于浏览 / 清理 `~/.claude/` 下的 Claude Code 会话历史。默认对磁盘只读，唯一的写操作是用户在 UI 显式点击 *Delete*。绑定 `127.0.0.1`，单用户单机使用。
+**Claude Code Session Manager** —— 一个本地 Web UI，用于浏览 / 清理 `~/.claude/` 下的 Claude Code 会话历史。默认对磁盘只读，写操作仅在用户 UI 显式触发时发生：*Delete* 一个会话、*Export* 一份可移植 bundle（写到 `~/.claude/` 之外）、或 *Import* 一份（跨设备共享记忆 + 对话历史，路径会重映射到本机）。绑定 `127.0.0.1`，单用户单机使用。
 
 详细产品说明见 [`README.md`](README.md)；设计文档见 [`docs/spec/`](docs/spec/)。
 
@@ -107,9 +107,10 @@ web/       React 19 + Vite + Tailwind v4 SPA。绝不直接读 ~/.claude/，只�
 - **删除流程的 5 个位置**（`server/lib/delete.ts`）：每条 session 实际散落在 `projects/<encoded-cwd>/<sid>.jsonl` + `projects/<encoded-cwd>/<sid>/` + `file-history/<sid>/` + `session-env/<sid>/` + `history.jsonl` 里的对应行 + `sessions/<pid>.json`（仅当 PID 已退出）。一次 delete 必须级联清理这些位置，缺一不可。
 - **删除安全网**（`server/lib/active-sessions.ts`）：sessionId 出现在仍然存活的 `sessions/<pid>.json` 中、或 `.jsonl` 在 5 分钟内被改过 → 跳过不删。Unix 用 `process.kill(pid, 0)`，Windows 用 `tasklist`。
 - **`history.jsonl` 改写用原子三步**：`backup → tmp → rename`，绝不原地写。失败时原文件保留为 `.bak-<timestamp>`。
-- **CSRF 保护**：所有 mutating endpoint（`DELETE /api/sessions`）要求 `Origin` 头匹配 `http(s)://(localhost|127.0.0.1):*`。
+- **CSRF 保护**：所有 mutating endpoint（`DELETE /api/sessions`、`POST /api/projects/:id/export`、`POST /api/import` 及 `/preview`）要求 `Origin` 头匹配 `http(s)://(localhost|127.0.0.1):*`。
+- **跨设备共享 = export/import（第二类写操作）**（`server/lib/{bundle,export-bundle,import-bundle}.ts`）：bundle 是「路径无关」的文件夹——export 把项目根的绝对路径替换成 `${CLAUDE_PROJECT_ROOT}` 哨兵，import 再换回本机选定路径。**要替换的是两个不同字段**：session `.jsonl` 行里的 `cwd`，和 `history.jsonl` 行里的 `project`（不是 `cwd`）。消息正文 / `gitBranch` / `version` 一律不改写（是归档记录）。export 拒绝写进 `~/.claude/`；import 复用 delete 的安全网（`isUnderClaudeRoot` + 跳过 live/5 分钟内活跃的 session + tmp→rename + history 原子 append-去重）。`history.jsonl` 去重 key 含 `project`，所以同 bundle 重复 import 是幂等的，但 import 到不同目标路径会当作不同条目新增。
 
-路由分布：`server/routes/{projects,sessions,disk}.ts`。每个路由文件做参数校验 → 调 `server/lib/` 下的纯函数 → 返回 `shared/types.ts` 里定义的响应类型。
+路由分布：`server/routes/{projects,sessions,disk,search,import}.ts`。每个路由文件做参数校验 → 调 `server/lib/` 下的纯函数 → 返回 `shared/types.ts` 里定义的响应类型。
 
 ### Web 端关键约束
 
@@ -129,5 +130,5 @@ web/       React 19 + Vite + Tailwind v4 SPA。绝不直接读 ~/.claude/，只�
 
 - **改了 `shared/types.ts`** → 一定要同时跑 server 和 web 的 typecheck（`npm run typecheck` 会同时跑两边）。wire 协议的字段不向前向后兼容，server / web 必须同步更新。
 - **新增 backend endpoint** → 在 `server/routes/` 下加，路径以 `/api/` 开头；记得加 ID 校验和 `isUnderClaudeRoot` 校验；前端在 `web/src/lib/api.ts` 加 fetcher，在 `query-keys.ts` 登记 key。
-- **改 `~/.claude/` 的 layout 假设** → 改 `PATHS` 一处即可；如果是新增一类相关文件，记得把它纳入 `delete.ts` 的级联清理 + `fs-size.ts` 的 `relatedBytes` 统计，否则会出现"删了但磁盘没变小"。
+- **改 `~/.claude/` 的 layout 假设** → 改 `PATHS` 一处即可；如果是新增一类相关文件，记得把它纳入 `delete.ts` 的级联清理 + `fs-size.ts` 的 `relatedBytes` 统计，否则会出现"删了但磁盘没变小"；同时判断它是否该进 export/import 的 bundle（当前 core tier 只含 `.jsonl` + memory + 匹配的 history 行）。
 - **production 模式** (`npm run start`) 要求 `dist/` 已 build，否则 Hono 的 `serveStatic` 中间件不会挂载，但 API 仍可用。dev 模式无需 build。

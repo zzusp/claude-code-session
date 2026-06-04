@@ -161,6 +161,168 @@ export interface HealthResponse {
   pid: number;
 }
 
+// ── Cross-device share: export/import bundles ───────────────────────────────
+//
+// A bundle is a path-INDEPENDENT folder a user copies / commits-to-git / cloud-
+// syncs between devices. The structural absolute path is replaced with a sentinel
+// (`placeholder`) on export and substituted with the local path on import:
+//   - session `.jsonl` lines carry the project root in their `cwd` field
+//   - `history.jsonl` lines carry it in their `project` field (different name!)
+
+export const BUNDLE_KIND = 'claude-session-bundle' as const;
+export const BUNDLE_SCHEMA_VERSION = 1 as const;
+
+export interface BundleFileMeta {
+  /** sha256 of the bytes as written into the bundle (sentinel form). */
+  sha256: string;
+  /** Line count for .jsonl / .ndjson members. */
+  lines: number;
+  bytes: number;
+}
+
+export interface BundleMemoryFileMeta {
+  filename: string;
+  /** True only for the MEMORY.md index. */
+  isIndex: boolean;
+  sha256: string;
+  bytes: number;
+}
+
+export interface BundleMemoryInventory {
+  hasIndex: boolean;
+  entries: BundleMemoryFileMeta[];
+}
+
+export interface BundleSessionMeta {
+  sessionId: string;
+  title: string;
+  customTitle: string | null;
+  firstAt: string | null;
+  lastAt: string | null;
+  messageCount: number;
+  /** True if at least one conversation line had its `cwd` replaced by the sentinel. */
+  cwdRewritten: boolean;
+  conversation: BundleFileMeta;
+  /** Null when no history.jsonl lines matched this session. */
+  history: BundleFileMeta | null;
+}
+
+export interface BundleSource {
+  platform: string;
+  pathSep: string;
+  projectId: string;
+  cwd: string;
+  cwdResolvedAtExport: boolean;
+}
+
+export interface BundleManifest {
+  schemaVersion: number;
+  kind: typeof BUNDLE_KIND;
+  exportedAt: string;
+  /** The literal sentinel string standing in for the project root. */
+  placeholder: string;
+  source: BundleSource;
+  memory: BundleMemoryInventory;
+  sessions: BundleSessionMeta[];
+}
+
+export interface ExportRequest {
+  projectId: string;
+  /** Session ids to include; null/'all' exports every session in the project. */
+  sessionIds: string[] | 'all';
+  destDir: string;
+}
+
+export interface ExportResult {
+  destDir: string;
+  sessionsExported: number;
+  memoryFilesExported: number;
+  historyLinesExported: number;
+  totalBytes: number;
+}
+
+export type ImportCollisionPolicy = 'skip' | 'overwrite-if-newer' | 'keep-both';
+
+export interface ImportTargetSuggestion {
+  cwd: string;
+  projectId: string;
+  reason: 'existing-project' | 'original-path' | 'same-basename';
+  /** True if the directory currently resolves on disk. */
+  resolved: boolean;
+}
+
+export interface ImportRemapPlan {
+  sourceCwd: string;
+  targetCwd: string;
+  targetProjectId: string;
+  /** True if a project dir already exists locally for the target id. */
+  targetProjectExists: boolean;
+}
+
+export type ImportSessionAction = 'create' | 'skip' | 'overwrite' | 'keep-both';
+
+export interface ImportSessionPlan {
+  sessionId: string;
+  title: string;
+  action: ImportSessionAction;
+  /** Present for skip; explains why. */
+  reason?: string;
+  /** For keep-both: the freshly minted session id the copy lands under. */
+  newSessionId?: string;
+  isLivePid: boolean;
+  isRecentlyActive: boolean;
+  /** Local lastAt when a same-id session already exists (drives overwrite-if-newer). */
+  localLastAt: string | null;
+  bundleLastAt: string | null;
+}
+
+export type ImportMemoryAction = 'create' | 'skip' | 'conflict';
+
+export interface ImportMemoryPlan {
+  filename: string;
+  isIndex: boolean;
+  action: ImportMemoryAction;
+  /** For conflict: the alternate filename the incoming copy will be written as. */
+  writtenAs?: string;
+}
+
+export interface ImportPreviewRequest {
+  bundleDir: string;
+  /** Omit to let the server pick the best-suggested target. */
+  targetCwd?: string;
+  collisionPolicy: ImportCollisionPolicy;
+}
+
+export interface ImportPreviewResult {
+  source: BundleSource;
+  remap: ImportRemapPlan;
+  suggestions: ImportTargetSuggestion[];
+  sessions: ImportSessionPlan[];
+  memory: ImportMemoryPlan[];
+  historyLinesToAdd: number;
+}
+
+export interface ImportCommitRequest {
+  bundleDir: string;
+  targetCwd: string;
+  collisionPolicy: ImportCollisionPolicy;
+}
+
+export interface ImportedSession {
+  sessionId: string;
+  action: ImportSessionAction;
+  newSessionId?: string;
+}
+
+export interface ImportResult {
+  targetProjectId: string;
+  targetCwd: string;
+  imported: ImportedSession[];
+  skipped: SkippedItem[];
+  historyLinesAdded: number;
+  memoryWritten: string[];
+}
+
 export type SearchBlockKind = 'text' | 'tool_use' | 'tool_result' | 'thinking';
 
 export interface SearchSnippet {

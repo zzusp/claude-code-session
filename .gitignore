@@ -17,3 +17,6 @@ npm-debug.log*
 # Local env overrides
 .env
 .env.local
+
+# Regenerable acceptance screenshots (big binaries — recreate via the round's script)
+docs/acceptance/cross-device-sharing/round-1/*.png

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { PATHS } from './lib/claude-paths.ts';
 import { findAvailablePort } from './lib/port.ts';
 import { diskRoute } from './routes/disk.ts';
+import { importRoute } from './routes/import.ts';
 import { projectsRoute } from './routes/projects.ts';
 import { searchRoute } from './routes/search.ts';
 import { sessionsRoute } from './routes/sessions.ts';
@@ -44,6 +45,7 @@ app.route('/api/projects', projectsRoute);
 app.route('/api/sessions', sessionsRoute);
 app.route('/api/disk-usage', diskRoute);
 app.route('/api/search', searchRoute);
+app.route('/api/import', importRoute);
 
 if (fs.existsSync(distDir)) {
   app.use('/*', serveStatic({ root: path.relative(process.cwd(), distDir) || '.' }));
