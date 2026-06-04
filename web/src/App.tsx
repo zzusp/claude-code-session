@@ -11,6 +11,7 @@ import SessionDetail from './routes/SessionDetail.tsx';
 
 const DiskUsage = lazy(() => import('./routes/DiskUsage.tsx'));
 const ProjectMemory = lazy(() => import('./routes/ProjectMemory.tsx'));
+const ImportPage = lazy(() => import('./routes/ImportPage.tsx'));
 
 export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -44,6 +45,14 @@ export default function App() {
               element={
                 <Suspense fallback={<RouteFallback />}>
                   <DiskUsage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/import"
+              element={
+                <Suspense fallback={<RouteFallback />}>
+                  <ImportPage />
                 </Suspense>
               }
             />

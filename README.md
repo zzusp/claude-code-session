@@ -2,7 +2,7 @@
 
 A local web UI to view and clean up Claude Code session history stored under `~/.claude/`.
 
-> **Read-only on disk by default.** The only write the server performs is when you explicitly click *Delete* in the UI. Active sessions (with a live PID or recent activity) are skipped automatically.
+> **Read-only on disk by default.** The server only writes when you explicitly act in the UI — *Delete* a session, *Export* a bundle (written to a folder **outside** `~/.claude/`), or *Import* one. Active sessions (with a live PID or recent activity) are never deleted or overwritten.
 
 ## Screenshots
 
@@ -28,7 +28,8 @@ A local web UI to view and clean up Claude Code session history stored under `~/
 | Page | What you can do |
 |---|---|
 | **Projects** (`/`) | See every Claude Code project (one per `cwd`) with session count, total bytes on disk, last-activity time. |
-| **Project detail** (`/projects/:id`) | Browse all sessions in one project. Multi-select + cascade-delete. Each row shows title, message count, byte breakdown, and a status badge (`live · pid N` / `recently active` / `idle`). Inline rename appends a `custom-title` record to the session's `.jsonl` (refused while a live PID owns the session). *Open folder* reveals the project's working directory in the OS file manager (Explorer / Finder / `xdg-open`). |
+| **Project detail** (`/projects/:id`) | Browse all sessions in one project. Multi-select + cascade-delete. Each row shows title, message count, byte breakdown, and a status badge (`live · pid N` / `recently active` / `idle`). Inline rename appends a `custom-title` record to the session's `.jsonl` (refused while a live PID owns the session). *Open folder* reveals the project's working directory in the OS file manager (Explorer / Finder / `xdg-open`). *Export* bundles the selected sessions (or all) plus the project's memory into a portable folder. |
+| **Import** (`/import`) | Bring a project's sessions + memory from another device. The bundle is path-independent; on import you pick the local target folder and paths are remapped to this machine. A dry-run preview shows exactly what will be created / skipped / overwritten before any write. See [Cross-device sharing](#cross-device-sharing). |
 | **Session detail** (`/projects/:id/sessions/:sid`) | Full message timeline: text, tool calls (collapsible), tool results, thinking blocks. Sticky search bar with client-side highlight. Toggle to show or hide system messages (`<command-name>` etc.). Inline *Delete* (top-right of the masthead) removes the current session and returns to the project list. |
 | **Project memory** (`/projects/:id/memory`) | Two-pane reader for `~/.claude/projects/<encoded-cwd>/memory/`: searchable file list (sort by index / recent / name / size) on the left, rendered Markdown on the right, with `MEMORY.md` pinned as the index. |
 | **Disk usage** (`/disk`) | Pie chart by project, monthly bar chart, top-20 largest sessions with deep links. |
@@ -80,6 +81,27 @@ Claude Code stores session data across **five** locations under `~/.claude/`. De
 
 The UI's confirmation dialog shows the exact files and bytes that will be removed *and* lists which selections will be skipped and why.
 
+## Cross-device sharing
+
+Export/import move a project's **memory + conversation history** between machines, accounting for the fact that the same project lives at a different absolute path on each device.
+
+**The path problem.** A project id is just the encoded `cwd`, and the real path is recorded *inside* the data — as `cwd` on every session `.jsonl` line and as `project` on every matching `history.jsonl` line. A bundle is therefore made **path-independent** at export: those two fields are replaced with a `${CLAUDE_PROJECT_ROOT}` sentinel. On import you choose the local target folder and the sentinel is substituted with that path. Message bodies, `gitBranch`, and `version` are **never** rewritten — they're an archival record.
+
+**Bundle (a plain folder you can copy, or keep in a git repo / cloud drive):**
+
+```
+<bundle>/
+  manifest.json            # schema, source platform + cwd, per-file sha256
+  memory/                  # MEMORY.md + *.md, copied verbatim
+  sessions/<sid>/
+    conversation.jsonl     # cwd     -> ${CLAUDE_PROJECT_ROOT}
+    history.ndjson         # project -> ${CLAUDE_PROJECT_ROOT}
+```
+
+Scope is the **core tier**: memory, conversations, and the matching `history.jsonl` lines (all path-portable). `file-history/`, `session-env/`, and the session subdir are intentionally excluded — they embed source-device absolute paths and aren't portable.
+
+**Import is safe by construction.** It reuses the same guards as delete: paths are validated under `~/.claude/`, a session that is live or was modified in the last 5 minutes is never overwritten, files are written via tmp→rename, and the `history.jsonl` merge is an atomic backup→tmp→rename append with de-duplication (so re-importing the same bundle is a no-op). When a session id already exists you choose **skip** (default), **overwrite if newer**, or **keep both** (imports under a fresh id).
+
 ## Architecture
 
 ```
@@ -87,14 +109,14 @@ shared/         Wire types + constants imported by BOTH server and web.
 server/         Hono + @hono/node-server backend, all filesystem operations.
   lib/          claude-paths, encode-cwd, scan, parse-jsonl, load-session,
                 load-memory, rename-session, search-all, search-session,
-                active-sessions, delete, disk-usage, fs-size, safe-id,
-                system-tags, port, …
-  routes/       projects, sessions, disk, search
+                active-sessions, delete, bundle, export-bundle, import-bundle,
+                disk-usage, fs-size, safe-id, system-tags, port, …
+  routes/       projects, sessions, disk, search, import
 web/            React 19 + Vite + Tailwind v4 SPA.
   src/routes/   ProjectsList, ProjectDetail, SessionDetail,
-                ProjectMemory, DiskUsage (lazy)
+                ProjectMemory, DiskUsage (lazy), ImportPage (lazy)
   src/components  Sidebar, SearchModal, PageHeader, MessageBubble,
-                  ToolBlock, DeleteDialog, HighlightedText, …
+                  ToolBlock, DeleteDialog, ExportDialog, HighlightedText, …
   src/lib       api, query-keys, i18n, theme, hotkeys, format
 docs/spec/      Design notes (start here before refactoring).
 docs/acceptance/  Per-feature e2e plans, round evidence, retrospectives.
@@ -111,6 +133,9 @@ docs/acceptance/  Per-feature e2e plans, round evidence, retrospectives.
 | `GET` | `/api/sessions/:projectId/:sessionId` | Full parsed message timeline. |
 | `PATCH` | `/api/sessions/:projectId/:sessionId` | Rename a session by appending a `custom-title` record to the `.jsonl`. |
 | `DELETE` | `/api/sessions` | Cascade-delete one or more sessions; CSRF-checked via `Origin`. |
+| `POST` | `/api/projects/:id/export` | Write a path-independent bundle (memory + conversations) to a folder outside `~/.claude/`; CSRF-checked. |
+| `POST` | `/api/import/preview` | Dry run: remap plan, per-session/memory actions, and history-line count — writes nothing; CSRF-checked. |
+| `POST` | `/api/import` | Commit an import into `~/.claude/` (atomic, never overwrites a live/recent session); CSRF-checked. |
 | `GET` | `/api/disk-usage` | Per-project totals + monthly buckets + top-N sessions. |
 | `GET` | `/api/search?q=...` | NDJSON stream of matches across every project. |
 
@@ -151,7 +176,8 @@ Decoding a project id back to a real path uses each session's own `cwd` field (r
 This tool is intended for a single user on their own machine. It is *not* hardened for multi-user / shared environments.
 
 - The HTTP listener binds to `127.0.0.1` only.
-- Mutating endpoints (`DELETE /api/sessions`, `PATCH /api/sessions/:projectId/:sessionId`) require an `Origin` header matching `http(s)://(localhost|127.0.0.1):*`. This blocks other web pages your browser opens from triggering writes via CSRF, but cannot stop another local process running as the same user.
+- Mutating endpoints (`DELETE /api/sessions`, `PATCH /api/sessions/:projectId/:sessionId`, `POST /api/projects/:id/export`, `POST /api/import` and its `/preview`) require an `Origin` header matching `http(s)://(localhost|127.0.0.1):*`. This blocks other web pages your browser opens from triggering writes via CSRF, but cannot stop another local process running as the same user.
+- *Export* refuses to write inside `~/.claude/`; *import* validates every destination under `~/.claude/`, skips any live/recently-active session, and writes atomically — the same safety rails as delete.
 - All filesystem paths are validated with `path.resolve(...).startsWith(claudeRoot)` (Windows-aware case-folded) before any read or write.
 - IDs from URL params are rejected if they contain `/`, `\`, `..`, or start with `.`.
 - The cross-session search endpoint streams NDJSON and aborts when the client disconnects, so a closed browser tab stops the scan immediately.

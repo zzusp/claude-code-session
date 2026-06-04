@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { deleteProject } from '../lib/delete-project.ts';
+import { ExportError, exportBundle } from '../lib/export-bundle.ts';
 import { loadProjectMemory } from '../lib/load-memory.ts';
 import { openFolder } from '../lib/open-folder.ts';
 import { isSafeId } from '../lib/safe-id.ts';
@@ -41,6 +42,44 @@ projectsRoute.post('/:id/reveal', async (c) => {
   if (!result.ok) return c.json({ error: result.error ?? 'failed to open folder' }, 500);
 
   return c.json({ ok: true, path: cwd.decoded });
+});
+
+projectsRoute.post('/:id/export', async (c) => {
+  if (!isAcceptableOrigin(c.req.header('origin'))) {
+    return c.json({ error: 'origin not allowed' }, 403);
+  }
+  const id = c.req.param('id');
+  if (!isSafeId(id)) return c.json({ error: 'invalid project id' }, 400);
+
+  let body: { sessionIds?: unknown; destDir?: unknown };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: 'invalid JSON body' }, 400);
+  }
+  if (typeof body.destDir !== 'string' || body.destDir.trim() === '') {
+    return c.json({ error: 'destDir is required' }, 400);
+  }
+
+  let sessionIds: string[] | 'all';
+  if (body.sessionIds === undefined || body.sessionIds === 'all') {
+    sessionIds = 'all';
+  } else if (
+    Array.isArray(body.sessionIds) &&
+    body.sessionIds.every((s) => typeof s === 'string')
+  ) {
+    sessionIds = body.sessionIds as string[];
+  } else {
+    return c.json({ error: 'sessionIds must be an array of strings or "all"' }, 400);
+  }
+
+  try {
+    const result = await exportBundle(id, sessionIds, body.destDir);
+    return c.json(result);
+  } catch (err) {
+    if (err instanceof ExportError) return c.json({ error: err.message }, 400);
+    throw err;
+  }
 });
 
 projectsRoute.delete('/:id', async (c) => {

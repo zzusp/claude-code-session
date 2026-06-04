@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Breadcrumbs, { BreadcrumbFolderIcon } from '../components/Breadcrumbs.tsx';
 import DeleteDialog from '../components/DeleteDialog.tsx';
+import ExportDialog from '../components/ExportDialog.tsx';
 import { Loading } from '../components/Loading.tsx';
 import PageHeader, { MetaItem, Sep } from '../components/PageHeader.tsx';
 import StatusDot from '../components/StatusDot.tsx';
@@ -25,6 +26,7 @@ export default function ProjectDetail() {
   const id = projectId ?? '';
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showDialog, setShowDialog] = useState(false);
+  const [showExport, setShowExport] = useState(false);
 
   const sessionsQuery = useQuery({
     queryKey: queryKeys.projectSessions(id),
@@ -64,6 +66,7 @@ export default function ProjectDetail() {
     () => sessions.filter((s) => selected.has(s.id)),
     [sessions, selected],
   );
+  const sessionsToExport = selected.size > 0 ? selectedSessions : sessions;
   const projectBytes = useMemo(() => sessions.reduce((a, s) => a + totalBytes(s), 0), [sessions]);
   const liveCount = useMemo(() => sessions.filter((s) => s.isLivePid).length, [sessions]);
   const recentCount = useMemo(
@@ -142,6 +145,18 @@ export default function ProjectDetail() {
                   ? t('memory.action.openCount', { n: memoryCount })
                   : t('memory.action.open')}
               </Link>
+              <button
+                type="button"
+                onClick={() => setShowExport(true)}
+                disabled={sessions.length === 0}
+                title={selected.size > 0 ? `${selected.size}` : undefined}
+                className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-1.5 text-xs font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-[var(--color-accent)]"
+              >
+                <ExportIcon />
+                {selected.size > 0
+                  ? `${t('export.action')} · ${selected.size}`
+                  : t('export.action')}
+              </button>
               <button
                 type="button"
                 onClick={() => setShowDialog(true)}
@@ -293,6 +308,14 @@ export default function ProjectDetail() {
           }}
         />
       )}
+
+      {showExport && (
+        <ExportDialog
+          projectId={id}
+          sessions={sessionsToExport}
+          onClose={() => setShowExport(false)}
+        />
+      )}
     </section>
   );
 }
@@ -318,6 +341,16 @@ function TrashIcon() {
       <path d="M3 6h18" />
       <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
       <path d="M5.5 6l1.1 13.2A1.5 1.5 0 0 0 8.1 20.5h7.8a1.5 1.5 0 0 0 1.5-1.3L18.5 6" />
+    </svg>
+  );
+}
+
+function ExportIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 3v12" />
+      <path d="M8 7l4-4 4 4" />
+      <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15" />
     </svg>
   );
 }

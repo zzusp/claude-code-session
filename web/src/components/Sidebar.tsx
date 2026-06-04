@@ -7,7 +7,7 @@ import ThemeToggle from './ThemeToggle.tsx';
 
 interface NavItem {
   to: string;
-  labelKey: 'nav.projects' | 'nav.disk';
+  labelKey: 'nav.projects' | 'nav.disk' | 'nav.import';
   icon: ReactNode;
   match: (pathname: string) => boolean;
 }
@@ -24,6 +24,12 @@ const NAV: NavItem[] = [
     labelKey: 'nav.disk',
     icon: <DiskIcon />,
     match: (p) => p === '/disk' || p.startsWith('/disk/'),
+  },
+  {
+    to: '/import',
+    labelKey: 'nav.import',
+    icon: <ImportIcon />,
+    match: (p) => p === '/import' || p.startsWith('/import/'),
   },
 ];
 
@@ -205,6 +211,16 @@ function DiskIcon() {
       <ellipse cx="12" cy="6.5" rx="8" ry="2.5" />
       <path d="M4 6.5v5c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-5" />
       <path d="M4 11.5v5c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-5" />
+    </svg>
+  );
+}
+
+function ImportIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 14V3" />
+      <path d="M8 10l4 4 4-4" />
+      <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15" />
     </svg>
   );
 }
