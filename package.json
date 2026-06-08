@@ -1,8 +1,14 @@
 {
-  "name": "@your-npm-scope/ccsm",
+  "name": "@zzusp/ccsm",
   "version": "0.1.0",
   "description": "Local web UI to view and clean up Claude Code session history (~/.claude/)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zzusp/claude-code-session.git"
+  },
+  "homepage": "https://github.com/zzusp/claude-code-session#readme",
+  "bugs": "https://github.com/zzusp/claude-code-session/issues",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -26,7 +32,8 @@
     "cli"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
     "dev": "concurrently -k -n server,web -c blue,magenta \"npm:dev:server\" \"npm:dev:web\"",

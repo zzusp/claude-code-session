@@ -65,15 +65,12 @@ Default port is `3131`. If it's busy, the server tries `3132 … 3140` and print
 Published to npm, the manager installs as a single command — `ccsm` — that starts the
 production server (the built SPA + the API in one process, no separate Vite dev server).
 
-> The package name below is a placeholder. Set your real npm scope in
-> [`package.json`](package.json) (replace `@your-npm-scope/ccsm`) before `npm publish`.
-
 ```bash
 # Run once, without installing
-npx @your-npm-scope/ccsm
+npx @zzusp/ccsm
 
 # …or install globally and run `ccsm` from anywhere
-npm install -g @your-npm-scope/ccsm
+npm install -g @zzusp/ccsm
 ccsm
 ```
 
