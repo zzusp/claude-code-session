@@ -60,6 +60,48 @@ Open <http://localhost:5173>.
 The HTTP server binds to `127.0.0.1` only — never reachable from the LAN.
 Default port is `3131`. If it's busy, the server tries `3132 … 3140` and prints the actual port to stdout.
 
+## Install as a CLI
+
+Published to npm, the manager installs as a single command — `ccsm` — that starts the
+production server (the built SPA + the API in one process, no separate Vite dev server).
+
+> The package name below is a placeholder. Set your real npm scope in
+> [`package.json`](package.json) (replace `@your-npm-scope/ccsm`) before `npm publish`.
+
+```bash
+# Run once, without installing
+npx @your-npm-scope/ccsm
+
+# …or install globally and run `ccsm` from anywhere
+npm install -g @your-npm-scope/ccsm
+ccsm
+```
+
+It prints the URL it picked (e.g. <http://127.0.0.1:3131>); open that. Requires **Node 22+**.
+
+| Flag | Effect |
+|---|---|
+| `-p, --port <number>` | Port to listen on. Default: first free port in `3131 … 3140`. If the given port is busy, `ccsm` exits — it won't silently pick another. |
+| `--host <host>` | Host to bind. Default `127.0.0.1` (loopback only). Pass `0.0.0.0` to expose the UI on your LAN — **no authentication**, see [Security model](#security-model). |
+| `-o, --open` | Open the UI in your default browser once the server is listening. |
+| `-h, --help` | Show usage and exit. |
+| `-v, --version` | Print the version and exit. |
+
+```bash
+ccsm --port 4000 --open       # custom port, then pop open the browser
+ccsm --host 0.0.0.0           # expose on the LAN (trusted networks only)
+```
+
+**Install from a local checkout** (without publishing to npm):
+
+```bash
+git clone <this-repo> && cd claude-code-session
+npm install
+npm run build         # produce dist/ — the CLI serves it
+npm install -g .      # or: npm link — registers the `ccsm` command
+ccsm
+```
+
 ## What gets deleted
 
 Claude Code stores session data across **five** locations under `~/.claude/`. Deleting a session here cleans up all of them in one shot:
@@ -175,7 +217,7 @@ Decoding a project id back to a real path uses each session's own `cwd` field (r
 
 This tool is intended for a single user on their own machine. It is *not* hardened for multi-user / shared environments.
 
-- The HTTP listener binds to `127.0.0.1` only.
+- The HTTP listener binds to `127.0.0.1` only by default — never reachable from the LAN. The CLI's `--host` flag can override this (e.g. `--host 0.0.0.0`); doing so exposes the UI on your network with **no authentication**, so anyone who can reach the host:port can read and delete your Claude Code history. The server prints a warning on startup whenever it binds to a non-loopback host. Only do this on a network you trust.
 - Mutating endpoints (`DELETE /api/sessions`, `PATCH /api/sessions/:projectId/:sessionId`, `POST /api/projects/:id/export`, `POST /api/import` and its `/preview`) require an `Origin` header matching `http(s)://(localhost|127.0.0.1):*`. This blocks other web pages your browser opens from triggering writes via CSRF, but cannot stop another local process running as the same user.
 - *Export* refuses to write inside `~/.claude/`; *import* validates every destination under `~/.claude/`, skips any live/recently-active session, and writes atomically — the same safety rails as delete.
 - All filesystem paths are validated with `path.resolve(...).startsWith(claudeRoot)` (Windows-aware case-folded) before any read or write.
