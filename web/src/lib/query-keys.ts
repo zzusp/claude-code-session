@@ -5,6 +5,8 @@ export const queryKeys = {
   projectMemory: (projectId: string) => ['project-memory', projectId] as const,
   session: (projectId: string, sessionId: string) =>
     ['session', projectId, sessionId] as const,
+  sessionModifiedFiles: (projectId: string, sessionId: string) =>
+    ['session-modified-files', projectId, sessionId] as const,
   diskUsage: () => ['disk-usage'] as const,
   diskCleanupSuggestions: () => ['disk-cleanup-suggestions'] as const,
   search: (query: string) => ['search', query] as const,

@@ -1,10 +1,24 @@
 import { Hono } from 'hono';
 import { deleteSessions, type DeleteRequestItem } from '../lib/delete.ts';
 import { loadSessionDetail } from '../lib/load-session.ts';
+import { loadModifiedFiles } from '../lib/modified-files.ts';
 import { renameSession } from '../lib/rename-session.ts';
 import { isSafeId } from '../lib/safe-id.ts';
 
 export const sessionsRoute = new Hono();
+
+// 注意：放在 /:projectId/:sessionId 之前——Hono trie 对静态后缀的具体路由优先匹配，
+// 但显式按"更具体的路由先注册"是最稳的写法，避免日后引入其他通配段时被错位拦截。
+sessionsRoute.get('/:projectId/:sessionId/modified-files', async (c) => {
+  const projectId = c.req.param('projectId');
+  const sessionId = c.req.param('sessionId');
+  if (!isSafeId(projectId) || !isSafeId(sessionId)) {
+    return c.json({ error: 'invalid id' }, 400);
+  }
+  const result = await loadModifiedFiles(projectId, sessionId);
+  if (!result) return c.json({ error: 'not found' }, 404);
+  return c.json(result);
+});
 
 sessionsRoute.get('/:projectId/:sessionId', async (c) => {
   const projectId = c.req.param('projectId');
