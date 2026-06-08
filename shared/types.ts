@@ -135,6 +135,42 @@ export interface DiskUsage {
   totalSessions: number;
 }
 
+// ── 清理建议：把"可行动"的 cleanup target 显式列出来 ──────────────────────────
+//
+// largeSessions：top 10 最大的会话（按 jsonl + subdir + file-history + session-env 合计）
+// orphanFileHistory / orphanSessionEnv：file-history/<sid>/ 或 session-env/<sid>/ 存在，
+//   但对应 sid 在 projects/*/<sid>.jsonl 全集中找不到——典型情况是会话主体已被手动删
+//   掉但侧 store 没清，纯属浪费磁盘。
+
+export interface DiskCleanupLargeSession {
+  sessionId: string;
+  projectId: string;
+  projectPath: string;
+  title: string;
+  customTitle: string | null;
+  sizeBytes: number;
+  lastActivity: string | null;
+}
+
+export type DiskOrphanKind = 'file-history' | 'session-env';
+
+export interface DiskCleanupOrphan {
+  sessionId: string;
+  sizeBytes: number;
+}
+
+export interface DiskCleanupSuggestions {
+  largeSessions: DiskCleanupLargeSession[];
+  orphanFileHistory: DiskCleanupOrphan[];
+  orphanSessionEnv: DiskCleanupOrphan[];
+}
+
+export interface DiskOrphanDeleteResult {
+  sessionId: string;
+  kind: DiskOrphanKind;
+  freedBytes: number;
+}
+
 export type MemoryType = 'user' | 'feedback' | 'project' | 'reference';
 
 export interface MemoryEntry {

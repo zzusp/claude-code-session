@@ -150,6 +150,35 @@ const DICT = {
     'disk.col.last': 'Last',
     'disk.col.size': 'Size',
 
+    'cleanup.title': 'Cleanup suggestions',
+    'cleanup.tagline':
+      'Things worth pruning. Review each row, then act — nothing here runs automatically.',
+    'cleanup.section.largeSessions': 'Largest sessions',
+    'cleanup.section.largeSessions.hint': 'Top {{n}} by total bytes on disk',
+    'cleanup.section.orphanFileHistory': 'Orphan file-history',
+    'cleanup.section.orphanFileHistory.hint':
+      'file-history/<sid>/ folders with no surviving session',
+    'cleanup.section.orphanSessionEnv': 'Orphan session-env',
+    'cleanup.section.orphanSessionEnv.hint':
+      'session-env/<sid>/ folders with no surviving session',
+    'cleanup.empty.largeSessions': 'No sessions on disk yet.',
+    'cleanup.empty.orphan': 'No orphans — nothing to prune.',
+    'cleanup.col.session': 'Session',
+    'cleanup.col.project': 'Project',
+    'cleanup.col.last': 'Last',
+    'cleanup.col.size': 'Size',
+    'cleanup.col.sid': 'Session id',
+    'cleanup.col.actions': 'Actions',
+    'cleanup.action.view': 'View',
+    'cleanup.action.delete': 'Delete',
+    'cleanup.action.deleting': 'Deleting…',
+    'cleanup.confirm.title': 'Delete orphan?',
+    'cleanup.confirm.body':
+      'This removes {{kind}}/{{sid}}/ ({{size}}) permanently. The session jsonl is already gone, so nothing else is affected.',
+    'cleanup.confirm.confirm': 'Delete',
+    'cleanup.confirm.cancel': 'Cancel',
+    'cleanup.failed': 'Failed: {{msg}}',
+
     'memory.title': 'Memory',
     'memory.empty': 'No memory recorded yet for this project.',
     'memory.action.open': 'Memory',
@@ -451,6 +480,35 @@ const DICT = {
     'disk.col.project': '项目',
     'disk.col.last': '最近',
     'disk.col.size': '大小',
+
+    'cleanup.title': '清理建议',
+    'cleanup.tagline':
+      '值得清理的目标。逐条审视并手动操作 — 这里没有任何自动清理。',
+    'cleanup.section.largeSessions': '最大的会话',
+    'cleanup.section.largeSessions.hint': '按总占用前 {{n}} 名',
+    'cleanup.section.orphanFileHistory': '孤儿 file-history',
+    'cleanup.section.orphanFileHistory.hint':
+      'file-history/<sid>/ 目录但无对应会话',
+    'cleanup.section.orphanSessionEnv': '孤儿 session-env',
+    'cleanup.section.orphanSessionEnv.hint':
+      'session-env/<sid>/ 目录但无对应会话',
+    'cleanup.empty.largeSessions': '磁盘上还没有会话。',
+    'cleanup.empty.orphan': '无孤儿 — 无可清理。',
+    'cleanup.col.session': '会话',
+    'cleanup.col.project': '项目',
+    'cleanup.col.last': '最近',
+    'cleanup.col.size': '大小',
+    'cleanup.col.sid': '会话 id',
+    'cleanup.col.actions': '操作',
+    'cleanup.action.view': '查看',
+    'cleanup.action.delete': '删除',
+    'cleanup.action.deleting': '删除中…',
+    'cleanup.confirm.title': '确认删除孤儿？',
+    'cleanup.confirm.body':
+      '将永久删除 {{kind}}/{{sid}}/（{{size}}）。其会话主体已不存在，不会影响其他数据。',
+    'cleanup.confirm.confirm': '删除',
+    'cleanup.confirm.cancel': '取消',
+    'cleanup.failed': '失败：{{msg}}',
 
     'memory.title': '记忆',
     'memory.empty': '该项目尚未沉淀任何记忆。',

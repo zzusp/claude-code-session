@@ -13,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import CleanupSuggestions from '../components/CleanupSuggestions.tsx';
 import { Loading } from '../components/Loading.tsx';
 import { MetaItem, Sep } from '../components/PageHeader.tsx';
 import StatCard from '../components/StatCard.tsx';
@@ -346,6 +347,8 @@ export default function DiskUsageRoute() {
               </div>
             )}
           </div>
+
+          <CleanupSuggestions />
         </>
       )}
     </section>
