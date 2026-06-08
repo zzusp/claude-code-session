@@ -1,11 +1,39 @@
 {
-  "name": "claude-code-session-manager",
-  "version": "0.1.0",
+  "name": "@zzusp/ccsm",
+  "version": "1.0.0",
   "description": "Local web UI to view and clean up Claude Code session history (~/.claude/)",
-  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zzusp/claude-code-session.git"
+  },
+  "homepage": "https://github.com/zzusp/claude-code-session#readme",
+  "bugs": "https://github.com/zzusp/claude-code-session/issues",
   "type": "module",
   "engines": {
     "node": ">=22"
+  },
+  "bin": {
+    "ccsm": "bin/cli.mjs"
+  },
+  "files": [
+    "bin/",
+    "server/",
+    "shared/",
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "session-manager",
+    "cli"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
     "dev": "concurrently -k -n server,web -c blue,magenta \"npm:dev:server\" \"npm:dev:web\"",
@@ -13,7 +41,8 @@
     "dev:web": "node scripts/wait-for-server.mjs && vite",
     "build": "vite build",
     "start": "tsx server/index.ts",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@fontsource-variable/geist-mono": "^5.2.7",
@@ -25,7 +54,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.1",
-    "recharts": "^2.15.0"
+    "recharts": "^2.15.0",
+    "tsx": "^4.19.2"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
@@ -36,7 +66,6 @@
     "concurrently": "^9.1.2",
     "playwright": "^1.59.1",
     "tailwindcss": "^4.0.0",
-    "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vite": "^6.0.7"
   }
