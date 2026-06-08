@@ -84,8 +84,9 @@ docs/
 | `npm run build` | 用 Vite 把 SPA 构建到 `dist/`。 |
 | `npm run start` | 单进程生产模式：Hono 同时托管 `dist/` 静态资源和 API。 |
 | `npm run typecheck` | `tsc -b` 同时校验 `tsconfig.server.json` + `tsconfig.web.json`。 |
+| `npm test` | vitest 跑 `server/**/*.test.ts`：覆盖 safety-net 核心（路径校验 `isSafeId` / `isUnderClaudeRoot`、删除 5 处级联 + 活会话/最近 5 分钟跳过、export ↔ import 占位符双向替换的对称性）。`npm run test:watch` 是开发期的 watch 模式。 |
 
-**没有 lint / 测试 runner。** 改完代码用 `npm run typecheck` 把整个 monorepo 过一遍；UI 行为靠 `docs/acceptance/` 下的 e2e 方案手动验证。
+**没有 lint。** 改完代码用 `npm run typecheck` 把整个 monorepo 过一遍，再跑 `npm test` 跑 server 端 safety-net 单元测试；web 端 UI 行为仍靠 `docs/acceptance/` 下的 e2e 方案手动验证。
 
 端口：3131 占用时自动顺延到 3140，并把实际端口打到 stdout。
 
