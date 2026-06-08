@@ -4,6 +4,9 @@ dist/
 .cache/
 *.tsbuildinfo
 
+# husky v9 runtime helpers (generated on each install via `prepare`)
+.husky/_/
+
 # Editor / OS
 .DS_Store
 .idea/

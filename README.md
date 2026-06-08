@@ -227,6 +227,10 @@ There is no authentication. If you're paranoid, run behind a firewall rule or on
 
 See [`docs/spec/session-manager-design.md`](docs/spec/session-manager-design.md) for the full design rationale (data model, routing decisions, cross-platform strategy, future work).
 
+## Contributing & releases
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (enforced by a `commit-msg` hook), versions follow [SemVer](https://semver.org/), and releases are cut locally with `release-it`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and [docs/spec/release-process.md](docs/spec/release-process.md) for the full policy.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
