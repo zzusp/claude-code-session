@@ -13,6 +13,7 @@ import Breadcrumbs, { BreadcrumbFolderIcon } from '../components/Breadcrumbs.tsx
 import DeleteDialog from '../components/DeleteDialog.tsx';
 import { Loading } from '../components/Loading.tsx';
 import MessageBubble from '../components/MessageBubble.tsx';
+import ModifiedFilesPanel from '../components/ModifiedFilesPanel.tsx';
 import {
   api,
   type Block,
@@ -39,7 +40,7 @@ export default function SessionDetailRoute() {
   const t = useT();
   const navigate = useNavigate();
   const { projectId, sessionId } = useParams<{ projectId: string; sessionId: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const pid = projectId ?? '';
   const sid = sessionId ?? '';
   const urlFocus = searchParams.get('focus');
@@ -258,6 +259,20 @@ export default function SessionDetailRoute() {
               setShowDeleteDialog(false);
               navigate(`/projects/${encodeURIComponent(pid)}`, { replace: true });
             }
+          }}
+        />
+      )}
+
+      {pid && sid && (
+        <ModifiedFilesPanel
+          projectId={pid}
+          sessionId={sid}
+          onFocusMessage={(uuid) => {
+            // Push ?focus=<uuid> so the existing url-applied effect scrolls
+            // and flashes the matching message bubble. Keep ?q if present.
+            const next = new URLSearchParams(searchParams);
+            next.set('focus', uuid);
+            setSearchParams(next, { replace: false });
           }}
         />
       )}

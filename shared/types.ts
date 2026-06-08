@@ -359,6 +359,55 @@ export interface ImportResult {
   memoryWritten: string[];
 }
 
+// ── Session: modified files ─────────────────────────────────────────────────
+//
+// 一个会话里"被修改过的文件" = 该会话 .jsonl 中 tool_use(Edit/Write/MultiEdit/
+// NotebookEdit) 的 input.file_path / notebook_path 聚合。文件快照本身在
+// ~/.claude/file-history/<sid>/<hash>@v<n>，文件名是 hash 反查不出路径，所以
+// 我们以 jsonl 里的 tool_use 记录为单一事实源。
+//
+// errored = 该 tool_use 对应的 tool_result 标了 is_error。
+// pending = 没找到对应 tool_result（截断或仍在进行中）。
+// totalCount/errorCount 把这两种都算在内，UI 区分展示。
+
+export type ModifiedFileToolName = 'Edit' | 'Write' | 'MultiEdit' | 'NotebookEdit';
+
+export interface ModifiedFileOperation {
+  toolUseId: string;
+  toolName: ModifiedFileToolName;
+  ts: string | null;
+  /** uuid of the assistant message that issued this tool_use; lets the UI focus it. */
+  messageUuid: string | null;
+  errored: boolean;
+  pending: boolean;
+}
+
+export interface ModifiedFileSummary {
+  /** Absolute path as recorded in the tool_use input. */
+  filePath: string;
+  /** Path relativized against session.cwd when filePath sits under it; else null. */
+  relativePath: string | null;
+  editCount: number;
+  writeCount: number;
+  multiEditCount: number;
+  notebookEditCount: number;
+  totalCount: number;
+  errorCount: number;
+  firstAt: string | null;
+  lastAt: string | null;
+  /** Operations sorted by ts asc (null ts last). */
+  operations: ModifiedFileOperation[];
+}
+
+export interface ModifiedFilesResponse {
+  sessionId: string;
+  projectId: string;
+  /** Session-recorded cwd; used for relative paths and display. */
+  cwd: string | null;
+  /** Files sorted by lastAt desc (no-ts entries last). */
+  files: ModifiedFileSummary[];
+}
+
 export type SearchBlockKind = 'text' | 'tool_use' | 'tool_result' | 'thinking';
 
 export interface SearchSnippet {
