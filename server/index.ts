@@ -9,6 +9,7 @@ import { parseArgs } from 'node:util';
 import { PATHS } from './lib/claude-paths.ts';
 import { findAvailablePort } from './lib/port.ts';
 import { diskRoute } from './routes/disk.ts';
+import { diskCleanupRoute } from './routes/disk-cleanup.ts';
 import { importRoute } from './routes/import.ts';
 import { projectsRoute } from './routes/projects.ts';
 import { searchRoute } from './routes/search.ts';
@@ -46,6 +47,7 @@ app.get('/api/health', (c) =>
 app.route('/api/projects', projectsRoute);
 app.route('/api/sessions', sessionsRoute);
 app.route('/api/disk-usage', diskRoute);
+app.route('/api/disk-cleanup', diskCleanupRoute);
 app.route('/api/search', searchRoute);
 app.route('/api/import', importRoute);
 
