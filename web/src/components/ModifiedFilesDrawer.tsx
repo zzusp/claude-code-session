@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type {
+  DiffHunk,
   ModifiedFileOperation,
   ModifiedFileSummary,
   ModifiedFileToolName,
@@ -576,7 +577,12 @@ function OperationCard({
         )}
       </div>
       <div className="border-t border-[var(--color-hairline)] bg-[var(--color-surface)]">
-        <OperationBody toolName={op.toolName} input={lookup?.input} hasLookup={!!lookup} />
+        <OperationBody
+          toolName={op.toolName}
+          input={lookup?.input}
+          hasLookup={!!lookup}
+          patch={op.structuredPatch}
+        />
       </div>
     </li>
   );
@@ -586,12 +592,24 @@ function OperationBody({
   toolName,
   input,
   hasLookup,
+  patch,
 }: {
   toolName: ModifiedFileToolName;
   input: unknown;
   hasLookup: boolean;
+  patch: DiffHunk[] | null;
 }) {
   const t = useT();
+
+  // 首选：tool_result 里的 structuredPatch——带真实文件行号的 hunk，未改动区自然省略。
+  if (patch && patch.length > 0) {
+    return (
+      <div className="px-3 py-2.5">
+        <UnifiedDiff rows={rowsFromHunks(patch)} />
+      </div>
+    );
+  }
+
   if (!hasLookup) {
     return (
       <p className="px-3 py-2.5 text-[12px] italic text-[var(--color-fg-muted)]">
@@ -601,22 +619,31 @@ function OperationBody({
   }
   const rec = asRecord(input);
 
+  // 全新文件（create，structuredPatch 为空）或结果尚未落地：整段按新增（全绿）渲染。
   if (toolName === 'Write') {
     const content = typeof rec.content === 'string' ? rec.content : '';
-    return <CodeBlock label={t('session.modified.newContent')} text={content} />;
+    return (
+      <div className="px-3 py-2.5">
+        <UnifiedDiff rows={rowsFromStrings('', content)} label={t('session.modified.newContent')} />
+      </div>
+    );
   }
 
   if (toolName === 'NotebookEdit') {
     const source = typeof rec.new_source === 'string' ? rec.new_source : '';
     const cellType = typeof rec.cell_type === 'string' ? rec.cell_type : null;
     return (
-      <CodeBlock
-        label={cellType ? `${t('session.modified.newContent')} · ${cellType}` : t('session.modified.newContent')}
-        text={source}
-      />
+      <div className="px-3 py-2.5">
+        <UnifiedDiff
+          rows={rowsFromStrings('', source)}
+          label={cellType ? `${t('session.modified.newContent')} · ${cellType}` : t('session.modified.newContent')}
+        />
+      </div>
     );
   }
 
+  // MultiEdit / Edit 尚无 structuredPatch（仍 pending）→ 从 old/new 文本兜底，
+  // 行号是片段内的相对值（结果落地后会被上面的 structuredPatch 分支取代为真实行号）。
   if (toolName === 'MultiEdit') {
     const edits = Array.isArray(rec.edits) ? rec.edits : [];
     if (edits.length === 0) return <EmptyBody />;
@@ -629,9 +656,11 @@ function OperationBody({
               <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--color-fg-muted)]">
                 {t('session.modified.editN', { n: i + 1 })}
               </p>
-              <DiffView
-                oldStr={typeof er.old_string === 'string' ? er.old_string : ''}
-                newStr={typeof er.new_string === 'string' ? er.new_string : ''}
+              <UnifiedDiff
+                rows={rowsFromStrings(
+                  typeof er.old_string === 'string' ? er.old_string : '',
+                  typeof er.new_string === 'string' ? er.new_string : '',
+                )}
               />
             </div>
           );
@@ -643,113 +672,98 @@ function OperationBody({
   // Edit
   return (
     <div className="px-3 py-2.5">
-      <DiffView
-        oldStr={typeof rec.old_string === 'string' ? rec.old_string : ''}
-        newStr={typeof rec.new_string === 'string' ? rec.new_string : ''}
+      <UnifiedDiff
+        rows={rowsFromStrings(
+          typeof rec.old_string === 'string' ? rec.old_string : '',
+          typeof rec.new_string === 'string' ? rec.new_string : '',
+        )}
       />
     </div>
   );
 }
 
-/** 行级 split diff：左栏=修改前、右栏=修改后，逐行对齐着色（git split view 风格）。 */
-type LineKind = 'equal' | 'del' | 'add' | 'empty';
 /** 行内 word-level 片段：changed=该 token 仅存在于本侧（GitHub 行内高亮）。 */
 interface Seg {
   text: string;
   changed: boolean;
 }
-interface SplitRow {
-  left: string | null;
-  right: string | null;
-  leftNo: number | null;
-  rightNo: number | null;
-  leftKind: LineKind;
-  rightKind: LineKind;
-  // 仅在「左删 + 右增」配对的修改行上有值，用于行内高亮；其余行为 null（整行着色）。
-  leftSegs: Seg[] | null;
-  rightSegs: Seg[] | null;
+
+/** 统一视图的一行：context=两侧都在的未改动行；del/add=删除/新增行；
+ *  gap=被折叠省略的未改动区间（只显示省略了多少行，不渲染正文）。 */
+type RowKind = 'context' | 'del' | 'add' | 'gap';
+interface UnifiedRow {
+  oldNo: number | null;
+  newNo: number | null;
+  kind: RowKind;
+  text: string | null;
+  /** 仅 gap 行有值：被折叠省略的行数。 */
+  gap?: number;
+  /** 仅在「删除 ↔ 新增」配对行上有值，用于行内高亮；其余为 null（整行着色）。 */
+  segs: Seg[] | null;
 }
 
-function DiffView({ oldStr, newStr }: { oldStr: string; newStr: string }) {
-  const t = useT();
-  const rows = useMemo(() => buildSplitRows(oldStr, newStr), [oldStr, newStr]);
-  if (oldStr.length === 0 && newStr.length === 0) return <EmptyBody />;
+/** GitHub 风格的统一 diff：单栏，左右两个行号 gutter（旧 / 新），未改动区折叠成 gap 行。 */
+function UnifiedDiff({ rows, label }: { rows: UnifiedRow[]; label?: string }) {
+  if (rows.length === 0) return <EmptyBody />;
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--color-hairline)]">
-      <div className="grid grid-cols-2 divide-x divide-[var(--color-hairline)] border-b border-[var(--color-hairline)] bg-[var(--color-sunken)]">
-        <span className="px-3 py-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--color-danger)]">
-          − {t('session.modified.before')}
-        </span>
-        <span className="px-3 py-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--color-moss)]">
-          + {t('session.modified.after')}
-        </span>
-      </div>
-      {/* 两栏各自横向滚动；行数与行高一致，纵向自然对齐。 */}
-      <div className="grid grid-cols-2 divide-x divide-[var(--color-hairline)]">
-        <DiffPane rows={rows} side="left" />
-        <DiffPane rows={rows} side="right" />
-      </div>
-    </div>
-  );
-}
-
-function DiffPane({ rows, side }: { rows: SplitRow[]; side: 'left' | 'right' }) {
-  return (
-    <div className="min-w-0 overflow-x-auto">
-      <div className="w-max min-w-full">
-        {rows.map((r, i) => (
-          <DiffLine
-            key={i}
-            no={side === 'left' ? r.leftNo : r.rightNo}
-            text={side === 'left' ? r.left : r.right}
-            kind={side === 'left' ? r.leftKind : r.rightKind}
-            segs={side === 'left' ? r.leftSegs : r.rightSegs}
-          />
-        ))}
+      {label && (
+        <div className="border-b border-[var(--color-hairline)] bg-[var(--color-sunken)] px-3 py-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--color-fg-muted)]">
+          {label}
+        </div>
+      )}
+      <div className="overflow-x-auto">
+        <div className="w-max min-w-full">
+          {rows.map((r, i) => (
+            <UnifiedLine key={i} row={r} />
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-function DiffLine({
-  no,
-  text,
-  kind,
-  segs,
-}: {
-  no: number | null;
-  text: string | null;
-  kind: LineKind;
-  segs: Seg[] | null;
-}) {
+function UnifiedLine({ row }: { row: UnifiedRow }) {
+  const t = useT();
+  if (row.kind === 'gap') {
+    return (
+      <div className="flex bg-[var(--color-sunken)] leading-[1.65] text-[var(--color-fg-faint)]">
+        <span className="sticky left-0 z-[1] w-[5.5em] shrink-0 select-none border-r border-[var(--color-hairline)] bg-[inherit] px-1.5 text-center font-mono text-[11px]">
+          ⋯
+        </span>
+        <span className="px-3 font-mono text-[10px] italic tracking-[0.04em]">
+          {t('session.modified.linesOmitted', { n: row.gap ?? 0 })}
+        </span>
+      </div>
+    );
+  }
   const bg =
-    kind === 'del'
+    row.kind === 'del'
       ? 'bg-[var(--color-danger-soft)]'
-      : kind === 'add'
+      : row.kind === 'add'
         ? 'bg-[var(--color-moss-soft)]'
-        : kind === 'empty'
-          ? 'bg-[var(--color-sunken)]'
-          : 'bg-[var(--color-surface)]';
-  const marker = kind === 'del' ? '−' : kind === 'add' ? '+' : '';
+        : 'bg-[var(--color-surface)]';
+  const marker = row.kind === 'del' ? '−' : row.kind === 'add' ? '+' : '';
   const markerColor =
-    kind === 'del'
+    row.kind === 'del'
       ? 'text-[var(--color-danger)]'
-      : kind === 'add'
+      : row.kind === 'add'
         ? 'text-[var(--color-moss)]'
         : 'text-transparent';
   // 改动 token 的强调底色：在整行 -soft 底色上再叠一层更饱和的同色（GitHub 行内高亮）。
-  const hl = kind === 'del' ? 'bg-[var(--color-danger)]/25' : 'bg-[var(--color-moss)]/30';
+  const hl = row.kind === 'del' ? 'bg-[var(--color-danger)]/25' : 'bg-[var(--color-moss)]/30';
   return (
     <div className={`flex leading-[1.65] ${bg}`}>
-      <span className="sticky left-0 z-[1] w-[2.75em] shrink-0 select-none border-r border-[var(--color-hairline)] bg-[inherit] px-1.5 text-right font-mono text-[10px] tabular-nums text-[var(--color-fg-faint)]">
-        {no ?? ' '}
+      <span className="sticky left-0 z-[1] flex shrink-0 select-none border-r border-[var(--color-hairline)] bg-[inherit] font-mono text-[10px] tabular-nums text-[var(--color-fg-faint)]">
+        <span className="w-[2.75em] px-1.5 text-right">{row.oldNo ?? ''}</span>
+        <span className="w-[2.75em] px-1.5 text-right">{row.newNo ?? ''}</span>
       </span>
       <span className={`w-4 shrink-0 select-none text-center font-mono text-[11.5px] ${markerColor}`}>
         {marker}
       </span>
       <div className="whitespace-pre pr-3 font-mono text-[11.5px] text-[var(--color-fg-primary)]">
-        {segs && segs.length > 0
-          ? segs.map((s, i) =>
+        {row.segs && row.segs.length > 0
+          ? row.segs.map((s, i) =>
               s.changed ? (
                 <span key={i} className={hl}>
                   {s.text}
@@ -758,23 +772,11 @@ function DiffLine({
                 <span key={i}>{s.text}</span>
               ),
             )
-          : text == null || text === ''
-            ? ' '
-            : text}
+          : row.text == null || row.text === ''
+            ? ' '
+            : row.text}
       </div>
     </div>
-  );
-}
-
-function CodeBlock({ label, text }: { label: string; text: string }) {
-  if (text.length === 0) return <EmptyBody />;
-  return (
-    <pre className="overflow-x-auto px-3 py-2.5 font-mono text-[11.5px] leading-relaxed text-[var(--color-fg-primary)]">
-      <span className="mb-1 block font-mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--color-fg-muted)]">
-        {label}
-      </span>
-      {text}
-    </pre>
   );
 }
 
@@ -787,23 +789,74 @@ function EmptyBody() {
   );
 }
 
-function buildSplitRows(oldStr: string, newStr: string): SplitRow[] {
-  // 空串视为 0 行（而非 ['']），避免纯新增/纯删除时出现一个幻影空行。
+/** structuredPatch（带真实行号的 hunk）→ 统一视图行。hunk 之间的未改动区折叠成一行 gap。 */
+function rowsFromHunks(hunks: DiffHunk[]): UnifiedRow[] {
+  const rows: UnifiedRow[] = [];
+  let prevNewEnd = 0; // 上一 hunk 结束时的新文件行号（0=文件开头）
+  for (const h of hunks) {
+    const gap = h.newStart - prevNewEnd - 1;
+    if (gap > 0) rows.push({ oldNo: null, newNo: null, kind: 'gap', text: null, gap, segs: null });
+    let oldNo = h.oldStart;
+    let newNo = h.newStart;
+    const lines = h.lines;
+    let i = 0;
+    while (i < lines.length) {
+      const c = lines[i]![0];
+      if (c === '-' || c === '+') {
+        // 收集相邻的一段删除 + 新增，按序号配对做行内高亮（GitHub 习惯）。
+        const dels: string[] = [];
+        const adds: string[] = [];
+        const delStart = oldNo;
+        const addStart = newNo;
+        while (i < lines.length && lines[i]![0] === '-') {
+          dels.push(lines[i]!.slice(1));
+          oldNo++;
+          i++;
+        }
+        while (i < lines.length && lines[i]![0] === '+') {
+          adds.push(lines[i]!.slice(1));
+          newNo++;
+          i++;
+        }
+        for (let x = 0; x < dels.length; x++) {
+          const paired = x < adds.length ? wordSegments(dels[x]!, adds[x]!) : null;
+          rows.push({ oldNo: delStart + x, newNo: null, kind: 'del', text: dels[x]!, segs: paired?.left ?? null });
+        }
+        for (let x = 0; x < adds.length; x++) {
+          const paired = x < dels.length ? wordSegments(dels[x]!, adds[x]!) : null;
+          rows.push({ oldNo: null, newNo: addStart + x, kind: 'add', text: adds[x]!, segs: paired?.right ?? null });
+        }
+      } else {
+        // 上下文行（前导空格）；异常前缀（如 "\ No newline at end of file"）并入上下文不影响对齐。
+        rows.push({ oldNo, newNo, kind: 'context', text: lines[i]!.slice(1), segs: null });
+        oldNo++;
+        newNo++;
+        i++;
+      }
+    }
+    prevNewEnd = newNo - 1;
+  }
+  return rows;
+}
+
+/** old/new 原文 → 统一视图行（行号从 1 起、无真实文件行号，用于 create 全新内容
+ *  或结果尚未落地的兜底；一旦 structuredPatch 到位即被真实行号版本取代）。 */
+function rowsFromStrings(oldStr: string, newStr: string): UnifiedRow[] {
+  // 空串视为 0 行（而非 ['']），避免纯新增 / 纯删除时出现一个幻影空行。
   const ops = diffOps(oldStr === '' ? [] : oldStr.split('\n'), newStr === '' ? [] : newStr.split('\n'));
-  const rows: SplitRow[] = [];
-  let leftNo = 0;
-  let rightNo = 0;
+  const rows: UnifiedRow[] = [];
+  let oldNo = 0;
+  let newNo = 0;
   let i = 0;
   while (i < ops.length) {
     const op = ops[i]!;
     if (op.type === 'equal') {
-      leftNo++;
-      rightNo++;
-      rows.push({ left: op.text, right: op.text, leftNo, rightNo, leftKind: 'equal', rightKind: 'equal', leftSegs: null, rightSegs: null });
+      oldNo++;
+      newNo++;
+      rows.push({ oldNo, newNo, kind: 'context', text: op.text, segs: null });
       i++;
       continue;
     }
-    // 收集相邻的一段 del / add，左右配对成同一行（git split view 习惯）。
     const dels: string[] = [];
     const adds: string[] = [];
     while (i < ops.length && ops[i]!.type !== 'equal') {
@@ -812,25 +865,15 @@ function buildSplitRows(oldStr: string, newStr: string): SplitRow[] {
       else adds.push(cur.text);
       i++;
     }
-    const max = Math.max(dels.length, adds.length);
-    for (let x = 0; x < max; x++) {
-      const hasL = x < dels.length;
-      const hasR = x < adds.length;
-      if (hasL) leftNo++;
-      if (hasR) rightNo++;
-      // 左删 + 右增 配对 → 行内 word-level 高亮（只标改动 token）。
-      // 单独的纯删 / 纯增行没有配对项，整行都是改动 → 整行标成 changed，拿到和配对行一致的饱和高亮。
-      const paired = hasL && hasR ? wordSegments(dels[x]!, adds[x]!) : null;
-      rows.push({
-        left: hasL ? dels[x]! : null,
-        right: hasR ? adds[x]! : null,
-        leftNo: hasL ? leftNo : null,
-        rightNo: hasR ? rightNo : null,
-        leftKind: hasL ? 'del' : 'empty',
-        rightKind: hasR ? 'add' : 'empty',
-        leftSegs: paired?.left ?? (hasL && !hasR ? [{ text: dels[x]!, changed: true }] : null),
-        rightSegs: paired?.right ?? (!hasL && hasR ? [{ text: adds[x]!, changed: true }] : null),
-      });
+    for (let x = 0; x < dels.length; x++) {
+      const paired = x < adds.length ? wordSegments(dels[x]!, adds[x]!) : null;
+      oldNo++;
+      rows.push({ oldNo, newNo: null, kind: 'del', text: dels[x]!, segs: paired?.left ?? null });
+    }
+    for (let x = 0; x < adds.length; x++) {
+      const paired = x < dels.length ? wordSegments(dels[x]!, adds[x]!) : null;
+      newNo++;
+      rows.push({ oldNo: null, newNo, kind: 'add', text: adds[x]!, segs: paired?.right ?? null });
     }
   }
   return rows;

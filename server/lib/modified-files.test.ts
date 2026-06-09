@@ -228,4 +228,53 @@ describe('loadModifiedFiles', () => {
     expect(out!.files).toHaveLength(1);
     expect(out!.files[0]!.filePath).toBe('/ok.ts');
   });
+
+  it('attaches structuredPatch from toolUseResult; [] for create, null when absent', async () => {
+    writeJsonl('proj-sp', 'sid-sp', [
+      { type: 'summary', cwd: '/repo' },
+      // Edit whose result line carries a real structuredPatch (accurate file line numbers).
+      assistantMsg('a1', '2026-06-01T10:00:00.000Z', [
+        toolUse('t1', 'Edit', { file_path: '/repo/a.ts', old_string: 'x', new_string: 'y' }),
+      ]),
+      {
+        type: 'user',
+        uuid: 'u1',
+        timestamp: '2026-06-01T10:00:01.000Z',
+        message: { content: [toolResult('t1', false)] },
+        toolUseResult: {
+          type: 'update',
+          filePath: '/repo/a.ts',
+          structuredPatch: [
+            { oldStart: 10, oldLines: 2, newStart: 10, newLines: 2, lines: [' ctx', '-x', '+y'] },
+          ],
+        },
+      },
+      // Write create → structuredPatch is an empty array (render input as all-added).
+      assistantMsg('a2', '2026-06-01T10:01:00.000Z', [
+        toolUse('t2', 'Write', { file_path: '/repo/b.ts', content: 'new' }),
+      ]),
+      {
+        type: 'user',
+        uuid: 'u2',
+        timestamp: '2026-06-01T10:01:01.000Z',
+        message: { content: [toolResult('t2', false)] },
+        toolUseResult: { type: 'create', filePath: '/repo/b.ts', structuredPatch: [] },
+      },
+      // Edit whose result has no toolUseResult sentinel → null (fall back to input diff).
+      assistantMsg('a3', '2026-06-01T10:02:00.000Z', [
+        toolUse('t3', 'Edit', { file_path: '/repo/c.ts', old_string: 'm', new_string: 'n' }),
+      ]),
+      userMsg('u3', '2026-06-01T10:02:01.000Z', [toolResult('t3', false)]),
+    ]);
+
+    const out = await loadModifiedFiles('proj-sp', 'sid-sp');
+    expect(out).not.toBeNull();
+    const byPath = new Map(out!.files.map((f) => [f.filePath, f]));
+
+    expect(byPath.get('/repo/a.ts')!.operations[0]!.structuredPatch).toEqual([
+      { oldStart: 10, oldLines: 2, newStart: 10, newLines: 2, lines: [' ctx', '-x', '+y'] },
+    ]);
+    expect(byPath.get('/repo/b.ts')!.operations[0]!.structuredPatch).toEqual([]);
+    expect(byPath.get('/repo/c.ts')!.operations[0]!.structuredPatch).toBeNull();
+  });
 });

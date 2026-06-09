@@ -417,6 +417,18 @@ export interface ImportResult {
 
 export type ModifiedFileToolName = 'Edit' | 'Write' | 'MultiEdit' | 'NotebookEdit';
 
+/** One hunk of a structured patch, copied verbatim from Claude Code's
+ *  `toolUseResult.structuredPatch`. Carries the *real* file line numbers so the
+ *  UI can render a GitHub-style unified diff with accurate gutters + omitted gaps. */
+export interface DiffHunk {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  /** Each entry prefixed with ' ' (context), '-' (removed), or '+' (added). */
+  lines: string[];
+}
+
 export interface ModifiedFileOperation {
   toolUseId: string;
   toolName: ModifiedFileToolName;
@@ -425,6 +437,10 @@ export interface ModifiedFileOperation {
   messageUuid: string | null;
   errored: boolean;
   pending: boolean;
+  /** Accurate diff from the tool_result, with real file line numbers. Empty array
+   *  for a brand-new file (Write/NotebookEdit create — render input content as all-added);
+   *  null when still pending or the session was truncated before the result. */
+  structuredPatch: DiffHunk[] | null;
 }
 
 export interface ModifiedFileSummary {
