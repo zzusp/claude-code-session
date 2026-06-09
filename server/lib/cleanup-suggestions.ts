@@ -3,6 +3,7 @@ import path from 'node:path';
 import { isUnderClaudeRoot, PATHS } from './claude-paths.ts';
 import { dirSize } from './fs-size.ts';
 import { isSafeId } from './safe-id.ts';
+import { safeRemove } from './safe-remove.ts';
 import { listProjects, listSessionsForProject } from './scan.ts';
 import type {
   DiskCleanupLargeSession,
@@ -99,9 +100,11 @@ export async function computeCleanupSuggestions(): Promise<DiskCleanupSuggestion
 /**
  * 删一个孤儿目录（file-history/<sid>/ 或 session-env/<sid>/）。
  *
- * 这里不复用 deleteSessions：那条路径以 projects/<pid>/<sid>.jsonl 为锚点，jsonl + subdir
- * 都不存在时会被 "no files for this session" 早退出，没法处理"主体已没了但侧 store 还在"
- * 的纯孤儿场景。
+ * 这里不复用 deleteSessions 的主流程：那条路径以 projects/<pid>/<sid>.jsonl 为锚点，
+ * jsonl + subdir 都不存在时会被 "no files for this session" 早退出，没法处理"主体已没了
+ * 但侧 store 还在"的纯孤儿场景。但「路径校验 + 实际 rm」这道安全网两条删除路径必须一致，
+ * 所以共用 safeRemove —— 差异只在前置判定（这里是"二次确认仍是孤儿"，deleteSessions 是
+ * "跳过 live PID / 5 分钟内活跃"）。
  *
  * 调用方负责 sid 已过 isSafeId、kind 已经过白名单校验。
  */
@@ -123,7 +126,7 @@ export function deleteOrphan(
     return { ok: false, reason: 'session is no longer orphaned' };
   }
   const freedBytes = dirSize(target);
-  fs.rmSync(target, { recursive: true, force: true });
+  safeRemove(target);
   return { ok: true, freedBytes };
 }
 

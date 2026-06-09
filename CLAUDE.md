@@ -105,7 +105,7 @@ web/       React 19 + Vite + Tailwind v4 SPA。绝不直接读 ~/.claude/，只�
 - **`~/.claude/` 路径只在一处定义**：`server/lib/claude-paths.ts` 的 `PATHS` 对象。其它地方需要拼路径必须从 `PATHS` 派生，不要再独立用 `os.homedir()` 拼。
 - **任何路径在读 / 写之前必须过 `isUnderClaudeRoot()` 校验**（Windows 下做大小写折叠），防止 path-traversal 逃出 `~/.claude/`。
 - **ID 校验**：`server/lib/safe-id.ts` 拒绝包含 `/`、`\`、`..` 或以 `.` 开头的 sessionId / projectId。所有从 URL 参数进来的 id 必须先过这一关。
-- **删除流程的 5 个位置**（`server/lib/delete.ts`）：每条 session 实际散落在 `projects/<encoded-cwd>/<sid>.jsonl` + `projects/<encoded-cwd>/<sid>/` + `file-history/<sid>/` + `session-env/<sid>/` + `history.jsonl` 里的对应行 + `sessions/<pid>.json`（仅当 PID 已退出）。一次 delete 必须级联清理这些位置，缺一不可。
+- **删除流程的 5 个位置**（`server/lib/delete.ts`）：每条 session 实际散落在 `projects/<encoded-cwd>/<sid>.jsonl` + `projects/<encoded-cwd>/<sid>/` + `file-history/<sid>/` + `session-env/<sid>/` + `history.jsonl` 里的对应行 + `sessions/<pid>.json`（仅当 PID 已退出）。一次 delete 必须级联清理这些位置，缺一不可。**孤儿场景走 `deleteOrphan`**（`server/lib/cleanup-suggestions.ts`）：jsonl + subdir 都没了、只剩 `file-history/<sid>/` 或 `session-env/<sid>/` 时，`deleteSessions` 会因 "no files" 早退，所以单删孤儿目录走 `deleteOrphan`。两条路径的「路径校验 + 实际 rm」共用 `server/lib/safe-remove.ts` 的 `safeRemove`，差异只在前置判定（`deleteSessions` 跳过 live PID / 5 分钟内活跃；`deleteOrphan` 二次确认仍是孤儿）——改删除安全网时改 `safeRemove` 一处即可。
 - **删除安全网**（`server/lib/active-sessions.ts`）：sessionId 出现在仍然存活的 `sessions/<pid>.json` 中、或 `.jsonl` 在 5 分钟内被改过 → 跳过不删。Unix 用 `process.kill(pid, 0)`，Windows 用 `tasklist`。
 - **`history.jsonl` 改写用原子三步**：`backup → tmp → rename`，绝不原地写。失败时原文件保留为 `.bak-<timestamp>`。
 - **CSRF 保护**：所有 mutating endpoint（`DELETE /api/sessions`、`POST /api/projects/:id/export`、`POST /api/import` 及 `/preview`）要求 `Origin` 头匹配 `http(s)://(localhost|127.0.0.1):*`。
