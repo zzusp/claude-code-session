@@ -181,3 +181,99 @@ export async function listSessionsForProject(projectId: string): Promise<Session
   out.sort((a, b) => (b.lastAt ?? '').localeCompare(a.lastAt ?? ''));
   return out;
 }
+
+export interface DiskScanSession {
+  id: string;
+  title: string;
+  customTitle: string | null;
+  lastAt: string | null;
+  relatedBytes: RelatedBytes;
+}
+
+export interface DiskScanProject {
+  id: string;
+  decodedCwd: string;
+  cwdResolved: boolean;
+  totalBytes: number;
+  sessionCount: number;
+  sessions: DiskScanSession[];
+}
+
+/**
+ * 磁盘视图（disk-usage + cleanup-suggestions）专用的单遍扫描：逐会话算
+ * relatedBytes + 解析一次 jsonl meta，项目 totalBytes = 其会话之和。
+ *
+ * 刻意不做 live-PID / recently-active 探测：两个磁盘视图都不展示这些，而
+ * `listSessionsForProject` 会按项目各建一次 active map（Windows 下 = 一次
+ * `tasklist` spawn，~400-700ms），被这两个接口按项目数放大成几十次 tasklist，
+ * 是磁盘页加载慢的主因。size/meta 原语与 `listSessionsForProject` 复用，只去掉
+ * active map 与「listProjects + listSessionsForProject」之间重复的 size 遍历。
+ */
+export async function scanProjectsForDisk(): Promise<DiskScanProject[]> {
+  if (!fs.existsSync(PATHS.projects)) return [];
+
+  const projectIds = fs
+    .readdirSync(PATHS.projects, { withFileTypes: true })
+    .filter((ent) => ent.isDirectory())
+    .map((ent) => ent.name);
+
+  const result: DiskScanProject[] = [];
+  for (const projectId of projectIds) {
+    const projectDir = path.join(PATHS.projects, projectId);
+    const ids = listSessionIdsInProject(projectDir);
+
+    const scanned = await Promise.all(ids.map((id) => scanDiskSession(projectDir, id)));
+
+    let totalBytes = 0;
+    let sampleCwd: string | null = null;
+    const sessions: DiskScanSession[] = [];
+    for (const { session, cwdFromMessages } of scanned) {
+      const r = session.relatedBytes;
+      totalBytes += r.jsonl + r.subdir + r.fileHistory + r.sessionEnv;
+      if (!sampleCwd && cwdFromMessages) sampleCwd = cwdFromMessages;
+      sessions.push(session);
+    }
+
+    const { decoded, resolved } = decodeProjectId(projectId, sampleCwd);
+    result.push({
+      id: projectId,
+      decodedCwd: decoded,
+      cwdResolved: resolved,
+      totalBytes,
+      sessionCount: ids.length,
+      sessions,
+    });
+  }
+
+  return result;
+}
+
+async function scanDiskSession(
+  projectDir: string,
+  id: string,
+): Promise<{ session: DiskScanSession; cwdFromMessages: string | null }> {
+  const jsonlPath = path.join(projectDir, `${id}${JSONL_EXT}`);
+  const relatedBytes: RelatedBytes = {
+    jsonl: fileSize(jsonlPath),
+    subdir: dirSize(path.join(projectDir, id)),
+    fileHistory: dirSize(path.join(PATHS.fileHistory, id)),
+    sessionEnv: dirSize(path.join(PATHS.sessionEnv, id)),
+  };
+
+  let title = '(no jsonl)';
+  let customTitle: string | null = null;
+  let lastAt: string | null = null;
+  let cwdFromMessages: string | null = null;
+  if (fs.existsSync(jsonlPath)) {
+    const meta = await parseJsonlMeta(jsonlPath);
+    title = meta.title;
+    customTitle = meta.customTitle;
+    lastAt = meta.lastAt;
+    cwdFromMessages = meta.cwdFromMessages;
+  }
+
+  return {
+    session: { id, title, customTitle, lastAt, relatedBytes },
+    cwdFromMessages,
+  };
+}

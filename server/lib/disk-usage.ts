@@ -1,16 +1,16 @@
-import { listProjects, listSessionsForProject } from './scan.ts';
+import { scanProjectsForDisk } from './scan.ts';
 import type {
   DiskUsage,
   DiskUsageMonthRow,
   DiskUsageProjectRow,
   DiskUsageTopSession,
-  SessionSummary,
+  RelatedBytes,
 } from '../types.ts';
 
 const TOP_N = 20;
 
 export async function computeDiskUsage(): Promise<DiskUsage> {
-  const projects = await listProjects();
+  const projects = await scanProjectsForDisk();
 
   const byProject: DiskUsageProjectRow[] = [];
   const monthMap = new Map<string, { bytes: number; count: number }>();
@@ -24,7 +24,6 @@ export async function computeDiskUsage(): Promise<DiskUsage> {
   }> = [];
 
   for (const p of projects) {
-    const sessions = await listSessionsForProject(p.id);
     byProject.push({
       projectId: p.id,
       decodedCwd: p.decodedCwd,
@@ -32,8 +31,8 @@ export async function computeDiskUsage(): Promise<DiskUsage> {
       sessionCount: p.sessionCount,
     });
 
-    for (const s of sessions) {
-      const total = sessionTotal(s);
+    for (const s of p.sessions) {
+      const total = sessionTotal(s.relatedBytes);
       const month = s.lastAt ? s.lastAt.slice(0, 7) : 'unknown';
       const acc = monthMap.get(month) ?? { bytes: 0, count: 0 };
       acc.bytes += total;
@@ -77,7 +76,6 @@ export async function computeDiskUsage(): Promise<DiskUsage> {
   };
 }
 
-function sessionTotal(s: SessionSummary): number {
-  const r = s.relatedBytes;
+function sessionTotal(r: RelatedBytes): number {
   return r.jsonl + r.subdir + r.fileHistory + r.sessionEnv;
 }
