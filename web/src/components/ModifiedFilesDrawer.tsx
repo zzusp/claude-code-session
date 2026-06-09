@@ -17,7 +17,7 @@ import type {
 import { formatDateTime, formatRelativeTime } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
 import { Loading } from './Loading.tsx';
-import MessageBubble from './MessageBubble.tsx';
+import MessageBubble, { WorkingIndicator } from './MessageBubble.tsx';
 
 // 三栏布局的最小内容区宽度：拖动任一分割线时，给中间文件内容栏保底的像素宽。
 const CONTENT_MIN_PX = 320;
@@ -41,6 +41,9 @@ interface Props {
   messages: Message[];
   /** Active search query, forwarded to MessageBubble for in-message highlight. */
   query: string;
+  /** Live poll says Claude is mid-turn — append the working indicator to the
+   *  conversation column's tail, mirroring the session timeline. */
+  isWorking: boolean;
   loading: boolean;
   error: Error | null;
   onClose: () => void;
@@ -57,6 +60,7 @@ export default function ModifiedFilesDrawer({
   editLookup,
   messages,
   query,
+  isWorking,
   loading,
   error,
   onClose,
@@ -275,7 +279,7 @@ export default function ModifiedFilesDrawer({
                 </span>
               </div>
               <div ref={convScrollRef} className="min-h-0 flex-1 overflow-auto px-4 py-2">
-                {messages.length === 0 ? (
+                {messages.length === 0 && !isWorking ? (
                   <p className="px-1 py-3 text-sm italic text-[var(--color-fg-muted)]">
                     {t('common.noMessagesMatch')}
                   </p>
@@ -296,6 +300,7 @@ export default function ModifiedFilesDrawer({
                           <MessageBubble message={m} query={query} />
                         </li>
                       ))}
+                      {isWorking && <WorkingIndicator />}
                     </ol>
                   </>
                 )}
