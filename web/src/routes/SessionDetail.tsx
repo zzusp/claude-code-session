@@ -13,11 +13,12 @@ import Breadcrumbs, { BreadcrumbFolderIcon } from '../components/Breadcrumbs.tsx
 import DeleteDialog from '../components/DeleteDialog.tsx';
 import { Loading } from '../components/Loading.tsx';
 import MessageBubble from '../components/MessageBubble.tsx';
-import ModifiedFilesPanel from '../components/ModifiedFilesPanel.tsx';
+import ModifiedFilesDrawer, { type EditLookup } from '../components/ModifiedFilesDrawer.tsx';
 import {
   api,
   type Block,
   type Message,
+  type ModifiedFilesResponse,
   type ProjectSummary,
   type SessionDetail,
   type SessionSummary,
@@ -52,6 +53,7 @@ export default function SessionDetailRoute() {
   const deferredQuery = useDeferredValue(query);
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showModifiedDrawer, setShowModifiedDrawer] = useState(false);
   const urlAppliedRef = useRef<string | null>(null);
   const flashedKeyRef = useRef<string | null>(null);
 
@@ -92,12 +94,38 @@ export default function SessionDetailRoute() {
       : t('session.action.deleteTooltipBlocked')
     : undefined;
 
+  // Modified-files summary (aggregated from a full jsonl scan, server-side). Fetched
+  // eagerly at route level so the masthead trigger can show the count; the drawer
+  // reuses this same data instead of querying again.
+  const modifiedFilesQuery = useQuery({
+    queryKey: queryKeys.sessionModifiedFiles(pid, sid),
+    queryFn: () =>
+      api<ModifiedFilesResponse>(
+        `/api/sessions/${encodeURIComponent(pid)}/${encodeURIComponent(sid)}/modified-files`,
+      ),
+    enabled: !!pid && !!sid,
+  });
+  const modifiedFiles = modifiedFilesQuery.data?.files ?? [];
+
   const indexed: IndexedMessage[] = useMemo(() => {
     if (!data) return [];
     return data.messages.map((message) => ({
       message,
       haystack: indexMessage(message),
     }));
+  }, [data]);
+
+  // tool_use id → { name, input } for the loaded messages, so the drawer can render
+  // each edit's actual content (Write body / Edit diff) without a second request.
+  const editLookup: EditLookup = useMemo(() => {
+    const map: EditLookup = new Map();
+    if (!data) return map;
+    for (const m of data.messages) {
+      for (const b of m.blocks) {
+        if (b.type === 'tool_use' && b.id) map.set(b.id, { name: b.name, input: b.input });
+      }
+    }
+    return map;
   }, [data]);
 
   const visibleMessages = useMemo(() => {
@@ -245,6 +273,9 @@ export default function SessionDetailRoute() {
             deleteDisabled={!currentSummary}
             deleteTooltip={deleteTooltip}
             deleteLabel={t('session.action.delete')}
+            onOpenModified={() => setShowModifiedDrawer(true)}
+            modifiedCount={modifiedFiles.length}
+            modifiedLoading={modifiedFilesQuery.isLoading}
           />
         </div>
       )}
@@ -263,10 +294,14 @@ export default function SessionDetailRoute() {
         />
       )}
 
-      {pid && sid && (
-        <ModifiedFilesPanel
-          projectId={pid}
-          sessionId={sid}
+      {showModifiedDrawer && (
+        <ModifiedFilesDrawer
+          files={modifiedFiles}
+          cwd={modifiedFilesQuery.data?.cwd ?? data?.meta.cwd ?? null}
+          editLookup={editLookup}
+          loading={modifiedFilesQuery.isLoading}
+          error={modifiedFilesQuery.error as Error | null}
+          onClose={() => setShowModifiedDrawer(false)}
           onFocusMessage={(uuid) => {
             // Push ?focus=<uuid> so the existing url-applied effect scrolls
             // and flashes the matching message bubble. Keep ?q if present.
@@ -374,6 +409,9 @@ function SessionMasthead({
   deleteDisabled,
   deleteTooltip,
   deleteLabel,
+  onOpenModified,
+  modifiedCount,
+  modifiedLoading,
 }: {
   sid: string;
   title: string | null;
@@ -391,6 +429,9 @@ function SessionMasthead({
   deleteDisabled?: boolean;
   deleteTooltip?: string;
   deleteLabel?: string;
+  onOpenModified: () => void;
+  modifiedCount: number;
+  modifiedLoading: boolean;
 }) {
   const t = useT();
   const dateline = formatDateline(firstAt);
@@ -413,9 +454,23 @@ function SessionMasthead({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-3">
-          <div className="font-mono text-[10px] uppercase tracking-[0.22em] tabular-nums text-[var(--color-fg-muted)]">
+          <div className="hidden font-mono text-[10px] uppercase tracking-[0.22em] tabular-nums text-[var(--color-fg-muted)] sm:block">
             {dateline}
           </div>
+          <button
+            type="button"
+            onClick={onOpenModified}
+            disabled={modifiedLoading}
+            aria-label={t('session.modified.openAria')}
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-[var(--color-accent)]"
+          >
+            <FilesIcon /> {t('session.modified.title')}
+            {modifiedCount > 0 && (
+              <span className="rounded-full bg-[var(--color-accent-soft)] px-1.5 font-mono text-[10px] tabular-nums text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
+                {modifiedCount}
+              </span>
+            )}
+          </button>
           {(onDelete || deleteDisabled) && (
             <button
               type="button"
@@ -783,6 +838,25 @@ function TrashIcon() {
       <path d="M3 6h18" />
       <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
       <path d="M5.5 6l1.1 13.2A1.5 1.5 0 0 0 8.1 20.5h7.8a1.5 1.5 0 0 0 1.5-1.3L18.5 6" />
+    </svg>
+  );
+}
+
+function FilesIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 5h6l2 2h10" />
+      <path d="M3 5v14h18V9H3" />
     </svg>
   );
 }
