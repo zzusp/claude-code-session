@@ -79,7 +79,7 @@ export default function SessionDetailRoute() {
   const t = useT();
   const navigate = useNavigate();
   const { projectId, sessionId } = useParams<{ projectId: string; sessionId: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const pid = projectId ?? '';
   const sid = sessionId ?? '';
   const urlFocus = searchParams.get('focus');
@@ -409,13 +409,6 @@ export default function SessionDetailRoute() {
             error={modifiedFilesQuery.error as Error | null}
             onOpenFile={(filePath) => openFileMutation.mutate(filePath)}
             onClose={() => setShowModifiedDrawer(false)}
-            onFocusMessage={(uuid) => {
-              // Push ?focus=<uuid> so the page underneath lands on the same
-              // message once the drawer closes. Keep ?q if present.
-              const next = new URLSearchParams(searchParams);
-              next.set('focus', uuid);
-              setSearchParams(next, { replace: false });
-            }}
           />
         )}
       </AnimatePresence>
