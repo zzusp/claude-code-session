@@ -408,6 +408,12 @@ export interface ModifiedFilesResponse {
   files: ModifiedFileSummary[];
 }
 
+/** Response of opening a session-modified file in the OS default app. */
+export interface OpenFileResult {
+  ok: true;
+  path: string;
+}
+
 export type SearchBlockKind = 'text' | 'tool_use' | 'tool_result' | 'thinking';
 
 export interface SearchSnippet {

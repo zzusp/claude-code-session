@@ -19,6 +19,7 @@ import {
   type Block,
   type Message,
   type ModifiedFilesResponse,
+  type OpenFileResult,
   type ProjectSummary,
   type SessionDetail,
   type SessionSummary,
@@ -106,6 +107,18 @@ export default function SessionDetailRoute() {
     enabled: !!pid && !!sid,
   });
   const modifiedFiles = modifiedFilesQuery.data?.files ?? [];
+
+  // 在系统默认程序里打开会话改过的某个文件（后端校验该路径属于本会话）。
+  const openFileMutation = useMutation({
+    mutationFn: (filePath: string) =>
+      api<OpenFileResult>(
+        `/api/sessions/${encodeURIComponent(pid)}/${encodeURIComponent(sid)}/open-file`,
+        { method: 'POST', body: JSON.stringify({ filePath }) },
+      ),
+    onError: (err: Error) => {
+      window.alert(t('session.modified.openFailed', { msg: err.message }));
+    },
+  });
 
   const indexed: IndexedMessage[] = useMemo(() => {
     if (!data) return [];
@@ -301,6 +314,7 @@ export default function SessionDetailRoute() {
           editLookup={editLookup}
           loading={modifiedFilesQuery.isLoading}
           error={modifiedFilesQuery.error as Error | null}
+          onOpenFile={(filePath) => openFileMutation.mutate(filePath)}
           onClose={() => setShowModifiedDrawer(false)}
           onFocusMessage={(uuid) => {
             // Push ?focus=<uuid> so the existing url-applied effect scrolls

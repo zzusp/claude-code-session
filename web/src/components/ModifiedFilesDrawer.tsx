@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type {
   ModifiedFileOperation,
   ModifiedFileSummary,
@@ -23,6 +23,8 @@ interface Props {
   onClose: () => void;
   /** Jump to the message that issued an op, then close the drawer. */
   onFocusMessage: (messageUuid: string) => void;
+  /** Open the real file on disk in the OS default app. */
+  onOpenFile: (filePath: string) => void;
 }
 
 export default function ModifiedFilesDrawer({
@@ -33,6 +35,7 @@ export default function ModifiedFilesDrawer({
   error,
   onClose,
   onFocusMessage,
+  onOpenFile,
 }: Props) {
   const t = useT();
   const tree = useMemo(() => buildTree(files), [files]);
@@ -61,6 +64,27 @@ export default function ModifiedFilesDrawer({
       else next.add(path);
       return next;
     });
+
+  // 文件树 / 内容之间可拖拽的分割线：railWidth 是树栏像素宽，拖动时实时改。
+  const splitRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+  const [railWidth, setRailWidth] = useState(300);
+  function onSplitterDown(e: ReactPointerEvent<HTMLDivElement>) {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    draggingRef.current = true;
+  }
+  function onSplitterMove(e: ReactPointerEvent<HTMLDivElement>) {
+    if (!draggingRef.current || !splitRef.current) return;
+    const rect = splitRef.current.getBoundingClientRect();
+    // 下限 200px、上限留给内容区至少 320px。
+    const max = Math.max(200, rect.width - 320);
+    setRailWidth(Math.min(max, Math.max(200, e.clientX - rect.left)));
+  }
+  function onSplitterUp(e: ReactPointerEvent<HTMLDivElement>) {
+    draggingRef.current = false;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  }
 
   // Esc 关闭 + 背景滚动锁。
   useEffect(() => {
@@ -104,7 +128,7 @@ export default function ModifiedFilesDrawer({
         role="dialog"
         aria-modal="true"
         aria-label={t('session.modified.title')}
-        className="fixed inset-y-0 right-0 z-[60] flex w-[min(94vw,900px)] flex-col border-l border-[var(--color-hairline)] bg-[var(--color-surface)] shadow-[var(--shadow-pop)]"
+        className="fixed inset-y-0 right-0 z-[60] flex w-[min(96vw,1280px)] flex-col border-l border-[var(--color-hairline)] bg-[var(--color-surface)] shadow-[var(--shadow-pop)]"
       >
         <header className="flex items-center justify-between gap-3 border-b border-[var(--color-hairline)] px-5 py-3.5">
           <div className="flex min-w-0 items-center gap-3">
@@ -157,9 +181,9 @@ export default function ModifiedFilesDrawer({
         )}
 
         {!loading && !error && count > 0 && (
-          <div className="flex min-h-0 flex-1">
+          <div ref={splitRef} className="flex min-h-0 flex-1">
             {/* Tree rail */}
-            <div className="flex w-[clamp(220px,36%,330px)] shrink-0 flex-col border-r border-[var(--color-hairline)]">
+            <div className="flex shrink-0 flex-col" style={{ width: railWidth }}>
               <div className="flex items-center justify-between gap-2 border-b border-[var(--color-hairline)] px-3 py-1.5">
                 <span className="eyebrow">{t('session.modified.col.file')}</span>
                 {allFolders.length > 0 && (
@@ -179,7 +203,7 @@ export default function ModifiedFilesDrawer({
                 )}
               </div>
               <div className="min-h-0 flex-1 overflow-auto py-1.5">
-                <ul role="tree" className="select-none">
+                <ul role="tree" className="w-max min-w-full select-none">
                   {tree.map((node) => (
                     <TreeRow
                       key={nodeKey(node)}
@@ -189,10 +213,24 @@ export default function ModifiedFilesDrawer({
                       onToggleFolder={toggleFolder}
                       selected={selected}
                       onSelectFile={setSelected}
+                      onOpenFile={onOpenFile}
                     />
                   ))}
                 </ul>
               </div>
+            </div>
+
+            {/* Draggable splitter */}
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              onPointerDown={onSplitterDown}
+              onPointerMove={onSplitterMove}
+              onPointerUp={onSplitterUp}
+              className="relative w-px shrink-0 cursor-col-resize touch-none bg-[var(--color-hairline)] transition-colors hover:bg-[var(--color-accent)]"
+            >
+              {/* 加宽命中区，但不挤占布局。 */}
+              <span className="absolute inset-y-0 -left-1.5 -right-1.5" aria-hidden />
             </div>
 
             {/* Detail pane */}
@@ -204,6 +242,7 @@ export default function ModifiedFilesDrawer({
                   cwd={cwd}
                   editLookup={editLookup}
                   onJump={jump}
+                  onOpenFile={onOpenFile}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center px-6">
@@ -312,6 +351,7 @@ function TreeRow({
   onToggleFolder,
   selected,
   onSelectFile,
+  onOpenFile,
 }: {
   node: TreeNode;
   depth: number;
@@ -319,7 +359,9 @@ function TreeRow({
   onToggleFolder: (path: string) => void;
   selected: string | null;
   onSelectFile: (path: string) => void;
+  onOpenFile: (filePath: string) => void;
 }) {
+  const t = useT();
   const indent = { paddingLeft: `${depth * 14 + 10}px` };
 
   if (node.kind === 'folder') {
@@ -334,7 +376,7 @@ function TreeRow({
         >
           <Caret open={!isCollapsed} />
           <FolderIcon open={!isCollapsed} />
-          <span className="truncate font-mono text-[12px] text-[var(--color-fg-secondary)]">
+          <span className="whitespace-nowrap font-mono text-[12px] text-[var(--color-fg-secondary)]">
             {node.name}
           </span>
         </button>
@@ -349,6 +391,7 @@ function TreeRow({
                 onToggleFolder={onToggleFolder}
                 selected={selected}
                 onSelectFile={onSelectFile}
+                onOpenFile={onOpenFile}
               />
             ))}
           </ul>
@@ -359,37 +402,53 @@ function TreeRow({
 
   const f = node.file;
   const isSelected = selected === f.filePath;
+  const openLabel = t('session.modified.openFile');
   return (
-    <li role="treeitem" aria-selected={isSelected}>
+    <li
+      role="treeitem"
+      aria-selected={isSelected}
+      className={
+        'group flex w-full items-center transition ' +
+        (isSelected
+          ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent-ink)] dark:text-[var(--color-fg-primary)]'
+          : 'hover:bg-[var(--color-sunken)]')
+      }
+    >
+      {/* flex-1 但不加 min-w-0：min-width:auto 保证按钮不缩到内容以下，
+          文件名 whitespace-nowrap 撑宽行 → 外层 ul(w-max) 横向出滚动条。 */}
       <button
         type="button"
         onClick={() => onSelectFile(f.filePath)}
         style={indent}
         title={f.filePath}
-        className={
-          'flex w-full items-center gap-1.5 py-1 pr-2 text-left transition ' +
-          (isSelected
-            ? 'bg-[var(--color-accent-soft)] text-[var(--color-accent-ink)] dark:text-[var(--color-fg-primary)]'
-            : 'hover:bg-[var(--color-sunken)]')
-        }
+        className="flex flex-1 items-center gap-1.5 py-1 pr-2 text-left"
       >
         <span className="w-[11px] shrink-0" aria-hidden />
         <FileIcon errored={f.errorCount > 0} />
         <span
           className={
-            'truncate font-mono text-[12px] ' +
+            'whitespace-nowrap font-mono text-[12px] ' +
             (isSelected ? 'font-medium' : 'text-[var(--color-fg-primary)]')
           }
         >
           {node.name}
         </span>
-        <span className="ml-auto flex shrink-0 items-center gap-1 pl-1.5">
-          {f.errorCount > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-danger)]" />}
-          <span className="font-mono text-[10px] tabular-nums text-[var(--color-fg-muted)]">
-            {f.totalCount}
-          </span>
-        </span>
       </button>
+      <span className="flex shrink-0 items-center gap-1 pl-1 pr-2">
+        {f.errorCount > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-danger)]" />}
+        <span className="font-mono text-[10px] tabular-nums text-[var(--color-fg-muted)] group-hover:hidden">
+          {f.totalCount}
+        </span>
+        <button
+          type="button"
+          onClick={() => onOpenFile(f.filePath)}
+          title={openLabel}
+          aria-label={openLabel}
+          className="hidden rounded-[var(--radius-control)] p-0.5 text-[var(--color-fg-muted)] transition hover:text-[var(--color-accent-ink)] group-hover:inline-flex dark:hover:text-[var(--color-accent)]"
+        >
+          <ExternalIcon />
+        </button>
+      </span>
     </li>
   );
 }
@@ -401,11 +460,13 @@ function FileDetail({
   cwd,
   editLookup,
   onJump,
+  onOpenFile,
 }: {
   file: ModifiedFileSummary;
   cwd: string | null;
   editLookup: EditLookup;
   onJump: (messageUuid: string) => void;
+  onOpenFile: (filePath: string) => void;
 }) {
   const t = useT();
   const display = file.relativePath ?? file.filePath;
@@ -417,9 +478,18 @@ function FileDetail({
       <div className="sticky top-0 z-10 border-b border-[var(--color-hairline)] bg-[var(--color-surface)]/95 px-5 py-3 backdrop-blur">
         <div className="flex items-center gap-2">
           <FileIcon errored={file.errorCount > 0} />
-          <h3 className="truncate font-mono text-[13.5px] font-medium text-[var(--color-fg-primary)]" title={file.filePath}>
+          <h3 className="min-w-0 flex-1 truncate font-mono text-[13.5px] font-medium text-[var(--color-fg-primary)]" title={file.filePath}>
             {tail}
           </h3>
+          <button
+            type="button"
+            onClick={() => onOpenFile(file.filePath)}
+            title={t('session.modified.openFile')}
+            className="inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
+          >
+            <ExternalIcon />
+            {t('session.modified.openFile')}
+          </button>
         </div>
         <p className="mt-0.5 truncate font-mono text-[10.5px] text-[var(--color-fg-faint)]" title={file.filePath}>
           {file.relativePath ?? `${t('session.modified.absolutePath')} · ${file.filePath}`}
@@ -581,29 +651,84 @@ function OperationBody({
   );
 }
 
+/** 行级 split diff：左栏=修改前、右栏=修改后，逐行对齐着色（git split view 风格）。 */
+type LineKind = 'equal' | 'del' | 'add' | 'empty';
+interface SplitRow {
+  left: string | null;
+  right: string | null;
+  leftNo: number | null;
+  rightNo: number | null;
+  leftKind: LineKind;
+  rightKind: LineKind;
+}
+
 function DiffView({ oldStr, newStr }: { oldStr: string; newStr: string }) {
   const t = useT();
-  const hasOld = oldStr.length > 0;
-  const hasNew = newStr.length > 0;
-  if (!hasOld && !hasNew) return <EmptyBody />;
+  const rows = useMemo(() => buildSplitRows(oldStr, newStr), [oldStr, newStr]);
+  if (oldStr.length === 0 && newStr.length === 0) return <EmptyBody />;
   return (
-    <div className="flex flex-col gap-1.5">
-      {hasOld && (
-        <pre className="overflow-x-auto rounded-lg border border-[var(--color-danger)]/30 bg-[var(--color-danger-soft)] px-3 py-2 font-mono text-[11.5px] leading-relaxed text-[var(--color-fg-primary)]">
-          <span className="mb-1 block font-mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--color-danger)]">
-            − {t('session.modified.before')}
-          </span>
-          {prefixLines(oldStr, '− ')}
-        </pre>
-      )}
-      {hasNew && (
-        <pre className="overflow-x-auto rounded-lg border border-[var(--color-moss)]/30 bg-[var(--color-moss-soft)] px-3 py-2 font-mono text-[11.5px] leading-relaxed text-[var(--color-fg-primary)]">
-          <span className="mb-1 block font-mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--color-moss)]">
-            + {t('session.modified.after')}
-          </span>
-          {prefixLines(newStr, '+ ')}
-        </pre>
-      )}
+    <div className="overflow-hidden rounded-lg border border-[var(--color-hairline)]">
+      <div className="grid grid-cols-2 divide-x divide-[var(--color-hairline)] border-b border-[var(--color-hairline)] bg-[var(--color-sunken)]">
+        <span className="px-3 py-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--color-danger)]">
+          − {t('session.modified.before')}
+        </span>
+        <span className="px-3 py-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--color-moss)]">
+          + {t('session.modified.after')}
+        </span>
+      </div>
+      {/* 两栏各自横向滚动；行数与行高一致，纵向自然对齐。 */}
+      <div className="grid grid-cols-2 divide-x divide-[var(--color-hairline)]">
+        <DiffPane rows={rows} side="left" />
+        <DiffPane rows={rows} side="right" />
+      </div>
+    </div>
+  );
+}
+
+function DiffPane({ rows, side }: { rows: SplitRow[]; side: 'left' | 'right' }) {
+  return (
+    <div className="min-w-0 overflow-x-auto">
+      <div className="w-max min-w-full">
+        {rows.map((r, i) => (
+          <DiffLine
+            key={i}
+            no={side === 'left' ? r.leftNo : r.rightNo}
+            text={side === 'left' ? r.left : r.right}
+            kind={side === 'left' ? r.leftKind : r.rightKind}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DiffLine({ no, text, kind }: { no: number | null; text: string | null; kind: LineKind }) {
+  const bg =
+    kind === 'del'
+      ? 'bg-[var(--color-danger-soft)]'
+      : kind === 'add'
+        ? 'bg-[var(--color-moss-soft)]'
+        : kind === 'empty'
+          ? 'bg-[var(--color-sunken)]'
+          : 'bg-[var(--color-surface)]';
+  const marker = kind === 'del' ? '−' : kind === 'add' ? '+' : '';
+  const markerColor =
+    kind === 'del'
+      ? 'text-[var(--color-danger)]'
+      : kind === 'add'
+        ? 'text-[var(--color-moss)]'
+        : 'text-transparent';
+  return (
+    <div className={`flex leading-[1.65] ${bg}`}>
+      <span className="sticky left-0 z-[1] w-[2.75em] shrink-0 select-none border-r border-[var(--color-hairline)] bg-[inherit] px-1.5 text-right font-mono text-[10px] tabular-nums text-[var(--color-fg-faint)]">
+        {no ?? ' '}
+      </span>
+      <span className={`w-4 shrink-0 select-none text-center font-mono text-[11.5px] ${markerColor}`}>
+        {marker}
+      </span>
+      <div className="whitespace-pre pr-3 font-mono text-[11.5px] text-[var(--color-fg-primary)]">
+        {text == null || text === '' ? ' ' : text}
+      </div>
     </div>
   );
 }
@@ -629,11 +754,88 @@ function EmptyBody() {
   );
 }
 
-function prefixLines(text: string, prefix: string): string {
-  return text
-    .split('\n')
-    .map((l) => prefix + l)
-    .join('\n');
+function buildSplitRows(oldStr: string, newStr: string): SplitRow[] {
+  // 空串视为 0 行（而非 ['']），避免纯新增/纯删除时出现一个幻影空行。
+  const ops = diffOps(oldStr === '' ? [] : oldStr.split('\n'), newStr === '' ? [] : newStr.split('\n'));
+  const rows: SplitRow[] = [];
+  let leftNo = 0;
+  let rightNo = 0;
+  let i = 0;
+  while (i < ops.length) {
+    const op = ops[i]!;
+    if (op.type === 'equal') {
+      leftNo++;
+      rightNo++;
+      rows.push({ left: op.text, right: op.text, leftNo, rightNo, leftKind: 'equal', rightKind: 'equal' });
+      i++;
+      continue;
+    }
+    // 收集相邻的一段 del / add，左右配对成同一行（git split view 习惯）。
+    const dels: string[] = [];
+    const adds: string[] = [];
+    while (i < ops.length && ops[i]!.type !== 'equal') {
+      const cur = ops[i]!;
+      if (cur.type === 'del') dels.push(cur.text);
+      else adds.push(cur.text);
+      i++;
+    }
+    const max = Math.max(dels.length, adds.length);
+    for (let x = 0; x < max; x++) {
+      const hasL = x < dels.length;
+      const hasR = x < adds.length;
+      if (hasL) leftNo++;
+      if (hasR) rightNo++;
+      rows.push({
+        left: hasL ? dels[x]! : null,
+        right: hasR ? adds[x]! : null,
+        leftNo: hasL ? leftNo : null,
+        rightNo: hasR ? rightNo : null,
+        leftKind: hasL ? 'del' : 'empty',
+        rightKind: hasR ? 'add' : 'empty',
+      });
+    }
+  }
+  return rows;
+}
+
+interface DiffOp {
+  type: 'equal' | 'del' | 'add';
+  text: string;
+}
+
+// 经典 LCS 行级 diff：dp[i][j] = a[i:] 与 b[j:] 的最长公共子序列长度，
+// 回溯得到 equal / del / add 操作序列。编辑片段通常很短，O(n·m) 足够。
+function diffOps(a: string[], b: string[]): DiffOp[] {
+  const n = a.length;
+  const m = b.length;
+  const dp: number[][] = [];
+  for (let i = 0; i <= n; i++) dp.push(new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    const row = dp[i]!;
+    const next = dp[i + 1]!;
+    for (let j = m - 1; j >= 0; j--) {
+      row[j] = a[i] === b[j] ? next[j + 1]! + 1 : Math.max(next[j]!, row[j + 1]!);
+    }
+  }
+  const ops: DiffOp[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) {
+      ops.push({ type: 'equal', text: a[i]! });
+      i++;
+      j++;
+    } else if (dp[i + 1]![j]! >= dp[i]![j + 1]!) {
+      ops.push({ type: 'del', text: a[i]! });
+      i++;
+    } else {
+      ops.push({ type: 'add', text: b[j]! });
+      j++;
+    }
+  }
+  while (i < n) ops.push({ type: 'del', text: a[i++]! });
+  while (j < m) ops.push({ type: 'add', text: b[j++]! });
+  return ops;
 }
 
 function asRecord(x: unknown): Record<string, unknown> {
@@ -717,6 +919,16 @@ function ArrowIcon() {
     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M5 12h14" />
       <path d="M13 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+function ExternalIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden>
+      <path d="M14 4h6v6" />
+      <path d="M20 4l-9 9" />
+      <path d="M19 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5" />
     </svg>
   );
 }
