@@ -24,7 +24,7 @@ import {
   type SessionDetail,
   type SessionSummary,
 } from '../lib/api.ts';
-import { MAX_SESSION_MESSAGES } from '../lib/constants.ts';
+import { MAX_SESSION_MESSAGES, RECENT_ACTIVITY_WINDOW_MIN } from '../lib/constants.ts';
 import { formatBytes, formatDateTime, formatRelativeTime } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
 import { fadeUpItem, staggerParent } from '../lib/motion.ts';
@@ -37,6 +37,25 @@ interface IndexedMessage {
 
 const INITIAL_WINDOW = 50;
 const LOAD_STEP = 50;
+
+// Live tail: while a session is still being written, poll the detail endpoint so
+// new messages append on their own. "Still being written" = the session's lastAt
+// (max of latest record ts and file mtime) sits inside the same recent-activity
+// window the rest of the app uses for "active". Polling self-terminates: once the
+// file stops changing, lastAt goes stale and refetchInterval returns false.
+const LIVE_POLL_INTERVAL_MS = 2000;
+const LIVE_WINDOW_MS = RECENT_ACTIVITY_WINDOW_MIN * 60 * 1000;
+// Auto-follow only kicks in when the viewport is within this many px of the
+// bottom — so watching the tail follows new messages, but scrolling up to read
+// history is never yanked back down.
+const BOTTOM_STICK_THRESHOLD_PX = 120;
+
+function isWithinLiveWindow(lastAt: string | null | undefined): boolean {
+  if (!lastAt) return false;
+  const ms = new Date(lastAt).getTime();
+  if (Number.isNaN(ms)) return false;
+  return Date.now() - ms < LIVE_WINDOW_MS;
+}
 
 export default function SessionDetailRoute() {
   const t = useT();
@@ -57,9 +76,14 @@ export default function SessionDetailRoute() {
   const [showModifiedDrawer, setShowModifiedDrawer] = useState(false);
   const urlAppliedRef = useRef<string | null>(null);
   const flashedKeyRef = useRef<string | null>(null);
+  // Live-tail follow state: whether the reader is parked at the bottom, and the
+  // message count from the previous render so we only follow genuine new arrivals.
+  const stickToBottomRef = useRef(true);
+  const prevMsgCountRef = useRef<number | null>(null);
 
   useEffect(() => {
     setWindowSize(INITIAL_WINDOW);
+    prevMsgCountRef.current = null;
   }, [pid, sid]);
 
   const { data, isLoading, error } = useQuery({
@@ -69,7 +93,14 @@ export default function SessionDetailRoute() {
         `/api/sessions/${encodeURIComponent(pid)}/${encodeURIComponent(sid)}`,
       ),
     enabled: !!pid && !!sid,
+    // Re-read the jsonl on an interval while the session is live so newly written
+    // messages stream in on their own. The function form is re-evaluated with a
+    // fresh Date.now() after every poll, so it stops on its own once activity
+    // stops — even when the response is byte-identical and never re-renders us.
+    refetchInterval: (query) =>
+      isWithinLiveWindow(query.state.data?.meta.lastAt) ? LIVE_POLL_INTERVAL_MS : false,
   });
+  const isLive = isWithinLiveWindow(data?.meta.lastAt);
 
   const projectsQuery = useQuery({
     queryKey: queryKeys.projects(),
@@ -199,6 +230,33 @@ export default function SessionDetailRoute() {
     return () => cancelAnimationFrame(rafId);
   }, [urlFocus, renderList, data, sid]);
 
+  // Track whether the reader is parked at the bottom of the page, so live appends
+  // can follow the tail without hijacking an upward scroll through history.
+  useEffect(() => {
+    const onScroll = () => {
+      const distance =
+        document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
+      stickToBottomRef.current = distance < BOTTOM_STICK_THRESHOLD_PX;
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // When a live poll appends new messages and the reader is at the bottom — and not
+  // mid-search or deep-linked to a specific message — follow the tail downward.
+  useEffect(() => {
+    const count = data?.meta.messageCount ?? null;
+    const prev = prevMsgCountRef.current;
+    prevMsgCountRef.current = count;
+    if (prev === null || count === null || count <= prev) return;
+    if (urlFocus || skipWindowing || !stickToBottomRef.current) return;
+    const rafId = requestAnimationFrame(() =>
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }),
+    );
+    return () => cancelAnimationFrame(rafId);
+  }, [data?.meta.messageCount, urlFocus, skipWindowing]);
+
   const projectTail = useMemo(() => {
     const cwd = project?.decodedCwd;
     if (!cwd) return pid.slice(-12);
@@ -259,6 +317,7 @@ export default function SessionDetailRoute() {
         <div className="surface-card mt-4 p-6">
           <SessionMasthead
             sid={sid}
+            isLive={isLive}
             title={sessionTitle}
             tagline={t('session.tagline', {
               started: formatRelativeTime(data.meta.firstAt),
@@ -408,6 +467,7 @@ export default function SessionDetailRoute() {
 
 function SessionMasthead({
   sid,
+  isLive,
   title,
   tagline,
   firstAt,
@@ -428,6 +488,7 @@ function SessionMasthead({
   modifiedLoading,
 }: {
   sid: string;
+  isLive: boolean;
   title: string | null;
   tagline: string;
   firstAt: string | null;
@@ -456,6 +517,18 @@ function SessionMasthead({
         <div className="flex min-w-0 items-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-fg-muted)]">
           <span className="text-[var(--color-accent)]">●</span>
           <span>§ SESSION</span>
+          {isLive && (
+            <span
+              title={t('session.live.tooltip')}
+              className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 normal-case tracking-[0.14em] text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]"
+            >
+              <span aria-hidden className="relative inline-flex h-1.5 w-1.5">
+                <span className="absolute inset-0 rounded-full bg-[var(--color-accent)] pulse-amber" />
+                <span className="absolute inset-0 rounded-full bg-[var(--color-accent)]" />
+              </span>
+              {t('session.live')}
+            </span>
+          )}
           <span className="hidden h-3 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
           <span className="hidden truncate normal-case tracking-[0.05em] text-[var(--color-fg-faint)] sm:inline">
             {sid}
