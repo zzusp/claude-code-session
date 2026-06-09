@@ -106,6 +106,8 @@ const DICT = {
     'session.meta.started': 'Started',
     'session.truncated': 'Session truncated to first {{n}} messages.',
     'session.shown': '{{shown}} / {{total}}',
+    'session.live': 'Live',
+    'session.live.tooltip': "Auto-updating — new messages stream in as they're written",
 
     'session.modified.title': 'Modified files',
     'session.modified.empty': 'No files were modified in this session.',
@@ -464,6 +466,8 @@ const DICT = {
     'session.meta.started': '开始时间',
     'session.truncated': '会话已截断至前 {{n}} 条消息。',
     'session.shown': '{{shown}} / {{total}}',
+    'session.live': '实时',
+    'session.live.tooltip': '自动更新 — 新消息写入时实时追加',
 
     'session.modified.title': '修改的文件',
     'session.modified.empty': '本次会话没有修改任何文件。',
