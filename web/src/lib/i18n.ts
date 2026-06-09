@@ -166,6 +166,9 @@ const DICT = {
     'session.modified.contentUnavailable':
       'Edit content unavailable (session truncated past this point).',
     'session.modified.noContent': 'No content recorded for this operation.',
+    'session.modified.showEarlier': 'show {{n}} earlier messages',
+    'session.modified.added': 'added',
+    'session.modified.modified': 'modified',
 
     'message.role.you': 'You',
     'message.role.claude': 'Claude',
@@ -557,6 +560,9 @@ const DICT = {
     'session.modified.editN': '改动 {{n}}',
     'session.modified.contentUnavailable': '改动内容不可用（会话在此处之后被截断）。',
     'session.modified.noContent': '该操作没有记录到内容。',
+    'session.modified.showEarlier': '显示更早的 {{n}} 条消息',
+    'session.modified.added': '新增',
+    'session.modified.modified': '修改',
 
     'message.role.you': '我',
     'message.role.claude': 'Claude',
