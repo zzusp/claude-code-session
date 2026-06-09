@@ -4,7 +4,7 @@ import { isUnderClaudeRoot, PATHS } from './claude-paths.ts';
 import { dirSize } from './fs-size.ts';
 import { isSafeId } from './safe-id.ts';
 import { safeRemove } from './safe-remove.ts';
-import { listProjects, listSessionsForProject } from './scan.ts';
+import { scanProjectsForDisk } from './scan.ts';
 import type {
   DiskCleanupLargeSession,
   DiskCleanupOrphan,
@@ -65,13 +65,12 @@ function scanOrphans(rootDir: string, known: Set<string>): DiskCleanupOrphan[] {
 }
 
 export async function computeCleanupSuggestions(): Promise<DiskCleanupSuggestions> {
-  const projects = await listProjects();
+  const projects = await scanProjectsForDisk();
 
   // 大会话：扫每个项目的会话，按总占用排序取 top 10
   const flat: DiskCleanupLargeSession[] = [];
   for (const p of projects) {
-    const sessions = await listSessionsForProject(p.id);
-    for (const s of sessions) {
+    for (const s of p.sessions) {
       const r = s.relatedBytes;
       const total = r.jsonl + r.subdir + r.fileHistory + r.sessionEnv;
       if (total <= 0) continue;
