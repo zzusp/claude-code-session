@@ -1,5 +1,12 @@
 import { motion } from 'motion/react';
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import type {
   DiffHunk,
   Message,
@@ -14,6 +21,11 @@ import MessageBubble, { WorkingIndicator } from './MessageBubble.tsx';
 
 // 三栏布局的最小内容区宽度：拖动任一分割线时，给中间文件内容栏保底的像素宽。
 const CONTENT_MIN_PX = 320;
+
+// 对话栏初始只渲染最新的这么多条消息（默认落点在底部最新一条），更早的折叠在
+// 顶部「显示更早」后按这个步长逐批展开——会话动辄上百条，全量渲染既慢又埋没最新动态。
+const CONV_INITIAL_VISIBLE = 20;
+const CONV_LOAD_STEP = 40;
 
 /** Lookup from a tool_use id → the issuing tool's name + raw input, built from the
  *  already-loaded session messages. Lets the detail pane render the actual edit
@@ -90,6 +102,61 @@ export default function ModifiedFilesDrawer({
   const [convWidth, setConvWidth] = useState(420);
   const [railWidth, setRailWidth] = useState(280);
 
+  // 对话栏可见消息：默认只展示尾部最新 CONV_INITIAL_VISIBLE 条，更早的折叠。
+  const [visibleCount, setVisibleCount] = useState(CONV_INITIAL_VISIBLE);
+  const startIndex = Math.max(0, messages.length - visibleCount);
+  const visibleMessages = useMemo(() => messages.slice(startIndex), [messages, startIndex]);
+  const hiddenCount = startIndex;
+
+  // 展开更早消息 / 跳转命中折叠区时，需要在重排后修正滚动位置：
+  //  - restoreFromBottom：展开时保持「离底部的距离」不变，避免视口往上跳。
+  //  - jumpUuid：跳转目标在折叠区时先全量展开，渲染后再滚到该消息。
+  const restoreFromBottom = useRef<number | null>(null);
+  const pendingJump = useRef<string | null>(null);
+
+  // 打开抽屉时把对话栏滚到底——最新一条消息就是落点。messages 已就绪，commit 后
+  // scrollHeight 即为准确值，用 layout effect 在绘制前定位，避免可见的跳动。
+  useLayoutEffect(() => {
+    const el = convScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+    // 只在首次挂载（抽屉打开）时落到底部。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // visibleCount 变化（展开更早 / 跳转触发的全量展开）后修正滚动位置。
+  useLayoutEffect(() => {
+    const el = convScrollRef.current;
+    if (!el) return;
+    if (pendingJump.current) {
+      scrollToMessage(pendingJump.current);
+      pendingJump.current = null;
+      restoreFromBottom.current = null;
+      return;
+    }
+    if (restoreFromBottom.current != null) {
+      el.scrollTop = el.scrollHeight - restoreFromBottom.current;
+      restoreFromBottom.current = null;
+    }
+  }, [visibleCount]);
+
+  function showEarlier() {
+    const el = convScrollRef.current;
+    restoreFromBottom.current = el ? el.scrollHeight - el.scrollTop : null;
+    setVisibleCount((c) => Math.min(messages.length, c + CONV_LOAD_STEP));
+  }
+
+  // 在对话栏里滚到某条消息并闪烁高亮。命中折叠区时返回 false，由调用方先展开。
+  function scrollToMessage(uuid: string): boolean {
+    const root = convScrollRef.current;
+    const el = root?.querySelector<HTMLElement>(`[data-uuid="${CSS.escape(uuid)}"]`);
+    if (!el) return false;
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const flashTarget = el.closest('li') ?? el;
+    flashTarget.classList.add('flash-focus');
+    window.setTimeout(() => flashTarget.classList.remove('flash-focus'), 1300);
+    return true;
+  }
+
   // Esc 关闭 + 背景滚动锁。
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -108,13 +175,14 @@ export default function ModifiedFilesDrawer({
   // 落点一致。不再关闭抽屉——三栏布局下「边看改动边看对话」才是这里的价值所在。
   function jump(uuid: string) {
     onFocusMessage(uuid);
-    const root = convScrollRef.current;
-    const el = root?.querySelector<HTMLElement>(`[data-uuid="${CSS.escape(uuid)}"]`);
-    if (!el) return;
-    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    const flashTarget = el.closest('li') ?? el;
-    flashTarget.classList.add('flash-focus');
-    window.setTimeout(() => flashTarget.classList.remove('flash-focus'), 1300);
+    // 目标若落在折叠区（startIndex 之前），先全量展开，渲染后再由 layout effect 滚过去。
+    const idx = messages.findIndex((m) => m.uuid === uuid);
+    if (idx >= 0 && idx < startIndex) {
+      pendingJump.current = uuid;
+      setVisibleCount(messages.length);
+      return;
+    }
+    scrollToMessage(uuid);
   }
 
   const count = files.length;
@@ -216,14 +284,25 @@ export default function ModifiedFilesDrawer({
                     {t('common.noMessagesMatch')}
                   </p>
                 ) : (
-                  <ol>
-                    {messages.map((m, i) => (
-                      <li key={m.uuid || m.ts || String(i)} className="py-3">
-                        <MessageBubble message={m} query={query} />
-                      </li>
-                    ))}
-                    {isWorking && <WorkingIndicator />}
-                  </ol>
+                  <>
+                    {hiddenCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={showEarlier}
+                        className="mb-1 flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-input)] border border-dashed border-[var(--color-hairline-strong)] py-2 font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--color-fg-muted)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
+                      >
+                        {t('session.modified.showEarlier', { n: hiddenCount })}
+                      </button>
+                    )}
+                    <ol>
+                      {visibleMessages.map((m, i) => (
+                        <li key={m.uuid || m.ts || String(startIndex + i)} className="py-3">
+                          <MessageBubble message={m} query={query} />
+                        </li>
+                      ))}
+                      {isWorking && <WorkingIndicator />}
+                    </ol>
+                  </>
                 )}
               </div>
             </motion.div>
@@ -376,6 +455,27 @@ function nodeKey(node: TreeNode): string {
   return node.kind === 'folder' ? `d:${node.path}` : `f:${node.file.filePath}`;
 }
 
+/** 本会话内对该文件的「变更类型」，仅用于文件名着色（Git 习惯：A 绿 / M 琥珀）。
+ *  added = 本会话首个操作就是「创建」（Write/NotebookEdit 且 structuredPatch 为空数组，
+ *  这是 Claude Code 记录全新文件的信号）；否则一律按 modified。本工具集没有删除语义，故无 deleted。 */
+type FileChangeType = 'added' | 'modified';
+function fileChangeType(file: ModifiedFileSummary): FileChangeType {
+  const first = file.operations[0];
+  const created =
+    !!first &&
+    (first.toolName === 'Write' || first.toolName === 'NotebookEdit') &&
+    Array.isArray(first.structuredPatch) &&
+    first.structuredPatch.length === 0;
+  return created ? 'added' : 'modified';
+}
+
+/** 变更类型 → 文件名/图标的前景色 token。errored 在调用处优先用 danger，不走这里。 */
+function changeToneClass(type: FileChangeType): string {
+  return type === 'added'
+    ? 'text-[var(--color-moss)]'
+    : 'text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]';
+}
+
 // 把扁平文件列表按目录段建成树。displayPath = relativePath ?? filePath，
 // 末段是文件名，其余是文件夹。文件夹内：文件夹优先、各自字母序。
 // 最后把"只有一个子文件夹"的单链折叠成 a/b 一行（IDE 习惯，省纵深）。
@@ -501,6 +601,9 @@ function TreeRow({
   const f = node.file;
   const isSelected = selected === f.filePath;
   const openLabel = t('session.modified.openFile');
+  const changeType = fileChangeType(f);
+  // 文件名/图标着色按变更类型走；errored 是另一根轴，红点单独标，不抢文件名的语义色。
+  const nameTone = changeToneClass(changeType);
   return (
     <li
       role="treeitem"
@@ -522,11 +625,12 @@ function TreeRow({
         className="flex flex-1 items-center gap-1.5 py-1 pr-2 text-left"
       >
         <span className="w-[11px] shrink-0" aria-hidden />
-        <FileIcon errored={f.errorCount > 0} />
+        <FileIcon errored={f.errorCount > 0} tone={changeType} />
         <span
           className={
             'whitespace-nowrap font-mono text-[12px] ' +
-            (isSelected ? 'font-medium' : 'text-[var(--color-fg-primary)]')
+            nameTone +
+            (isSelected ? ' font-medium' : '')
           }
         >
           {node.name}
@@ -534,6 +638,12 @@ function TreeRow({
       </button>
       <span className="flex shrink-0 items-center gap-1 pl-1 pr-2">
         {f.errorCount > 0 && <span className="h-1.5 w-1.5 rounded-full bg-[var(--color-danger)]" />}
+        <span
+          className={`font-mono text-[10px] font-semibold leading-none ${nameTone}`}
+          title={t(changeType === 'added' ? 'session.modified.added' : 'session.modified.modified')}
+        >
+          {changeType === 'added' ? 'A' : 'M'}
+        </span>
         <span className="font-mono text-[10px] tabular-nums text-[var(--color-fg-muted)] group-hover:hidden">
           {f.totalCount}
         </span>
@@ -569,14 +679,21 @@ function FileDetail({
   const t = useT();
   const display = file.relativePath ?? file.filePath;
   const tail = display.split(/[\\/]+/).pop() ?? display;
+  const changeType = fileChangeType(file);
   void cwd;
 
   return (
     <div className="flex flex-col">
       <div className="sticky top-0 z-10 border-b border-[var(--color-hairline)] bg-[var(--color-surface)]/95 px-5 py-3 backdrop-blur">
         <div className="flex items-center gap-2">
-          <FileIcon errored={file.errorCount > 0} />
-          <h3 className="min-w-0 flex-1 truncate font-mono text-[13.5px] font-medium text-[var(--color-fg-primary)]" title={file.filePath}>
+          <FileIcon errored={file.errorCount > 0} tone={changeType} />
+          <h3
+            className={
+              'min-w-0 flex-1 truncate font-mono text-[13.5px] font-medium ' +
+              (file.errorCount > 0 ? 'text-[var(--color-danger)]' : changeToneClass(changeType))
+            }
+            title={file.filePath}
+          >
             {tail}
           </h3>
           <button
@@ -702,7 +819,7 @@ function OperationBody({
   if (patch && patch.length > 0) {
     return (
       <div className="px-3 py-2.5">
-        <UnifiedDiff rows={rowsFromHunks(patch)} />
+        <SplitDiff rows={rowsFromHunks(patch)} />
       </div>
     );
   }
@@ -721,7 +838,7 @@ function OperationBody({
     const content = typeof rec.content === 'string' ? rec.content : '';
     return (
       <div className="px-3 py-2.5">
-        <UnifiedDiff rows={rowsFromStrings('', content)} label={t('session.modified.newContent')} />
+        <SplitDiff rows={rowsFromStrings('', content)} label={t('session.modified.newContent')} />
       </div>
     );
   }
@@ -731,7 +848,7 @@ function OperationBody({
     const cellType = typeof rec.cell_type === 'string' ? rec.cell_type : null;
     return (
       <div className="px-3 py-2.5">
-        <UnifiedDiff
+        <SplitDiff
           rows={rowsFromStrings('', source)}
           label={cellType ? `${t('session.modified.newContent')} · ${cellType}` : t('session.modified.newContent')}
         />
@@ -753,7 +870,7 @@ function OperationBody({
               <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--color-fg-muted)]">
                 {t('session.modified.editN', { n: i + 1 })}
               </p>
-              <UnifiedDiff
+              <SplitDiff
                 rows={rowsFromStrings(
                   typeof er.old_string === 'string' ? er.old_string : '',
                   typeof er.new_string === 'string' ? er.new_string : '',
@@ -769,7 +886,7 @@ function OperationBody({
   // Edit
   return (
     <div className="px-3 py-2.5">
-      <UnifiedDiff
+      <SplitDiff
         rows={rowsFromStrings(
           typeof rec.old_string === 'string' ? rec.old_string : '',
           typeof rec.new_string === 'string' ? rec.new_string : '',
@@ -799,9 +916,70 @@ interface UnifiedRow {
   segs: Seg[] | null;
 }
 
-/** GitHub 风格的统一 diff：单栏，左右两个行号 gutter（旧 / 新），未改动区折叠成 gap 行。 */
-function UnifiedDiff({ rows, label }: { rows: UnifiedRow[]; label?: string }) {
+/** 分屏（左右两栏）一侧的一行。kind=empty 时本侧无对应行（对侧是纯增 / 纯删），
+ *  渲染成留白占位行，保证两栏行高一一对齐。 */
+interface SplitCell {
+  no: number | null;
+  kind: 'context' | 'del' | 'add' | 'empty';
+  text: string | null;
+  segs: Seg[] | null;
+}
+/** 分屏一行：pair=左右各一格；gap=折叠的未改动区间，两栏同高同文。 */
+interface SplitRow {
+  kind: 'pair' | 'gap';
+  gap?: number;
+  left?: SplitCell;
+  right?: SplitCell;
+}
+
+/** 统一视图行 → 分屏行。rowsFrom* 在一个改动块里先发全部 del 再发全部 add，
+ *  这里按序号把 del[x]↔add[x] 配成一行（多出的一侧用 empty 占位），未改动行左右同文。 */
+function toSplitRows(rows: UnifiedRow[]): SplitRow[] {
+  const out: SplitRow[] = [];
+  let i = 0;
+  while (i < rows.length) {
+    const r = rows[i]!;
+    if (r.kind === 'gap') {
+      out.push({ kind: 'gap', gap: r.gap ?? 0 });
+      i++;
+      continue;
+    }
+    if (r.kind === 'context') {
+      out.push({
+        kind: 'pair',
+        left: { no: r.oldNo, kind: 'context', text: r.text, segs: null },
+        right: { no: r.newNo, kind: 'context', text: r.text, segs: null },
+      });
+      i++;
+      continue;
+    }
+    const dels: UnifiedRow[] = [];
+    const adds: UnifiedRow[] = [];
+    while (i < rows.length && rows[i]!.kind === 'del') dels.push(rows[i++]!);
+    while (i < rows.length && rows[i]!.kind === 'add') adds.push(rows[i++]!);
+    const max = Math.max(dels.length, adds.length);
+    for (let x = 0; x < max; x++) {
+      const d = dels[x];
+      const a = adds[x];
+      out.push({
+        kind: 'pair',
+        left: d
+          ? { no: d.oldNo, kind: 'del', text: d.text, segs: d.segs }
+          : { no: null, kind: 'empty', text: null, segs: null },
+        right: a
+          ? { no: a.newNo, kind: 'add', text: a.text, segs: a.segs }
+          : { no: null, kind: 'empty', text: null, segs: null },
+      });
+    }
+  }
+  return out;
+}
+
+/** GitHub 风格的分屏 diff：左栏旧（含删除），右栏新（含新增），两栏行级对齐。
+ *  两栏各自横向滚动；因每行 whitespace-pre 恒为一行高、左右行数相同，纵向天然对齐。 */
+function SplitDiff({ rows, label }: { rows: UnifiedRow[]; label?: string }) {
   if (rows.length === 0) return <EmptyBody />;
+  const split = toSplitRows(rows);
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--color-hairline)]">
       {label && (
@@ -809,58 +987,69 @@ function UnifiedDiff({ rows, label }: { rows: UnifiedRow[]; label?: string }) {
           {label}
         </div>
       )}
-      <div className="overflow-x-auto">
-        <div className="w-max min-w-full">
-          {rows.map((r, i) => (
-            <UnifiedLine key={i} row={r} />
-          ))}
+      <div className="flex">
+        <div className="w-1/2 overflow-x-auto border-r border-[var(--color-hairline)]">
+          <div className="w-max min-w-full">
+            {split.map((r, i) => (
+              <SplitLine key={i} row={r} side="left" />
+            ))}
+          </div>
+        </div>
+        <div className="w-1/2 overflow-x-auto">
+          <div className="w-max min-w-full">
+            {split.map((r, i) => (
+              <SplitLine key={i} row={r} side="right" />
+            ))}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function UnifiedLine({ row }: { row: UnifiedRow }) {
+function SplitLine({ row, side }: { row: SplitRow; side: 'left' | 'right' }) {
   const t = useT();
   if (row.kind === 'gap') {
     return (
       <div className="flex bg-[var(--color-sunken)] leading-[1.65] text-[var(--color-fg-faint)]">
-        <span className="sticky left-0 z-[1] w-[5.5em] shrink-0 select-none border-r border-[var(--color-hairline)] bg-[inherit] px-1.5 text-center font-mono text-[11px]">
+        <span className="sticky left-0 z-[1] w-[3em] shrink-0 select-none border-r border-[var(--color-hairline)] bg-[inherit] px-1.5 text-center font-mono text-[11px]">
           ⋯
         </span>
-        <span className="px-3 font-mono text-[10px] italic tracking-[0.04em]">
+        <span className="whitespace-nowrap px-3 font-mono text-[10px] italic tracking-[0.04em]">
           {t('session.modified.linesOmitted', { n: row.gap ?? 0 })}
         </span>
       </div>
     );
   }
+  const cell = side === 'left' ? row.left! : row.right!;
   const bg =
-    row.kind === 'del'
+    cell.kind === 'del'
       ? 'bg-[var(--color-danger-soft)]'
-      : row.kind === 'add'
+      : cell.kind === 'add'
         ? 'bg-[var(--color-moss-soft)]'
-        : 'bg-[var(--color-surface)]';
-  const marker = row.kind === 'del' ? '−' : row.kind === 'add' ? '+' : '';
+        : cell.kind === 'empty'
+          ? 'bg-[var(--color-sunken)]/40'
+          : 'bg-[var(--color-surface)]';
+  const marker = cell.kind === 'del' ? '−' : cell.kind === 'add' ? '+' : '';
   const markerColor =
-    row.kind === 'del'
+    cell.kind === 'del'
       ? 'text-[var(--color-danger)]'
-      : row.kind === 'add'
+      : cell.kind === 'add'
         ? 'text-[var(--color-moss)]'
         : 'text-transparent';
   // 改动 token 的强调底色：在整行 -soft 底色上再叠一层更饱和的同色（GitHub 行内高亮）。
-  const hl = row.kind === 'del' ? 'bg-[var(--color-danger)]/25' : 'bg-[var(--color-moss)]/30';
+  const hl = cell.kind === 'del' ? 'bg-[var(--color-danger)]/25' : 'bg-[var(--color-moss)]/30';
   return (
     <div className={`flex leading-[1.65] ${bg}`}>
-      <span className="sticky left-0 z-[1] flex shrink-0 select-none border-r border-[var(--color-hairline)] bg-[inherit] font-mono text-[10px] tabular-nums text-[var(--color-fg-faint)]">
-        <span className="w-[2.75em] px-1.5 text-right">{row.oldNo ?? ''}</span>
-        <span className="w-[2.75em] px-1.5 text-right">{row.newNo ?? ''}</span>
+      <span className="sticky left-0 z-[1] w-[3em] shrink-0 select-none border-r border-[var(--color-hairline)] bg-[inherit] px-1.5 text-right font-mono text-[10px] tabular-nums text-[var(--color-fg-faint)]">
+        {cell.no ?? ''}
       </span>
       <span className={`w-4 shrink-0 select-none text-center font-mono text-[11.5px] ${markerColor}`}>
         {marker}
       </span>
       <div className="whitespace-pre pr-3 font-mono text-[11.5px] text-[var(--color-fg-primary)]">
-        {row.segs && row.segs.length > 0
-          ? row.segs.map((s, i) =>
+        {cell.segs && cell.segs.length > 0
+          ? cell.segs.map((s, i) =>
               s.changed ? (
                 <span key={i} className={hl}>
                   {s.text}
@@ -869,9 +1058,9 @@ function UnifiedLine({ row }: { row: UnifiedRow }) {
                 <span key={i}>{s.text}</span>
               ),
             )
-          : row.text == null || row.text === ''
+          : cell.text == null || cell.text === ''
             ? ' '
-            : row.text}
+            : cell.text}
       </div>
     </div>
   );
@@ -1096,7 +1285,12 @@ function FolderIcon({ open }: { open: boolean }) {
   );
 }
 
-function FileIcon({ errored }: { errored?: boolean }) {
+function FileIcon({ errored, tone }: { errored?: boolean; tone?: FileChangeType }) {
+  const color = errored
+    ? 'text-[var(--color-danger)]'
+    : tone
+      ? changeToneClass(tone)
+      : 'text-[var(--color-fg-muted)]';
   return (
     <svg
       width="12"
@@ -1107,7 +1301,7 @@ function FileIcon({ errored }: { errored?: boolean }) {
       strokeWidth="1.6"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={'shrink-0 ' + (errored ? 'text-[var(--color-danger)]' : 'text-[var(--color-fg-muted)]')}
+      className={'shrink-0 ' + color}
       aria-hidden
     >
       <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
