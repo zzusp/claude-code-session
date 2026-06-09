@@ -25,5 +25,6 @@ npm-debug.log*
 docs/acceptance/cross-device-sharing/round-1/*.png
 docs/acceptance/modified-files-drawer/round-1/*.png
 docs/acceptance/modified-files-drawer/round-2/*.png
+docs/acceptance/modified-files-drawer/round-3/*.png
 docs/acceptance/version-update-notice/round-1/screenshots/
 docs/acceptance/version-update-notice/round-1/verdict.json
