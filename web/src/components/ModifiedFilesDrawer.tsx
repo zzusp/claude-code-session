@@ -143,15 +143,15 @@ export default function ModifiedFilesDrawer({
   }
 
   // 实时轮询追加了新消息、或 Claude 刚开始处理（WorkingIndicator 出现）时，若用户停在
-  // 底部就跟随到最新——和会话时间线的自动跟随同义。展开更早 / 跳转触发的重排由上面的
-  // visibleCount layout effect 负责，这里用 pendingJump / restoreFromBottom 让位，避免互相打架。
+  // 底部就跟随到最新——和会话时间线的自动跟随同义。展开更早触发的重排由上面的
+  // visibleCount layout effect 负责，这里给 restoreFromBottom 让位，避免互相打架。
   useLayoutEffect(() => {
     const grew = messages.length > prevMsgCount.current;
     const startedWorking = isWorking && !prevIsWorking.current;
     prevMsgCount.current = messages.length;
     prevIsWorking.current = isWorking;
     if (!grew && !startedWorking) return;
-    if (pendingJump.current || restoreFromBottom.current != null) return;
+    if (restoreFromBottom.current != null) return;
     if (!stickToBottom.current) return;
     const el = convScrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
