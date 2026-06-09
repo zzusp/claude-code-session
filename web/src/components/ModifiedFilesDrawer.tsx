@@ -172,13 +172,13 @@ export default function ModifiedFilesDrawer({
         aria-label={t('session.modified.title')}
         className="fixed inset-0 z-[60] flex w-full flex-col bg-[var(--color-surface)] shadow-[var(--shadow-pop)]"
       >
-        <header className="flex items-center justify-between gap-3 border-b border-[var(--color-hairline)] px-5 py-3.5">
-          <div className="flex min-w-0 items-center gap-3">
+        <header className="flex items-center justify-between gap-3 border-b border-[var(--color-hairline)] px-5 py-2">
+          <div className="flex min-w-0 items-center gap-2.5">
             <span className="text-[var(--color-accent)]">
               <TreeGlyph />
             </span>
             <div className="min-w-0">
-              <h2 className="font-display text-[17px] font-light tracking-tight text-[var(--color-fg-primary)]">
+              <h2 className="font-display text-[15px] font-light leading-tight tracking-tight text-[var(--color-fg-primary)]">
                 {t('session.modified.title')}
               </h2>
               {cwd && (
@@ -1142,7 +1142,7 @@ function FileIcon({ errored, tone }: { errored?: boolean; tone?: FileChangeType 
 
 function TreeGlyph() {
   return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M3 5h7l2 2h9" />
       <path d="M3 5v14h18V9" />
       <path d="M8 13h8M8 16h5" opacity="0.5" />
