@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type {
   DiffHunk,
+  Message,
   ModifiedFileOperation,
   ModifiedFileSummary,
   ModifiedFileToolName,
@@ -9,6 +10,10 @@ import type {
 import { formatDateTime, formatRelativeTime } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
 import { Loading } from './Loading.tsx';
+import MessageBubble from './MessageBubble.tsx';
+
+// 三栏布局的最小内容区宽度：拖动任一分割线时，给中间文件内容栏保底的像素宽。
+const CONTENT_MIN_PX = 320;
 
 /** Lookup from a tool_use id → the issuing tool's name + raw input, built from the
  *  already-loaded session messages. Lets the detail pane render the actual edit
@@ -19,10 +24,16 @@ interface Props {
   files: ModifiedFileSummary[];
   cwd: string | null;
   editLookup: EditLookup;
+  /** Session conversation, rendered in the drawer's left column so edits can be
+   *  read alongside the dialogue that drove them. Already meta-filtered upstream. */
+  messages: Message[];
+  /** Active search query, forwarded to MessageBubble for in-message highlight. */
+  query: string;
   loading: boolean;
   error: Error | null;
   onClose: () => void;
-  /** Jump to the message that issued an op, then close the drawer. */
+  /** Sync ?focus=<uuid> to the page underneath so closing the drawer lands on the
+   *  same message. The drawer itself scrolls its own conversation column. */
   onFocusMessage: (messageUuid: string) => void;
   /** Open the real file on disk in the OS default app. */
   onOpenFile: (filePath: string) => void;
@@ -32,6 +43,8 @@ export default function ModifiedFilesDrawer({
   files,
   cwd,
   editLookup,
+  messages,
+  query,
   loading,
   error,
   onClose,
@@ -66,26 +79,12 @@ export default function ModifiedFilesDrawer({
       return next;
     });
 
-  // 文件树 / 内容之间可拖拽的分割线：railWidth 是树栏像素宽，拖动时实时改。
+  // 三栏（对话 | 内容 | 文件树）的两条可拖拽分割线：对话栏与文件树栏各持一个像素
+  // 宽度，中间内容栏吃掉剩余空间。拖动时实时改、并各自给内容区留 CONTENT_MIN_PX 保底。
   const splitRef = useRef<HTMLDivElement>(null);
-  const draggingRef = useRef(false);
-  const [railWidth, setRailWidth] = useState(300);
-  function onSplitterDown(e: ReactPointerEvent<HTMLDivElement>) {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    draggingRef.current = true;
-  }
-  function onSplitterMove(e: ReactPointerEvent<HTMLDivElement>) {
-    if (!draggingRef.current || !splitRef.current) return;
-    const rect = splitRef.current.getBoundingClientRect();
-    // 下限 200px、上限留给内容区至少 320px。
-    const max = Math.max(200, rect.width - 320);
-    setRailWidth(Math.min(max, Math.max(200, e.clientX - rect.left)));
-  }
-  function onSplitterUp(e: ReactPointerEvent<HTMLDivElement>) {
-    draggingRef.current = false;
-    e.currentTarget.releasePointerCapture(e.pointerId);
-  }
+  const convScrollRef = useRef<HTMLDivElement>(null);
+  const [convWidth, setConvWidth] = useState(420);
+  const [railWidth, setRailWidth] = useState(280);
 
   // Esc 关闭 + 背景滚动锁。
   useEffect(() => {
@@ -101,9 +100,17 @@ export default function ModifiedFilesDrawer({
     };
   }, [onClose]);
 
+  // 跳转：在抽屉左侧对话栏里滚到该消息并高亮；同时把 ?focus 推给底层页面，关闭后
+  // 落点一致。不再关闭抽屉——三栏布局下「边看改动边看对话」才是这里的价值所在。
   function jump(uuid: string) {
     onFocusMessage(uuid);
-    onClose();
+    const root = convScrollRef.current;
+    const el = root?.querySelector<HTMLElement>(`[data-uuid="${CSS.escape(uuid)}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const flashTarget = el.closest('li') ?? el;
+    flashTarget.classList.add('flash-focus');
+    window.setTimeout(() => flashTarget.classList.remove('flash-focus'), 1300);
   }
 
   const count = files.length;
@@ -117,6 +124,7 @@ export default function ModifiedFilesDrawer({
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         transition={{ duration: 0.18 }}
         onClick={onClose}
         className="fixed inset-0 z-[55] bg-[oklch(0.16_0.006_85_/_0.5)] backdrop-blur-[2px]"
@@ -125,6 +133,7 @@ export default function ModifiedFilesDrawer({
       <motion.aside
         initial={{ x: '100%' }}
         animate={{ x: 0 }}
+        exit={{ x: '100%' }}
         transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
         role="dialog"
         aria-modal="true"
@@ -183,8 +192,79 @@ export default function ModifiedFilesDrawer({
 
         {!loading && !error && count > 0 && (
           <div ref={splitRef} className="flex min-h-0 flex-1">
-            {/* Tree rail */}
-            <div className="flex shrink-0 flex-col" style={{ width: railWidth }}>
+            {/* ① 对话栏：左侧，入场时从左缘滑入——读作「对话流进了弹窗」。 */}
+            <motion.div
+              initial={{ opacity: 0, x: -32 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1], delay: 0.06 }}
+              className="flex shrink-0 flex-col border-r border-[var(--color-hairline)]"
+              style={{ width: convWidth }}
+            >
+              <div className="flex items-center gap-2 border-b border-[var(--color-hairline)] px-4 py-1.5">
+                <span className="eyebrow">{t('session.modified.col.conversation')}</span>
+                <span className="ml-auto font-mono text-[10px] tabular-nums text-[var(--color-fg-muted)]">
+                  {messages.length}
+                </span>
+              </div>
+              <div ref={convScrollRef} className="min-h-0 flex-1 overflow-auto px-4 py-2">
+                {messages.length === 0 ? (
+                  <p className="px-1 py-3 text-sm italic text-[var(--color-fg-muted)]">
+                    {t('common.noMessagesMatch')}
+                  </p>
+                ) : (
+                  <ol>
+                    {messages.map((m, i) => (
+                      <li key={m.uuid || m.ts || String(i)} className="py-3">
+                        <MessageBubble message={m} query={query} />
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </div>
+            </motion.div>
+
+            <Splitter
+              getRect={() => splitRef.current?.getBoundingClientRect() ?? null}
+              onResize={(clientX, rect) =>
+                setConvWidth(clampWidth(clientX - rect.left, rect.width - railWidth))
+              }
+            />
+
+            {/* ② 文件内容栏：中间，吃掉剩余空间。 */}
+            <div className="min-w-0 flex-1 overflow-auto">
+              {selectedFile ? (
+                <FileDetail
+                  key={selectedFile.filePath}
+                  file={selectedFile}
+                  cwd={cwd}
+                  editLookup={editLookup}
+                  onJump={jump}
+                  onOpenFile={onOpenFile}
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center px-6">
+                  <p className="text-center text-sm italic text-[var(--color-fg-muted)]">
+                    {t('session.modified.selectFile')}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <Splitter
+              getRect={() => splitRef.current?.getBoundingClientRect() ?? null}
+              onResize={(clientX, rect) =>
+                setRailWidth(clampWidth(rect.right - clientX, rect.width - convWidth))
+              }
+            />
+
+            {/* ③ 文件树栏：右侧，入场时从右缘滑入。 */}
+            <motion.div
+              initial={{ opacity: 0, x: 32 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1], delay: 0.06 }}
+              className="flex shrink-0 flex-col border-l border-[var(--color-hairline)]"
+              style={{ width: railWidth }}
+            >
               <div className="flex items-center justify-between gap-2 border-b border-[var(--color-hairline)] px-3 py-1.5">
                 <span className="eyebrow">{t('session.modified.col.file')}</span>
                 {allFolders.length > 0 && (
@@ -219,45 +299,57 @@ export default function ModifiedFilesDrawer({
                   ))}
                 </ul>
               </div>
-            </div>
-
-            {/* Draggable splitter */}
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              onPointerDown={onSplitterDown}
-              onPointerMove={onSplitterMove}
-              onPointerUp={onSplitterUp}
-              className="relative w-px shrink-0 cursor-col-resize touch-none bg-[var(--color-hairline)] transition-colors hover:bg-[var(--color-accent)]"
-            >
-              {/* 加宽命中区，但不挤占布局。 */}
-              <span className="absolute inset-y-0 -left-1.5 -right-1.5" aria-hidden />
-            </div>
-
-            {/* Detail pane */}
-            <div className="min-w-0 flex-1 overflow-auto">
-              {selectedFile ? (
-                <FileDetail
-                  key={selectedFile.filePath}
-                  file={selectedFile}
-                  cwd={cwd}
-                  editLookup={editLookup}
-                  onJump={jump}
-                  onOpenFile={onOpenFile}
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center px-6">
-                  <p className="text-center text-sm italic text-[var(--color-fg-muted)]">
-                    {t('session.modified.selectFile')}
-                  </p>
-                </div>
-              )}
-            </div>
+            </motion.div>
           </div>
         )}
       </motion.aside>
     </>
   );
+}
+
+/* ── Draggable column splitter ──────────────────────────────────────────── */
+
+// 竖向分割线：拖动时把指针的 clientX 连同容器矩形回传，由调用方换算出该侧栏宽度。
+// 用 setPointerCapture 锁住指针，拖出分割线也不丢事件。
+function Splitter({
+  getRect,
+  onResize,
+}: {
+  getRect: () => DOMRect | null;
+  onResize: (clientX: number, rect: DOMRect) => void;
+}) {
+  const dragging = useRef(false);
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      onPointerDown={(e: ReactPointerEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        dragging.current = true;
+      }}
+      onPointerMove={(e: ReactPointerEvent<HTMLDivElement>) => {
+        if (!dragging.current) return;
+        const rect = getRect();
+        if (rect) onResize(e.clientX, rect);
+      }}
+      onPointerUp={(e: ReactPointerEvent<HTMLDivElement>) => {
+        dragging.current = false;
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }}
+      className="relative w-px shrink-0 cursor-col-resize touch-none bg-[var(--color-hairline)] transition-colors hover:bg-[var(--color-accent)]"
+    >
+      {/* 加宽命中区，但不挤占布局。 */}
+      <span className="absolute inset-y-0 -left-1.5 -right-1.5" aria-hidden />
+    </div>
+  );
+}
+
+// 把某侧栏宽夹在 [220px, available − 内容保底] 之间。available = 容器宽 − 另一侧栏宽。
+function clampWidth(value: number, available: number): number {
+  const min = 220;
+  const max = Math.max(min, available - CONTENT_MIN_PX);
+  return Math.min(max, Math.max(min, value));
 }
 
 /* ── File tree ──────────────────────────────────────────────────────────── */

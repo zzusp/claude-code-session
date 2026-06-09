@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   useDeferredValue,
   useEffect,
@@ -192,6 +192,13 @@ export default function SessionDetailRoute() {
     }
     return map;
   }, [data]);
+
+  // 抽屉左栏的对话：默认隐去 meta/system 噪声行，留下真正的对话与工具调用。
+  // 跳转目标都是 assistant 的 tool_use 消息，不在 meta 之列，过滤后仍可定位。
+  const conversationMessages = useMemo(
+    () => data?.messages.filter((m) => !m.isMeta) ?? [],
+    [data],
+  );
 
   const visibleMessages = useMemo(() => {
     let list = indexed;
@@ -388,24 +395,29 @@ export default function SessionDetailRoute() {
         />
       )}
 
-      {showModifiedDrawer && (
-        <ModifiedFilesDrawer
-          files={modifiedFiles}
-          cwd={modifiedFilesQuery.data?.cwd ?? data?.meta.cwd ?? null}
-          editLookup={editLookup}
-          loading={modifiedFilesQuery.isLoading}
-          error={modifiedFilesQuery.error as Error | null}
-          onOpenFile={(filePath) => openFileMutation.mutate(filePath)}
-          onClose={() => setShowModifiedDrawer(false)}
-          onFocusMessage={(uuid) => {
-            // Push ?focus=<uuid> so the existing url-applied effect scrolls
-            // and flashes the matching message bubble. Keep ?q if present.
-            const next = new URLSearchParams(searchParams);
-            next.set('focus', uuid);
-            setSearchParams(next, { replace: false });
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {showModifiedDrawer && (
+          <ModifiedFilesDrawer
+            key="modified-files-drawer"
+            files={modifiedFiles}
+            cwd={modifiedFilesQuery.data?.cwd ?? data?.meta.cwd ?? null}
+            editLookup={editLookup}
+            messages={conversationMessages}
+            query={deferredQuery}
+            loading={modifiedFilesQuery.isLoading}
+            error={modifiedFilesQuery.error as Error | null}
+            onOpenFile={(filePath) => openFileMutation.mutate(filePath)}
+            onClose={() => setShowModifiedDrawer(false)}
+            onFocusMessage={(uuid) => {
+              // Push ?focus=<uuid> so the page underneath lands on the same
+              // message once the drawer closes. Keep ?q if present.
+              const next = new URLSearchParams(searchParams);
+              next.set('focus', uuid);
+              setSearchParams(next, { replace: false });
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       <FilterLedger
         query={query}
