@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.0.1](https://github.com/zzusp/claude-code-session/compare/v1.0.0...v1.0.1) (2026-06-09)
+
+### Features
+
+* **disk:** 新增清理建议区块与孤儿目录单条删除 ([54942a7](https://github.com/zzusp/claude-code-session/commit/54942a7c40125ed73425a410651e2ebac924c278))
+* **modified-files:** structuredPatch 驱动的 GitHub 风格统一 diff ([c93298c](https://github.com/zzusp/claude-code-session/commit/c93298c84f2761db42215f895c90ce660c161b05))
+* **session:** 处理中新消息到达时对话自动滚到底 ([69321bb](https://github.com/zzusp/claude-code-session/commit/69321bbb9ee430c7079d9d1282098bbf2b7ad5e7))
+* **session:** 会话详情页对运行中会话实时追加新消息 ([1cd5900](https://github.com/zzusp/claude-code-session/commit/1cd590088eae60691f0c25d99d0bf6c302f80b64))
+* **session:** 区分「工作中」与「运行中」会话状态 ([e6292e7](https://github.com/zzusp/claude-code-session/commit/e6292e7cf837420080bc934092b7724114d191e4))
+* **session:** 新增修改文件面板与定位跳转 ([312b2e6](https://github.com/zzusp/claude-code-session/commit/312b2e6a3e9075d026ec885ed0a3e53d4b8ec5bd))
+* **session:** 修改文件抽屉 diff 增加行内 word-level 高亮 ([33d64ab](https://github.com/zzusp/claude-code-session/commit/33d64abb57c2d0e7e973eaa6baac310026117b92))
+* **session:** 修改文件抽屉对话落底 + 分屏 diff + 文件名变更色 ([94efe05](https://github.com/zzusp/claude-code-session/commit/94efe05bd28846a9f72960f6911d088c33d4bd0b))
+* **session:** 修改文件抽屉改为全屏铺满 ([c34375f](https://github.com/zzusp/claude-code-session/commit/c34375f51a36bf68c76f9c86ef35cacf050e2f0a))
+* **session:** 修改文件抽屉重排为三栏（对话｜内容｜文件树） ([1817793](https://github.com/zzusp/claude-code-session/commit/1817793398e0d28f468c46ed99a9e312d1383f4c))
+* **session:** 修改文件抽屉左右 git-diff + 打开文件 + 可拖拽栏宽 ([0954254](https://github.com/zzusp/claude-code-session/commit/09542542747954d56cf652f12c0f2d8f5d8820b8))
+* **session:** 修改文件弹窗将多次变更按行号拼接为单文件左右对照 ([5541844](https://github.com/zzusp/claude-code-session/commit/554184427e2dfc5ba4e3da4c0b8ad6a359e0d268))
+* **session:** 修改文件改用右侧抽屉 + IDE 目录树 + 内容查看 ([92b7b98](https://github.com/zzusp/claude-code-session/commit/92b7b98c13b181243da0099c5fffa2cf5e1c09b9))
+* **version:** 添加新版本提示与一键更新 ([7a3e30a](https://github.com/zzusp/claude-code-session/commit/7a3e30a23d77013925f4102c4552d942f340a2ed))
+* **web:** 在会话列表加多选 + 串行批量删除 ([34b0bfd](https://github.com/zzusp/claude-code-session/commit/34b0bfd78b3c8d368bf4fd9c02a01d68c2f73a42))
+
+### Bug Fixes
+
+* **claude-paths:** 按平台显式选 path.win32/path.posix，单测可跑真实 Windows 路径 ([#31](https://github.com/zzusp/claude-code-session/issues/31)) ([2dcd9d4](https://github.com/zzusp/claude-code-session/commit/2dcd9d4b5e65c6d3032e23b81f6c47081277ce4a))
+* **modified-files:** 缩小"修改的文件"弹窗顶部 header 高度 ([3de1949](https://github.com/zzusp/claude-code-session/commit/3de1949f58aee9585c298c118008899dcc60eed5))
+* **modified-files:** header 再压一档 52px→46px ([f8266a7](https://github.com/zzusp/claude-code-session/commit/f8266a75c23110ce0db6db301e6c7db01e26a9f9))
+* **session:** 修复抽屉新消息跟随引用已删除的 pendingJump 报错 ([9c8eb14](https://github.com/zzusp/claude-code-session/commit/9c8eb1412f6493ff8ccda009eb63678c78b580fb)), closes [#49](https://github.com/zzusp/claude-code-session/issues/49) [#50](https://github.com/zzusp/claude-code-session/issues/50)
+* **session:** 修复处理中指示器错位 + 修改文件弹窗对话同步显示处理中 ([6114040](https://github.com/zzusp/claude-code-session/commit/6114040be9e3009a3d88fb12b8b65f80b3b36770))
+* **session:** 修改文件 diff 给单独的删除/新增行补上饱和高亮 ([903edc4](https://github.com/zzusp/claude-code-session/commit/903edc4e53f6f04641465c021a1d191bc2940032))
+
+### Performance Improvements
+
+* **disk:** 磁盘占用页加载从 ~109s 降到 ~2.5s ([0cc4285](https://github.com/zzusp/claude-code-session/commit/0cc42858f0370dd846f8016276ca0e7df4942460))
+
 本项目所有值得记录的变更都会写在这里。
 
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
