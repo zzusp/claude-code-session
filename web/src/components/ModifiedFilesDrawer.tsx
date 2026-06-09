@@ -27,6 +27,10 @@ const CONTENT_MIN_PX = 320;
 const CONV_INITIAL_VISIBLE = 20;
 const CONV_LOAD_STEP = 40;
 
+// 对话栏「贴底跟随」阈值：滚动位置离底部小于这个像素时，视作用户在追看最新动态——
+// 实时轮询追加新消息（或 Claude 开始处理）后自动滚到底；超过则认为在往上翻历史，不打断。
+const CONV_BOTTOM_STICK_PX = 120;
+
 /** Lookup from a tool_use id → the issuing tool's name + raw input, built from the
  *  already-loaded session messages. Lets the detail pane render the actual edit
  *  content (Write body / Edit diff) without a second backend round-trip. */
@@ -114,6 +118,12 @@ export default function ModifiedFilesDrawer({
   const restoreFromBottom = useRef<number | null>(null);
   const pendingJump = useRef<string | null>(null);
 
+  // 实时跟随状态：用户是否停在对话栏底部（决定要不要追新），以及上一次的消息数 /
+  // 处理中标志（只在「真有新消息到达」或「刚开始处理」时才追，避免每次轮询都滚动）。
+  const stickToBottom = useRef(true);
+  const prevMsgCount = useRef(messages.length);
+  const prevIsWorking = useRef(isWorking);
+
   // 打开抽屉时把对话栏滚到底——最新一条消息就是落点。messages 已就绪，commit 后
   // scrollHeight 即为准确值，用 layout effect 在绘制前定位，避免可见的跳动。
   useLayoutEffect(() => {
@@ -138,6 +148,28 @@ export default function ModifiedFilesDrawer({
       restoreFromBottom.current = null;
     }
   }, [visibleCount]);
+
+  // 滚动时记录是否停在底部，供下面的实时跟随判断「该不该追新」。
+  function onConvScroll() {
+    const el = convScrollRef.current;
+    if (!el) return;
+    stickToBottom.current = el.scrollHeight - (el.scrollTop + el.clientHeight) < CONV_BOTTOM_STICK_PX;
+  }
+
+  // 实时轮询追加了新消息、或 Claude 刚开始处理（WorkingIndicator 出现）时，若用户停在
+  // 底部就跟随到最新——和会话时间线的自动跟随同义。展开更早 / 跳转触发的重排由上面的
+  // visibleCount layout effect 负责，这里用 pendingJump / restoreFromBottom 让位，避免互相打架。
+  useLayoutEffect(() => {
+    const grew = messages.length > prevMsgCount.current;
+    const startedWorking = isWorking && !prevIsWorking.current;
+    prevMsgCount.current = messages.length;
+    prevIsWorking.current = isWorking;
+    if (!grew && !startedWorking) return;
+    if (pendingJump.current || restoreFromBottom.current != null) return;
+    if (!stickToBottom.current) return;
+    const el = convScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length, isWorking]);
 
   function showEarlier() {
     const el = convScrollRef.current;
@@ -278,7 +310,11 @@ export default function ModifiedFilesDrawer({
                   {messages.length}
                 </span>
               </div>
-              <div ref={convScrollRef} className="min-h-0 flex-1 overflow-auto px-4 py-2">
+              <div
+                ref={convScrollRef}
+                onScroll={onConvScroll}
+                className="min-h-0 flex-1 overflow-auto px-4 py-2"
+              >
                 {messages.length === 0 && !isWorking ? (
                   <p className="px-1 py-3 text-sm italic text-[var(--color-fg-muted)]">
                     {t('common.noMessagesMatch')}

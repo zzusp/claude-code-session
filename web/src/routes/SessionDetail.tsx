@@ -98,6 +98,9 @@ export default function SessionDetailRoute() {
   // message count from the previous render so we only follow genuine new arrivals.
   const stickToBottomRef = useRef(true);
   const prevMsgCountRef = useRef<number | null>(null);
+  // Previous "working" flag, so the tail follows the moment the working indicator
+  // appears (the indicator grows the page without bumping messageCount).
+  const prevIsWorkingRef = useRef(false);
 
   useEffect(() => {
     setWindowSize(INITIAL_WINDOW);
@@ -284,6 +287,19 @@ export default function SessionDetailRoute() {
     );
     return () => cancelAnimationFrame(rafId);
   }, [data?.meta.messageCount, urlFocus, skipWindowing]);
+
+  // The working indicator appears below the last message without bumping
+  // messageCount — follow the tail the moment it shows up so it stays in view.
+  useEffect(() => {
+    const startedWorking = isWorking && !prevIsWorkingRef.current;
+    prevIsWorkingRef.current = isWorking;
+    if (!startedWorking) return;
+    if (urlFocus || skipWindowing || !stickToBottomRef.current) return;
+    const rafId = requestAnimationFrame(() =>
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }),
+    );
+    return () => cancelAnimationFrame(rafId);
+  }, [isWorking, urlFocus, skipWindowing]);
 
   const projectTail = useMemo(() => {
     const cwd = project?.decodedCwd;
