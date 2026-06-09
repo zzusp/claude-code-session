@@ -197,6 +197,42 @@ export interface HealthResponse {
   pid: number;
 }
 
+// ── Version check & self-update ─────────────────────────────────────────────
+//
+// current = package.json version (same source as `ccsm --version`).
+// latest/releaseNotes/releaseUrl come from the GitHub "latest release" API; when
+// that check fails (offline, rate-limited) `checkError` carries the reason and the
+// UI silently degrades to showing just the current version.
+
+export interface VersionInfo {
+  current: string;
+  /** Latest release tag with leading `v` stripped; null if the check failed. */
+  latest: string | null;
+  hasUpdate: boolean;
+  /** Release title (GitHub `name`), falling back to the tag. */
+  releaseName: string | null;
+  /** Markdown release notes (GitHub `body`). */
+  releaseNotes: string | null;
+  /** Link to the GitHub release page. */
+  releaseUrl: string | null;
+  publishedAt: string | null;
+  repositoryUrl: string;
+  /** Non-null when the latest-release lookup failed. */
+  checkError: string | null;
+}
+
+export interface VersionUpdateResult {
+  /** True when `npm install -g …` exited 0. */
+  ok: boolean;
+  fromVersion: string;
+  /** Target version on success; null on failure. */
+  toVersion: string | null;
+  /** Tail of the package-manager stdout/stderr. */
+  output: string;
+  /** True after a successful update — the running process still serves the old code. */
+  restartRequired: boolean;
+}
+
 // ── Cross-device share: export/import bundles ───────────────────────────────
 //
 // A bundle is a path-INDEPENDENT folder a user copies / commits-to-git / cloud-

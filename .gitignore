@@ -24,3 +24,5 @@ npm-debug.log*
 # Regenerable acceptance screenshots (big binaries — recreate via the round's script)
 docs/acceptance/cross-device-sharing/round-1/*.png
 docs/acceptance/modified-files-drawer/round-1/*.png
+docs/acceptance/version-update-notice/round-1/screenshots/
+docs/acceptance/version-update-notice/round-1/verdict.json

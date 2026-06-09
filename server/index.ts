@@ -14,6 +14,7 @@ import { importRoute } from './routes/import.ts';
 import { projectsRoute } from './routes/projects.ts';
 import { searchRoute } from './routes/search.ts';
 import { sessionsRoute } from './routes/sessions.ts';
+import { versionRoute } from './routes/version.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
@@ -50,6 +51,7 @@ app.route('/api/disk-usage', diskRoute);
 app.route('/api/disk-cleanup', diskCleanupRoute);
 app.route('/api/search', searchRoute);
 app.route('/api/import', importRoute);
+app.route('/api/version', versionRoute);
 
 if (fs.existsSync(distDir)) {
   app.use('/*', serveStatic({ root: path.relative(process.cwd(), distDir) || '.' }));
