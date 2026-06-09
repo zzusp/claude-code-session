@@ -128,7 +128,7 @@ export default function ModifiedFilesDrawer({
         role="dialog"
         aria-modal="true"
         aria-label={t('session.modified.title')}
-        className="fixed inset-y-0 right-0 z-[60] flex w-[min(96vw,1280px)] flex-col border-l border-[var(--color-hairline)] bg-[var(--color-surface)] shadow-[var(--shadow-pop)]"
+        className="fixed inset-0 z-[60] flex w-full flex-col bg-[var(--color-surface)] shadow-[var(--shadow-pop)]"
       >
         <header className="flex items-center justify-between gap-3 border-b border-[var(--color-hairline)] px-5 py-3.5">
           <div className="flex min-w-0 items-center gap-3">
