@@ -172,13 +172,13 @@ export default function ModifiedFilesDrawer({
         aria-label={t('session.modified.title')}
         className="fixed inset-0 z-[60] flex w-full flex-col bg-[var(--color-surface)] shadow-[var(--shadow-pop)]"
       >
-        <header className="flex items-center justify-between gap-3 border-b border-[var(--color-hairline)] px-5 py-2">
+        <header className="flex items-center justify-between gap-3 border-b border-[var(--color-hairline)] px-5 py-1.5">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="text-[var(--color-accent)]">
               <TreeGlyph />
             </span>
             <div className="min-w-0">
-              <h2 className="font-display text-[15px] font-light leading-tight tracking-tight text-[var(--color-fg-primary)]">
+              <h2 className="font-display text-[14px] font-light leading-tight tracking-tight text-[var(--color-fg-primary)]">
                 {t('session.modified.title')}
               </h2>
               {cwd && (
