@@ -3,6 +3,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { PATHS } from './claude-paths.ts';
 import type {
+  DiffHunk,
   ModifiedFileOperation,
   ModifiedFileSummary,
   ModifiedFileToolName,
@@ -35,6 +36,9 @@ export async function loadModifiedFiles(
   // tool_use_id → is_error；tool_result 在 jsonl 中通常出现在对应 tool_use 之后，
   // 但不强依赖顺序——单次扫完再回填。
   const resultErr = new Map<string, boolean>();
+  // tool_use_id → 该次工具结果的 structuredPatch（带真实行号的 hunk）。
+  // 哨兵记录在 user 消息顶层的 obj.toolUseResult 上，与同一行 content 里的 tool_result 一一对应。
+  const resultPatch = new Map<string, DiffHunk[]>();
   let cwd: string | null = null;
 
   const rl = readline.createInterface({
@@ -88,6 +92,10 @@ export async function loadModifiedFiles(
         if (typeof id !== 'string' || !id) continue;
         // 同一 tool_use_id 理论上只对应一条 result；以首次出现为准。
         if (!resultErr.has(id)) resultErr.set(id, b.is_error === true);
+        if (!resultPatch.has(id)) {
+          const patch = extractStructuredPatch(obj.toolUseResult);
+          if (patch) resultPatch.set(id, patch);
+        }
       }
     }
   }
@@ -104,6 +112,7 @@ export async function loadModifiedFiles(
       messageUuid: op.messageUuid,
       errored,
       pending,
+      structuredPatch: resultPatch.has(op.toolUseId) ? resultPatch.get(op.toolUseId)! : null,
     };
     let summary = byPath.get(op.filePath);
     if (!summary) {
@@ -159,6 +168,36 @@ export async function loadModifiedFiles(
   });
 
   return { sessionId, projectId, cwd, files };
+}
+
+/** Pull the structuredPatch hunks out of a `toolUseResult` sentinel. Returns an
+ *  empty array for a brand-new file (Write/NotebookEdit create, where Claude Code
+ *  records `structuredPatch: []`), and null when the field is absent/malformed. */
+function extractStructuredPatch(tur: unknown): DiffHunk[] | null {
+  if (!tur || typeof tur !== 'object') return null;
+  const sp = (tur as Record<string, unknown>).structuredPatch;
+  if (!Array.isArray(sp)) return null;
+  const hunks: DiffHunk[] = [];
+  for (const h of sp) {
+    if (!h || typeof h !== 'object') continue;
+    const r = h as Record<string, unknown>;
+    if (
+      typeof r.oldStart === 'number' &&
+      typeof r.oldLines === 'number' &&
+      typeof r.newStart === 'number' &&
+      typeof r.newLines === 'number' &&
+      Array.isArray(r.lines)
+    ) {
+      hunks.push({
+        oldStart: r.oldStart,
+        oldLines: r.oldLines,
+        newStart: r.newStart,
+        newLines: r.newLines,
+        lines: r.lines.filter((l): l is string => typeof l === 'string'),
+      });
+    }
+  }
+  return hunks;
 }
 
 function extractFilePath(input: Record<string, unknown>): string | null {
