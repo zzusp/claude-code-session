@@ -10,4 +10,5 @@ export const queryKeys = {
   diskUsage: () => ['disk-usage'] as const,
   diskCleanupSuggestions: () => ['disk-cleanup-suggestions'] as const,
   search: (query: string) => ['search', query] as const,
+  version: () => ['version'] as const,
 };

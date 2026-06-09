@@ -35,7 +35,7 @@ A local web UI to view and clean up Claude Code session history stored under `~/
 | **Disk usage** (`/disk`) | Pie chart by project, monthly bar chart, top-20 largest sessions with deep links. |
 | **Cross-session search** (⌘K / Ctrl+K) | Global modal that streams matches from every project as you type. Searches text, tool calls, and thinking blocks; each result deep-links into the session at the matched message. |
 
-The persistent sidebar carries the search trigger plus locale (zh / en) and theme (light / dark) toggles. The HTTP listener exposes the same content as a single SPA, so deep links like `/projects/:id/sessions/:sid?q=foo` are sharable between browser tabs on the same machine.
+The persistent sidebar carries the search trigger plus locale (zh / en) and theme (light / dark) toggles, and a **version indicator** at the bottom. On open it checks GitHub for the latest release (cached for an hour); when a newer version exists it shows an amber "new version" pill. Clicking it opens a dialog with the release notes and links to the release page and repository, plus a one-click **Update now** that runs `npm install -g @zzusp/ccsm@latest` on the server and prompts you to restart `ccsm`. If the check fails (offline, or no GitHub release published yet) it silently falls back to showing just the current version. The HTTP listener exposes the same content as a single SPA, so deep links like `/projects/:id/sessions/:sid?q=foo` are sharable between browser tabs on the same machine.
 
 ## Quick start
 

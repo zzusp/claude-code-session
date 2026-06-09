@@ -4,6 +4,7 @@ import { HOTKEY_HINT } from '../lib/hotkeys.ts';
 import { useT } from '../lib/i18n.ts';
 import LocaleToggle from './LocaleToggle.tsx';
 import ThemeToggle from './ThemeToggle.tsx';
+import VersionNotice from './VersionNotice.tsx';
 
 interface NavItem {
   to: string;
@@ -157,6 +158,7 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
             <span className="eyebrow">{t('nav.theme')}</span>
             <ThemeToggle />
           </div>
+          <VersionNotice />
           <p className="font-mono text-[10px] leading-snug text-[var(--color-fg-faint)]">
             {t('app.brand.footnote')}
           </p>
