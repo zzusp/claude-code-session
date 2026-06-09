@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import readline from 'node:readline';
+import { INTERRUPTED_MARKER_RE } from './constants.ts';
 import { SYSTEM_TAG_RE, pickTitleText } from './system-tags.ts';
 
 export interface JsonlMeta {
@@ -10,6 +11,13 @@ export interface JsonlMeta {
   lastAt: string | null;
   messageCount: number;
   cwdFromMessages: string | null;
+  /**
+   * The last conversation turn is unfinished — Claude still owes output. True when
+   * the final `user`/`assistant` record is either a `user` message (and not an
+   * abort marker) or an `assistant` message that ends on a `tool_use` block. This
+   * is the structural half of "working"; liveness gating happens in the caller.
+   */
+  lastTurnIncomplete: boolean;
 }
 
 export async function parseJsonlMeta(filePath: string): Promise<JsonlMeta> {
@@ -20,6 +28,9 @@ export async function parseJsonlMeta(filePath: string): Promise<JsonlMeta> {
   let lastAt: string | null = null;
   let messageCount = 0;
   let cwdFromMessages: string | null = null;
+  // Re-evaluated on every conversation record so it reflects the *last* turn once
+  // the scan finishes.
+  let lastTurnIncomplete = false;
 
   const rl = readline.createInterface({
     input: fs.createReadStream(filePath, { encoding: 'utf8' }),
@@ -57,11 +68,17 @@ export async function parseJsonlMeta(filePath: string): Promise<JsonlMeta> {
 
     if (obj.type === 'user' || obj.type === 'assistant') {
       messageCount += 1;
+      const msg = obj.message as { content?: unknown } | undefined;
 
-      if (!firstUserTitle && obj.type === 'user') {
-        const msg = obj.message as { content?: unknown } | undefined;
+      if (obj.type === 'assistant') {
+        lastTurnIncomplete = endsWithToolUse(msg?.content);
+      } else {
         const candidate = extractUserText(msg?.content);
-        if (candidate && !SYSTEM_TAG_RE.test(candidate)) {
+        // A trailing user record means Claude owes a reply — unless it is the
+        // synthetic abort marker, which means the operator stopped the turn.
+        lastTurnIncomplete = !INTERRUPTED_MARKER_RE.test(candidate);
+
+        if (!firstUserTitle && candidate && !SYSTEM_TAG_RE.test(candidate)) {
           const usable = pickTitleText(candidate);
           if (usable) {
             firstUserTitle = usable.slice(0, 80).replace(/\s+/g, ' ').trim();
@@ -84,7 +101,22 @@ export async function parseJsonlMeta(filePath: string): Promise<JsonlMeta> {
     lastAt: reconciledLastAt,
     messageCount,
     cwdFromMessages,
+    lastTurnIncomplete,
   };
+}
+
+// An assistant message that ends on a `tool_use` block (Anthropic `stop_reason:
+// "tool_use"`) is mid-work: a tool is pending and Claude will continue once it
+// returns. Verified 1:1 against `stop_reason` across real sessions.
+function endsWithToolUse(content: unknown): boolean {
+  if (!Array.isArray(content)) return false;
+  for (let i = content.length - 1; i >= 0; i--) {
+    const block = content[i];
+    if (block && typeof block === 'object' && typeof (block as { type?: unknown }).type === 'string') {
+      return (block as { type: string }).type === 'tool_use';
+    }
+  }
+  return false;
 }
 
 function extractUserText(content: unknown): string {

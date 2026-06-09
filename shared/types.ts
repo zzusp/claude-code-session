@@ -31,6 +31,15 @@ export interface SessionSummary {
   isLivePid: boolean;
   isRecentlyActive: boolean;
   livePid: number | null;
+  /**
+   * Claude is *actively processing this turn* right now (a stricter state than
+   * `isLivePid`, which only means a Claude Code process is alive). True when the
+   * session has a live PID, was touched recently, and its last conversation turn
+   * is unfinished — Claude owes a reply (last record is `user`) or is mid-work
+   * (last `assistant` record ends on a `tool_use`). An aborted turn (trailing
+   * `[Request interrupted by user]`) counts as finished.
+   */
+  isWorking: boolean;
 }
 
 export type Block =

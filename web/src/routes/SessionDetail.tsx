@@ -24,7 +24,11 @@ import {
   type SessionDetail,
   type SessionSummary,
 } from '../lib/api.ts';
-import { MAX_SESSION_MESSAGES, RECENT_ACTIVITY_WINDOW_MIN } from '../lib/constants.ts';
+import {
+  INTERRUPTED_MARKER_RE,
+  MAX_SESSION_MESSAGES,
+  RECENT_ACTIVITY_WINDOW_MIN,
+} from '../lib/constants.ts';
 import { formatBytes, formatDateTime, formatRelativeTime } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
 import { fadeUpItem, staggerParent } from '../lib/motion.ts';
@@ -55,6 +59,20 @@ function isWithinLiveWindow(lastAt: string | null | undefined): boolean {
   const ms = new Date(lastAt).getTime();
   if (Number.isNaN(ms)) return false;
   return Date.now() - ms < LIVE_WINDOW_MS;
+}
+
+// Mirror of the server's `lastTurnIncomplete` over the parsed message list: the
+// last turn is unfinished when the final record is a `user` message (Claude owes
+// a reply) that isn't an abort marker, or an `assistant` message that ends on a
+// pending `tool_use`. Combined with the live window this drives the "working" UI.
+function lastTurnIncomplete(messages: Message[]): boolean {
+  const last = messages[messages.length - 1];
+  if (!last) return false;
+  if (last.type === 'assistant') {
+    return last.blocks[last.blocks.length - 1]?.type === 'tool_use';
+  }
+  const text = last.blocks.find((b) => b.type === 'text');
+  return !(text && INTERRUPTED_MARKER_RE.test(text.text));
 }
 
 export default function SessionDetailRoute() {
@@ -101,6 +119,9 @@ export default function SessionDetailRoute() {
       isWithinLiveWindow(query.state.data?.meta.lastAt) ? LIVE_POLL_INTERVAL_MS : false,
   });
   const isLive = isWithinLiveWindow(data?.meta.lastAt);
+  // Recomputed off the polled message list every 2s, so the working indicator
+  // appears while Claude generates and clears the moment its reply lands.
+  const isWorking = isLive && !!data && lastTurnIncomplete(data.messages);
 
   const projectsQuery = useQuery({
     queryKey: queryKeys.projects(),
@@ -318,6 +339,7 @@ export default function SessionDetailRoute() {
           <SessionMasthead
             sid={sid}
             isLive={isLive}
+            isWorking={isWorking}
             title={sessionTitle}
             tagline={t('session.tagline', {
               started: formatRelativeTime(data.meta.firstAt),
@@ -454,6 +476,8 @@ export default function SessionDetailRoute() {
                 );
               })}
             </motion.div>
+
+            {isWorking && !skipWindowing && <WorkingIndicator />}
           </ol>
         )}
       </div>
@@ -465,9 +489,48 @@ export default function SessionDetailRoute() {
 
 /* ─────────────────────────────────────────────────────────────────── */
 
+// Trailing "Claude is working…" row — sits at the tail of the timeline while the
+// live poll keeps `isWorking` true, then unmounts when the reply lands.
+function WorkingIndicator() {
+  const t = useT();
+  return (
+    <li className="py-3" aria-live="polite">
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden
+          className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)]"
+        >
+          <span className="relative inline-flex h-2.5 w-2.5">
+            <span className="absolute inset-0 rounded-full bg-[var(--color-accent)] pulse-amber" />
+            <span className="absolute inset-0 rounded-full bg-[var(--color-accent)]" />
+          </span>
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="font-display text-[14px] font-medium tracking-tight text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
+            {t('message.role.claude')}
+          </span>
+          <article className="mt-1.5 inline-flex items-center gap-2.5 rounded-2xl rounded-tl-sm border border-l-[3px] border-[var(--color-hairline)] border-l-[var(--color-accent)] bg-[var(--color-surface)] px-4 py-3">
+            <span aria-hidden className="loading-dots text-[var(--color-accent)]">
+              <span />
+              <span />
+              <span />
+            </span>
+            <span className="font-display text-[13.5px] italic text-[var(--color-fg-muted)]">
+              {t('session.working.indicator')}
+            </span>
+          </article>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────── */
+
 function SessionMasthead({
   sid,
   isLive,
+  isWorking,
   title,
   tagline,
   firstAt,
@@ -489,6 +552,7 @@ function SessionMasthead({
 }: {
   sid: string;
   isLive: boolean;
+  isWorking: boolean;
   title: string | null;
   tagline: string;
   firstAt: string | null;
@@ -517,7 +581,19 @@ function SessionMasthead({
         <div className="flex min-w-0 items-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-fg-muted)]">
           <span className="text-[var(--color-accent)]">●</span>
           <span>§ SESSION</span>
-          {isLive && (
+          {isWorking ? (
+            <span
+              title={t('session.working.tooltip')}
+              className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 normal-case tracking-[0.14em] text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]"
+            >
+              <span aria-hidden className="loading-dots text-[var(--color-accent)]">
+                <span />
+                <span />
+                <span />
+              </span>
+              {t('session.working')}
+            </span>
+          ) : isLive ? (
             <span
               title={t('session.live.tooltip')}
               className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 normal-case tracking-[0.14em] text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]"
@@ -528,7 +604,7 @@ function SessionMasthead({
               </span>
               {t('session.live')}
             </span>
-          )}
+          ) : null}
           <span className="hidden h-3 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
           <span className="hidden truncate normal-case tracking-[0.05em] text-[var(--color-fg-faint)] sm:inline">
             {sid}

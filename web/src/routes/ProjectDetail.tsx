@@ -84,7 +84,13 @@ export default function ProjectDetail() {
   );
   const sessionsToExport = selected.size > 0 ? selectedSessions : sessions;
   const projectBytes = useMemo(() => sessions.reduce((a, s) => a + totalBytes(s), 0), [sessions]);
-  const liveCount = useMemo(() => sessions.filter((s) => s.isLivePid).length, [sessions]);
+  // Disjoint buckets: working ⊂ live, so subtract working from the live count to
+  // keep the three meta tallies mutually exclusive (matches the per-row StatusDot).
+  const workingCount = useMemo(() => sessions.filter((s) => s.isWorking).length, [sessions]);
+  const liveCount = useMemo(
+    () => sessions.filter((s) => s.isLivePid && !s.isWorking).length,
+    [sessions],
+  );
   const recentCount = useMemo(
     () => sessions.filter((s) => s.isRecentlyActive && !s.isLivePid).length,
     [sessions],
@@ -256,6 +262,19 @@ export default function ProjectDetail() {
                 <MetaItem label={t('project.meta.sessions')} value={sessions.length} />
                 <Sep />
                 <MetaItem label={t('project.meta.onDisk')} value={formatBytes(projectBytes)} />
+                {workingCount > 0 && (
+                  <>
+                    <Sep />
+                    <MetaItem
+                      label={t('project.meta.working')}
+                      value={
+                        <span className="text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
+                          {workingCount}
+                        </span>
+                      }
+                    />
+                  </>
+                )}
                 <Sep />
                 <MetaItem
                   label={t('project.meta.live')}
