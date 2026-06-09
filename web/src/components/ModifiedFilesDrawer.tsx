@@ -818,8 +818,9 @@ function buildSplitRows(oldStr: string, newStr: string): SplitRow[] {
       const hasR = x < adds.length;
       if (hasL) leftNo++;
       if (hasR) rightNo++;
-      // 左删 + 右增 配对 → 算行内 word-level 高亮；纯增 / 纯删行不需要（整行着色）。
-      const segs = hasL && hasR ? wordSegments(dels[x]!, adds[x]!) : null;
+      // 左删 + 右增 配对 → 行内 word-level 高亮（只标改动 token）。
+      // 单独的纯删 / 纯增行没有配对项，整行都是改动 → 整行标成 changed，拿到和配对行一致的饱和高亮。
+      const paired = hasL && hasR ? wordSegments(dels[x]!, adds[x]!) : null;
       rows.push({
         left: hasL ? dels[x]! : null,
         right: hasR ? adds[x]! : null,
@@ -827,8 +828,8 @@ function buildSplitRows(oldStr: string, newStr: string): SplitRow[] {
         rightNo: hasR ? rightNo : null,
         leftKind: hasL ? 'del' : 'empty',
         rightKind: hasR ? 'add' : 'empty',
-        leftSegs: segs?.left ?? null,
-        rightSegs: segs?.right ?? null,
+        leftSegs: paired?.left ?? (hasL && !hasR ? [{ text: dels[x]!, changed: true }] : null),
+        rightSegs: paired?.right ?? (!hasL && hasR ? [{ text: adds[x]!, changed: true }] : null),
       });
     }
   }
