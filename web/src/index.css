@@ -213,6 +213,12 @@
     animation: pulse-amber 1.6s cubic-bezier(0.4, 0, 0.4, 1) infinite;
   }
 
+  /* Update-available notification pulse — red, adapts to light/dark via token */
+  .pulse-danger {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--color-danger) 60%, transparent);
+    animation: pulse-danger 1.6s cubic-bezier(0.4, 0, 0.4, 1) infinite;
+  }
+
   /* Editorial loading rule — a hairline with a soft accent sweep. Read it as
      "typesetter's ruler, ink still wet". The sweep is a clipped gradient,
      not a box-shadow, so it stays crisp at any width. */
@@ -448,6 +454,12 @@
   0%   { box-shadow: 0 0 0 0   oklch(0.78 0.155 70 / 0.55); }
   70%  { box-shadow: 0 0 0 6px oklch(0.78 0.155 70 / 0); }
   100% { box-shadow: 0 0 0 0   oklch(0.78 0.155 70 / 0); }
+}
+
+@keyframes pulse-danger {
+  0%   { box-shadow: 0 0 0 0   color-mix(in oklch, var(--color-danger) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 6px color-mix(in oklch, var(--color-danger) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0   color-mix(in oklch, var(--color-danger) 0%, transparent); }
 }
 
 @keyframes stagger-in {
