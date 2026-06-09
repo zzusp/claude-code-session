@@ -4,7 +4,7 @@ import { HOTKEY_HINT } from '../lib/hotkeys.ts';
 import { useT } from '../lib/i18n.ts';
 import LocaleToggle from './LocaleToggle.tsx';
 import ThemeToggle from './ThemeToggle.tsx';
-import VersionNotice from './VersionNotice.tsx';
+import VersionNotice, { useVersionInfo } from './VersionNotice.tsx';
 
 interface NavItem {
   to: string;
@@ -38,6 +38,7 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
   const t = useT();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
+  const hasUpdate = useVersionInfo().data?.hasUpdate ?? false;
 
   useEffect(() => {
     const handler = () => setOpen(false);
@@ -64,9 +65,19 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-label={t('nav.toggleNav')}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--color-hairline)] text-[var(--color-fg-secondary)] hover:border-[var(--color-hairline-strong)]"
+            className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--color-hairline)] text-[var(--color-fg-secondary)] hover:border-[var(--color-hairline-strong)]"
           >
             <MenuIcon open={open} />
+            {hasUpdate && !open && (
+              <span
+                aria-hidden
+                className="absolute right-1 top-1 inline-flex h-2 w-2"
+                title={t('version.modal.eyebrowUpdate')}
+              >
+                <span className="absolute inset-0 rounded-full bg-[var(--color-danger)] pulse-danger" />
+                <span className="absolute inset-0 rounded-full bg-[var(--color-danger)]" />
+              </span>
+            )}
           </button>
         </div>
       </div>
