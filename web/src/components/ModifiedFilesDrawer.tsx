@@ -653,6 +653,11 @@ function OperationBody({
 
 /** 行级 split diff：左栏=修改前、右栏=修改后，逐行对齐着色（git split view 风格）。 */
 type LineKind = 'equal' | 'del' | 'add' | 'empty';
+/** 行内 word-level 片段：changed=该 token 仅存在于本侧（GitHub 行内高亮）。 */
+interface Seg {
+  text: string;
+  changed: boolean;
+}
 interface SplitRow {
   left: string | null;
   right: string | null;
@@ -660,6 +665,9 @@ interface SplitRow {
   rightNo: number | null;
   leftKind: LineKind;
   rightKind: LineKind;
+  // 仅在「左删 + 右增」配对的修改行上有值，用于行内高亮；其余行为 null（整行着色）。
+  leftSegs: Seg[] | null;
+  rightSegs: Seg[] | null;
 }
 
 function DiffView({ oldStr, newStr }: { oldStr: string; newStr: string }) {
@@ -695,6 +703,7 @@ function DiffPane({ rows, side }: { rows: SplitRow[]; side: 'left' | 'right' }) 
             no={side === 'left' ? r.leftNo : r.rightNo}
             text={side === 'left' ? r.left : r.right}
             kind={side === 'left' ? r.leftKind : r.rightKind}
+            segs={side === 'left' ? r.leftSegs : r.rightSegs}
           />
         ))}
       </div>
@@ -702,7 +711,17 @@ function DiffPane({ rows, side }: { rows: SplitRow[]; side: 'left' | 'right' }) 
   );
 }
 
-function DiffLine({ no, text, kind }: { no: number | null; text: string | null; kind: LineKind }) {
+function DiffLine({
+  no,
+  text,
+  kind,
+  segs,
+}: {
+  no: number | null;
+  text: string | null;
+  kind: LineKind;
+  segs: Seg[] | null;
+}) {
   const bg =
     kind === 'del'
       ? 'bg-[var(--color-danger-soft)]'
@@ -718,6 +737,8 @@ function DiffLine({ no, text, kind }: { no: number | null; text: string | null; 
       : kind === 'add'
         ? 'text-[var(--color-moss)]'
         : 'text-transparent';
+  // 改动 token 的强调底色：在整行 -soft 底色上再叠一层更饱和的同色（GitHub 行内高亮）。
+  const hl = kind === 'del' ? 'bg-[var(--color-danger)]/25' : 'bg-[var(--color-moss)]/30';
   return (
     <div className={`flex leading-[1.65] ${bg}`}>
       <span className="sticky left-0 z-[1] w-[2.75em] shrink-0 select-none border-r border-[var(--color-hairline)] bg-[inherit] px-1.5 text-right font-mono text-[10px] tabular-nums text-[var(--color-fg-faint)]">
@@ -727,7 +748,19 @@ function DiffLine({ no, text, kind }: { no: number | null; text: string | null; 
         {marker}
       </span>
       <div className="whitespace-pre pr-3 font-mono text-[11.5px] text-[var(--color-fg-primary)]">
-        {text == null || text === '' ? ' ' : text}
+        {segs && segs.length > 0
+          ? segs.map((s, i) =>
+              s.changed ? (
+                <span key={i} className={hl}>
+                  {s.text}
+                </span>
+              ) : (
+                <span key={i}>{s.text}</span>
+              ),
+            )
+          : text == null || text === ''
+            ? ' '
+            : text}
       </div>
     </div>
   );
@@ -766,7 +799,7 @@ function buildSplitRows(oldStr: string, newStr: string): SplitRow[] {
     if (op.type === 'equal') {
       leftNo++;
       rightNo++;
-      rows.push({ left: op.text, right: op.text, leftNo, rightNo, leftKind: 'equal', rightKind: 'equal' });
+      rows.push({ left: op.text, right: op.text, leftNo, rightNo, leftKind: 'equal', rightKind: 'equal', leftSegs: null, rightSegs: null });
       i++;
       continue;
     }
@@ -785,6 +818,8 @@ function buildSplitRows(oldStr: string, newStr: string): SplitRow[] {
       const hasR = x < adds.length;
       if (hasL) leftNo++;
       if (hasR) rightNo++;
+      // 左删 + 右增 配对 → 算行内 word-level 高亮；纯增 / 纯删行不需要（整行着色）。
+      const segs = hasL && hasR ? wordSegments(dels[x]!, adds[x]!) : null;
       rows.push({
         left: hasL ? dels[x]! : null,
         right: hasR ? adds[x]! : null,
@@ -792,10 +827,46 @@ function buildSplitRows(oldStr: string, newStr: string): SplitRow[] {
         rightNo: hasR ? rightNo : null,
         leftKind: hasL ? 'del' : 'empty',
         rightKind: hasR ? 'add' : 'empty',
+        leftSegs: segs?.left ?? null,
+        rightSegs: segs?.right ?? null,
       });
     }
   }
   return rows;
+}
+
+// token 粒度：连续空白 / 连续单词字符 / 连续标点各成一段，贴近 GitHub 的行内分词。
+const WORD_RE = /\s+|\w+|[^\w\s]+/g;
+
+/** 一行内的 word-level diff：复用 diffOps（行级 LCS）在 token 上再跑一次。
+ *  返回左右两侧的 token 段（changed=仅本侧独有）。两行毫无公共 token、空行或过长行时返回 null（退回整行着色）。 */
+function wordSegments(oldLine: string, newLine: string): { left: Seg[]; right: Seg[] } | null {
+  const a = oldLine.match(WORD_RE) ?? [];
+  const b = newLine.match(WORD_RE) ?? [];
+  if (a.length === 0 || b.length === 0) return null;
+  if (a.length * b.length > 20000) return null; // O(n·m) 兜底，避免超长/压缩行卡顿
+  const ops = diffOps(a, b);
+  const left: Seg[] = [];
+  const right: Seg[] = [];
+  for (const op of ops) {
+    if (op.type === 'equal') {
+      pushSeg(left, op.text, false);
+      pushSeg(right, op.text, false);
+    } else if (op.type === 'del') {
+      pushSeg(left, op.text, true);
+    } else {
+      pushSeg(right, op.text, true);
+    }
+  }
+  // 两侧全是 changed → 没有公共 token，高亮等于整行，没意义，退回整行着色。
+  if (left.every((s) => s.changed) && right.every((s) => s.changed)) return null;
+  return { left, right };
+}
+
+function pushSeg(arr: Seg[], text: string, changed: boolean): void {
+  const last = arr[arr.length - 1];
+  if (last && last.changed === changed) last.text += text;
+  else arr.push({ text, changed });
 }
 
 interface DiffOp {
