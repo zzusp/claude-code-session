@@ -10,11 +10,9 @@ import {
 import type {
   DiffHunk,
   Message,
-  ModifiedFileOperation,
   ModifiedFileSummary,
   ModifiedFileToolName,
 } from '../lib/api.ts';
-import { formatDateTime, formatRelativeTime } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
 import { Loading } from './Loading.tsx';
 import MessageBubble, { WorkingIndicator } from './MessageBubble.tsx';
@@ -47,9 +45,6 @@ interface Props {
   loading: boolean;
   error: Error | null;
   onClose: () => void;
-  /** Sync ?focus=<uuid> to the page underneath so closing the drawer lands on the
-   *  same message. The drawer itself scrolls its own conversation column. */
-  onFocusMessage: (messageUuid: string) => void;
   /** Open the real file on disk in the OS default app. */
   onOpenFile: (filePath: string) => void;
 }
@@ -64,7 +59,6 @@ export default function ModifiedFilesDrawer({
   loading,
   error,
   onClose,
-  onFocusMessage,
   onOpenFile,
 }: Props) {
   const t = useT();
@@ -108,11 +102,9 @@ export default function ModifiedFilesDrawer({
   const visibleMessages = useMemo(() => messages.slice(startIndex), [messages, startIndex]);
   const hiddenCount = startIndex;
 
-  // 展开更早消息 / 跳转命中折叠区时，需要在重排后修正滚动位置：
-  //  - restoreFromBottom：展开时保持「离底部的距离」不变，避免视口往上跳。
-  //  - jumpUuid：跳转目标在折叠区时先全量展开，渲染后再滚到该消息。
+  // 展开更早消息时需要在重排后修正滚动位置：restoreFromBottom 保持「离底部的距离」
+  // 不变，避免视口往上跳。
   const restoreFromBottom = useRef<number | null>(null);
-  const pendingJump = useRef<string | null>(null);
 
   // 打开抽屉时把对话栏滚到底——最新一条消息就是落点。messages 已就绪，commit 后
   // scrollHeight 即为准确值，用 layout effect 在绘制前定位，避免可见的跳动。
@@ -123,16 +115,10 @@ export default function ModifiedFilesDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // visibleCount 变化（展开更早 / 跳转触发的全量展开）后修正滚动位置。
+  // visibleCount 变化（展开更早）后修正滚动位置。
   useLayoutEffect(() => {
     const el = convScrollRef.current;
     if (!el) return;
-    if (pendingJump.current) {
-      scrollToMessage(pendingJump.current);
-      pendingJump.current = null;
-      restoreFromBottom.current = null;
-      return;
-    }
     if (restoreFromBottom.current != null) {
       el.scrollTop = el.scrollHeight - restoreFromBottom.current;
       restoreFromBottom.current = null;
@@ -143,18 +129,6 @@ export default function ModifiedFilesDrawer({
     const el = convScrollRef.current;
     restoreFromBottom.current = el ? el.scrollHeight - el.scrollTop : null;
     setVisibleCount((c) => Math.min(messages.length, c + CONV_LOAD_STEP));
-  }
-
-  // 在对话栏里滚到某条消息并闪烁高亮。命中折叠区时返回 false，由调用方先展开。
-  function scrollToMessage(uuid: string): boolean {
-    const root = convScrollRef.current;
-    const el = root?.querySelector<HTMLElement>(`[data-uuid="${CSS.escape(uuid)}"]`);
-    if (!el) return false;
-    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    const flashTarget = el.closest('li') ?? el;
-    flashTarget.classList.add('flash-focus');
-    window.setTimeout(() => flashTarget.classList.remove('flash-focus'), 1300);
-    return true;
   }
 
   // Esc 关闭 + 背景滚动锁。
@@ -170,20 +144,6 @@ export default function ModifiedFilesDrawer({
       document.body.style.overflow = prevOverflow;
     };
   }, [onClose]);
-
-  // 跳转：在抽屉左侧对话栏里滚到该消息并高亮；同时把 ?focus 推给底层页面，关闭后
-  // 落点一致。不再关闭抽屉——三栏布局下「边看改动边看对话」才是这里的价值所在。
-  function jump(uuid: string) {
-    onFocusMessage(uuid);
-    // 目标若落在折叠区（startIndex 之前），先全量展开，渲染后再由 layout effect 滚过去。
-    const idx = messages.findIndex((m) => m.uuid === uuid);
-    if (idx >= 0 && idx < startIndex) {
-      pendingJump.current = uuid;
-      setVisibleCount(messages.length);
-      return;
-    }
-    scrollToMessage(uuid);
-  }
 
   const count = files.length;
   const countLabel =
@@ -320,9 +280,7 @@ export default function ModifiedFilesDrawer({
                 <FileDetail
                   key={selectedFile.filePath}
                   file={selectedFile}
-                  cwd={cwd}
                   editLookup={editLookup}
-                  onJump={jump}
                   onOpenFile={onOpenFile}
                 />
               ) : (
@@ -665,22 +623,18 @@ function TreeRow({
 
 function FileDetail({
   file,
-  cwd,
   editLookup,
-  onJump,
   onOpenFile,
 }: {
   file: ModifiedFileSummary;
-  cwd: string | null;
   editLookup: EditLookup;
-  onJump: (messageUuid: string) => void;
   onOpenFile: (filePath: string) => void;
 }) {
   const t = useT();
   const display = file.relativePath ?? file.filePath;
   const tail = display.split(/[\\/]+/).pop() ?? display;
   const changeType = fileChangeType(file);
-  void cwd;
+  const { rows, newFile } = useMemo(() => buildFileRows(file, editLookup), [file, editLookup]);
 
   return (
     <div className="flex flex-col">
@@ -719,181 +673,57 @@ function FileDetail({
               {t('session.modified.errorBadge', { n: file.errorCount })}
             </span>
           )}
-          <span className="ml-auto font-mono text-[10.5px] tabular-nums text-[var(--color-fg-muted)]" title={file.lastAt ? formatDateTime(file.lastAt) : undefined}>
-            {formatRelativeTime(file.lastAt)}
-          </span>
         </div>
       </div>
 
-      <ol className="flex flex-col gap-4 px-5 py-4">
-        {file.operations.map((op, idx) => (
-          <OperationCard
-            key={op.toolUseId || `${idx}-${op.ts ?? ''}`}
-            op={op}
-            index={idx + 1}
-            lookup={editLookup.get(op.toolUseId)}
-            onJump={onJump}
-          />
-        ))}
-      </ol>
+      <div className="px-5 py-4">
+        <SplitDiff rows={rows} label={newFile ? t('session.modified.newContent') : undefined} />
+      </div>
     </div>
   );
 }
 
-function OperationCard({
-  op,
-  index,
-  lookup,
-  onJump,
-}: {
-  op: ModifiedFileOperation;
-  index: number;
-  lookup: { name: string; input: unknown } | undefined;
-  onJump: (messageUuid: string) => void;
-}) {
-  const t = useT();
-  const tone = op.errored
-    ? 'border-[var(--color-danger)]/40'
-    : op.pending
-      ? 'border-[var(--color-accent)]/40'
-      : 'border-[var(--color-hairline)]';
+const strOf = (v: unknown): string => (typeof v === 'string' ? v : '');
 
-  return (
-    <li className={`overflow-hidden rounded-xl border ${tone} bg-[var(--color-sunken)]`}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
-        <span className="font-mono text-[10.5px] tabular-nums text-[var(--color-fg-muted)]">
-          #{index.toString().padStart(2, '0')}
-        </span>
-        <span className="rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-[var(--color-fg-secondary)]">
-          {op.toolName}
-        </span>
-        <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-secondary)]">
-          {op.ts ? formatDateTime(op.ts) : '—'}
-        </span>
-        {op.errored && (
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.1em] text-[var(--color-danger)]">
-            · {t('session.modified.opErrored')}
-          </span>
-        )}
-        {op.pending && (
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.1em] text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
-            · {t('session.modified.opPending')}
-          </span>
-        )}
-        {op.messageUuid && (
-          <button
-            type="button"
-            onClick={() => onJump(op.messageUuid!)}
-            className="ml-auto inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
-          >
-            {t('session.modified.jump')} <ArrowIcon />
-          </button>
-        )}
-      </div>
-      <div className="border-t border-[var(--color-hairline)] bg-[var(--color-surface)]">
-        <OperationBody
-          toolName={op.toolName}
-          input={lookup?.input}
-          hasLookup={!!lookup}
-          patch={op.structuredPatch}
-        />
-      </div>
-    </li>
-  );
-}
-
-function OperationBody({
-  toolName,
-  input,
-  hasLookup,
-  patch,
-}: {
-  toolName: ModifiedFileToolName;
-  input: unknown;
-  hasLookup: boolean;
-  patch: DiffHunk[] | null;
-}) {
-  const t = useT();
-
-  // 首选：tool_result 里的 structuredPatch——带真实文件行号的 hunk，未改动区自然省略。
-  if (patch && patch.length > 0) {
-    return (
-      <div className="px-3 py-2.5">
-        <SplitDiff rows={rowsFromHunks(patch)} />
-      </div>
-    );
+/** 把一个文件在本会话里的全部操作合并成「单文件」统一视图行：左旧右新。
+ *  首选带真实文件行号的 structuredPatch——把各次操作的 hunk 全收齐、按新文件行号排序，
+ *  交给 rowsFromHunks 渲染（hunk 间的未改动区折叠成一行 gap），于是同一文件的多次改动
+ *  拼成一份连贯的左右对照。注意：各次操作的行号是「该次操作落地后」坐标，跨操作不共享
+ *  同一坐标系；同一处被多次改写会按操作先后逐次呈现（中间态），这是只有 diff、没有整文件
+ *  快照时能做到的最忠实拼接。
+ *  完全没有 structuredPatch（全新文件 create / 结果尚未落地的 pending）时，退回用 tool
+ *  输入的原文按操作顺序拼接；newFile=本会话全程只有 Write/NotebookEdit 的创建写入。 */
+function buildFileRows(
+  file: ModifiedFileSummary,
+  editLookup: EditLookup,
+): { rows: UnifiedRow[]; newFile: boolean } {
+  const hunks = file.operations.flatMap((op) => op.structuredPatch ?? []);
+  if (hunks.length > 0) {
+    const sorted = [...hunks].sort((a, b) => a.newStart - b.newStart);
+    return { rows: rowsFromHunks(sorted), newFile: false };
   }
 
-  if (!hasLookup) {
-    return (
-      <p className="px-3 py-2.5 text-[12px] italic text-[var(--color-fg-muted)]">
-        {t('session.modified.contentUnavailable')}
-      </p>
-    );
+  const rows: UnifiedRow[] = [];
+  let newFile = true;
+  for (const op of file.operations) {
+    const rec = asRecord(editLookup.get(op.toolUseId)?.input);
+    if (op.toolName === 'Write') {
+      rows.push(...rowsFromStrings('', strOf(rec.content)));
+    } else if (op.toolName === 'NotebookEdit') {
+      rows.push(...rowsFromStrings('', strOf(rec.new_source)));
+    } else if (op.toolName === 'MultiEdit') {
+      newFile = false;
+      const edits = Array.isArray(rec.edits) ? rec.edits : [];
+      for (const e of edits) {
+        const er = asRecord(e);
+        rows.push(...rowsFromStrings(strOf(er.old_string), strOf(er.new_string)));
+      }
+    } else {
+      newFile = false;
+      rows.push(...rowsFromStrings(strOf(rec.old_string), strOf(rec.new_string)));
+    }
   }
-  const rec = asRecord(input);
-
-  // 全新文件（create，structuredPatch 为空）或结果尚未落地：整段按新增（全绿）渲染。
-  if (toolName === 'Write') {
-    const content = typeof rec.content === 'string' ? rec.content : '';
-    return (
-      <div className="px-3 py-2.5">
-        <SplitDiff rows={rowsFromStrings('', content)} label={t('session.modified.newContent')} />
-      </div>
-    );
-  }
-
-  if (toolName === 'NotebookEdit') {
-    const source = typeof rec.new_source === 'string' ? rec.new_source : '';
-    const cellType = typeof rec.cell_type === 'string' ? rec.cell_type : null;
-    return (
-      <div className="px-3 py-2.5">
-        <SplitDiff
-          rows={rowsFromStrings('', source)}
-          label={cellType ? `${t('session.modified.newContent')} · ${cellType}` : t('session.modified.newContent')}
-        />
-      </div>
-    );
-  }
-
-  // MultiEdit / Edit 尚无 structuredPatch（仍 pending）→ 从 old/new 文本兜底，
-  // 行号是片段内的相对值（结果落地后会被上面的 structuredPatch 分支取代为真实行号）。
-  if (toolName === 'MultiEdit') {
-    const edits = Array.isArray(rec.edits) ? rec.edits : [];
-    if (edits.length === 0) return <EmptyBody />;
-    return (
-      <div className="flex flex-col divide-y divide-[var(--color-hairline)]">
-        {edits.map((e, i) => {
-          const er = asRecord(e);
-          return (
-            <div key={i} className="px-3 py-2.5">
-              <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--color-fg-muted)]">
-                {t('session.modified.editN', { n: i + 1 })}
-              </p>
-              <SplitDiff
-                rows={rowsFromStrings(
-                  typeof er.old_string === 'string' ? er.old_string : '',
-                  typeof er.new_string === 'string' ? er.new_string : '',
-                )}
-              />
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  // Edit
-  return (
-    <div className="px-3 py-2.5">
-      <SplitDiff
-        rows={rowsFromStrings(
-          typeof rec.old_string === 'string' ? rec.old_string : '',
-          typeof rec.new_string === 'string' ? rec.new_string : '',
-        )}
-      />
-    </div>
-  );
+  return { rows, newFile };
 }
 
 /** 行内 word-level 片段：changed=该 token 仅存在于本侧（GitHub 行内高亮）。 */
@@ -1316,15 +1146,6 @@ function TreeGlyph() {
       <path d="M3 5h7l2 2h9" />
       <path d="M3 5v14h18V9" />
       <path d="M8 13h8M8 16h5" opacity="0.5" />
-    </svg>
-  );
-}
-
-function ArrowIcon() {
-  return (
-    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M5 12h14" />
-      <path d="M13 5l7 7-7 7" />
     </svg>
   );
 }
