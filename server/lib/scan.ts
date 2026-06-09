@@ -141,6 +141,7 @@ export async function listSessionsForProject(projectId: string): Promise<Session
     let firstAt: string | null = null;
     let lastAt: string | null = null;
     let messageCount = 0;
+    let lastTurnIncomplete = false;
 
     if (fs.existsSync(jsonlPath)) {
       const meta = await parseJsonlMeta(jsonlPath);
@@ -149,6 +150,7 @@ export async function listSessionsForProject(projectId: string): Promise<Session
       firstAt = meta.firstAt;
       lastAt = meta.lastAt;
       messageCount = meta.messageCount;
+      lastTurnIncomplete = meta.lastTurnIncomplete;
     }
 
     const livePid = activeMap.get(id) ?? null;
@@ -175,6 +177,11 @@ export async function listSessionsForProject(projectId: string): Promise<Session
       isLivePid: livePid !== null,
       isRecentlyActive,
       livePid,
+      // "Working" narrows "live" to actively-processing: a live PID, fresh file
+      // activity, and an unfinished last turn. The live-PID gate keeps a session
+      // that crashed mid-turn (file frozen with a trailing `user` record) from
+      // reading as "working".
+      isWorking: livePid !== null && isRecentlyActive && lastTurnIncomplete,
     });
   }
 
