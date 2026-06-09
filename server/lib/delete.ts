@@ -6,6 +6,7 @@ import { isUnderClaudeRoot, PATHS } from './claude-paths.ts';
 import { RECENT_ACTIVITY_WINDOW_MS } from './constants.ts';
 import { dirSize, fileSize } from './fs-size.ts';
 import { isSafeId } from './safe-id.ts';
+import { safeRemove } from './safe-remove.ts';
 import {
   buildActiveSessionMap,
   readActivePidEntries,
@@ -77,10 +78,10 @@ export async function deleteSessions(items: DeleteRequestItem[]): Promise<Delete
     };
     const cleaned: string[] = [];
 
-    if (rmFile(jsonlPath)) cleaned.push('projects/<id>.jsonl');
-    if (rmDir(subdirPath)) cleaned.push('projects/<id>/');
-    if (rmDir(fhPath)) cleaned.push('file-history/<id>/');
-    if (rmDir(sePath)) cleaned.push('session-env/<id>/');
+    if (safeRemove(jsonlPath)) cleaned.push('projects/<id>.jsonl');
+    if (safeRemove(subdirPath)) cleaned.push('projects/<id>/');
+    if (safeRemove(fhPath)) cleaned.push('file-history/<id>/');
+    if (safeRemove(sePath)) cleaned.push('session-env/<id>/');
 
     deleted.push({
       ...item,
@@ -99,18 +100,6 @@ export async function deleteSessions(items: DeleteRequestItem[]): Promise<Delete
   }
 
   return { deleted, skipped, historyLinesRemoved };
-}
-
-function rmFile(p: string): boolean {
-  if (!fs.existsSync(p)) return false;
-  fs.rmSync(p, { force: true });
-  return true;
-}
-
-function rmDir(p: string): boolean {
-  if (!fs.existsSync(p)) return false;
-  fs.rmSync(p, { recursive: true, force: true });
-  return true;
 }
 
 function isRecentlyActive(jsonlPath: string): boolean {

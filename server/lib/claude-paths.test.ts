@@ -59,29 +59,55 @@ describe('isUnderClaudeRoot (POSIX 语义)', () => {
 });
 
 describe('isUnderClaudeRoot (Windows 大小写折叠语义)', () => {
-  // 说明：claude-paths 走 node:path 而非 path.win32 / path.posix，
-  // 真正在 POSIX runtime 把 'C:\...' 喂给 path.resolve 会被当成相对路径处理。
-  // 想在 macOS 上跑 win32 分支需要重写实现选 path.win32，本测试不动产代码。
-  // 退而求其次：在 POSIX 上用全小写假根模拟"折叠后"的等价语义，
-  // 校验大小写折叠分支确实把不同大小写的目标视为同一棵子树。
-  it('折叠后路径以小写比较，混合大小写目标仍被识别为子树（POSIX 模拟）', async () => {
+  // claude-paths 现在按 process.platform 显式选 path.win32 / path.posix，
+  // 所以在 POSIX runtime 上把 platform 设成 'win32' + 喂真实 Windows 路径形式
+  // （盘符 + 反斜杠 / UNC），就能跑通真实的 path.win32 盘符正规化 + 大小写折叠分支，
+  // 不再靠 POSIX 假根模拟。isUnderClaudeRoot 是纯字符串比较，不碰 fs，无需铺真实目录。
+  // async 包装：必须 `return await fn()`，让 finally 的平台还原发生在 await import + 断言
+  // 全部完成之后。若写成同步 `return fn()`，finally 会在动态 import 真正求值模块前就还原，
+  // 模块顶层读到的就不是 'win32' 了。
+  async function withWin32<T>(fn: () => Promise<T>): Promise<T> {
     const origPlatform = process.platform;
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
-    // 在 POSIX 环境下喂 POSIX 风格的假根，避免 path.resolve('C:\\') 把它当相对路径
-    const lowerRoot = path.join(tmpHome, 'home', 'alice');
-    vi.spyOn(os, 'homedir').mockReturnValue(lowerRoot);
     try {
-      const { isUnderClaudeRoot } = await import('./claude-paths.ts');
-      const claudeRoot = path.join(lowerRoot, '.claude');
-      // 大小写互换的子路径仍判定为子树
-      expect(isUnderClaudeRoot(claudeRoot)).toBe(true);
-      expect(isUnderClaudeRoot(claudeRoot.toUpperCase())).toBe(true);
-      expect(isUnderClaudeRoot(path.join(claudeRoot.toUpperCase(), 'projects', 'foo'))).toBe(true);
-      // 兄弟目录（同前缀但非子目录）仍然拒绝
-      expect(isUnderClaudeRoot(claudeRoot + '_evil')).toBe(false);
+      return await fn();
     } finally {
       Object.defineProperty(process, 'platform', { value: origPlatform, configurable: true });
     }
+  }
+
+  it('真实 C:\\ 路径：盘符大小写 + 路径大小写折叠后判同一子树', async () => {
+    await withWin32(async () => {
+      vi.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\Foo');
+      const { isUnderClaudeRoot, PATHS } = await import('./claude-paths.ts');
+
+      expect(PATHS.root).toBe('C:\\Users\\Foo\\.claude');
+
+      // root 自身 + 子路径
+      expect(isUnderClaudeRoot('C:\\Users\\Foo\\.claude')).toBe(true);
+      expect(isUnderClaudeRoot('C:\\Users\\Foo\\.claude\\projects\\bar')).toBe(true);
+      // 盘符小写 + 整段大小写互换仍判为同一子树
+      expect(isUnderClaudeRoot('c:\\users\\foo\\.claude\\projects\\bar')).toBe(true);
+      expect(isUnderClaudeRoot('C:\\USERS\\FOO\\.CLAUDE')).toBe(true);
+      // 兄弟目录（同前缀非子树）拒绝
+      expect(isUnderClaudeRoot('C:\\Users\\Foo\\.claude_evil')).toBe(false);
+      // 父目录本身不算
+      expect(isUnderClaudeRoot('C:\\Users\\Foo')).toBe(false);
+      // 含 .. 逃逸出 root 的被 path.win32.resolve 解析后拒绝
+      expect(isUnderClaudeRoot('C:\\Users\\Foo\\.claude\\..\\..\\escape')).toBe(false);
+    });
+  });
+
+  it('UNC 路径（\\\\server\\share\\...）同样走 win32 正规化 + 折叠', async () => {
+    await withWin32(async () => {
+      vi.spyOn(os, 'homedir').mockReturnValue('\\\\server\\share\\Foo');
+      const { isUnderClaudeRoot, PATHS } = await import('./claude-paths.ts');
+
+      expect(PATHS.root).toBe('\\\\server\\share\\Foo\\.claude');
+      expect(isUnderClaudeRoot('\\\\server\\share\\Foo\\.claude')).toBe(true);
+      expect(isUnderClaudeRoot('\\\\SERVER\\SHARE\\FOO\\.claude\\file-history\\sid')).toBe(true);
+      expect(isUnderClaudeRoot('\\\\server\\share\\Foo\\.claude_evil')).toBe(false);
+    });
   });
 });
 
