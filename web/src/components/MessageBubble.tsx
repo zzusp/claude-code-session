@@ -199,6 +199,43 @@ function Blocks({ blocks, query }: { blocks: Block[]; query: string }) {
   );
 }
 
+// Trailing "Claude is working…" row — sits at the tail of a timeline while the
+// live poll keeps `isWorking` true, then unmounts when the reply lands. Shared by
+// the session detail timeline and the modified-files drawer's conversation column.
+export function WorkingIndicator() {
+  const t = useT();
+  return (
+    <li className="py-3" aria-live="polite">
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden
+          className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)]"
+        >
+          <span className="relative inline-flex h-2.5 w-2.5">
+            <span className="absolute inset-0 rounded-full bg-[var(--color-accent)] pulse-amber" />
+            <span className="absolute inset-0 rounded-full bg-[var(--color-accent)]" />
+          </span>
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="block font-display text-[14px] font-medium tracking-tight text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
+            {t('message.role.claude')}
+          </span>
+          <article className="mt-1.5 inline-flex items-center gap-2.5 rounded-2xl rounded-tl-sm border border-l-[3px] border-[var(--color-hairline)] border-l-[var(--color-accent)] bg-[var(--color-surface)] px-4 py-3">
+            <span aria-hidden className="loading-dots text-[var(--color-accent)]">
+              <span />
+              <span />
+              <span />
+            </span>
+            <span className="font-display text-[13.5px] italic text-[var(--color-fg-muted)]">
+              {t('session.working.indicator')}
+            </span>
+          </article>
+        </div>
+      </div>
+    </li>
+  );
+}
+
 function Avatar({ role }: { role: 'user' | 'assistant' }) {
   if (role === 'assistant') {
     return (
