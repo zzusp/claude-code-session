@@ -196,6 +196,14 @@ export default function SessionDetailRoute() {
     return map;
   }, [data]);
 
+  // 时间线 tool_result 头部标注来源工具：toolUseId → 工具名（tool_use 与其
+  // result 分属两条消息，需跨消息反查）。
+  const toolNames = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const [id, v] of editLookup) m.set(id, v.name);
+    return m;
+  }, [editLookup]);
+
   // 抽屉左栏的对话：默认隐去 meta/system 噪声行，留下真正的对话与工具调用。
   // 跳转目标都是 assistant 的 tool_use 消息，不在 meta 之列，过滤后仍可定位。
   const conversationMessages = useMemo(
@@ -493,7 +501,11 @@ export default function SessionDetailRoute() {
                     variants={fadeUpItem}
                     className={isMeta ? 'py-2' : 'py-3'}
                   >
-                    <MessageBubble message={m.message} query={deferredQuery} />
+                    <MessageBubble
+                      message={m.message}
+                      query={deferredQuery}
+                      toolNames={toolNames}
+                    />
                   </motion.li>
                 );
               })}

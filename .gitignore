@@ -13,6 +13,13 @@ dist/
 .vscode/
 *.swp
 
+# Claude Code local state (per-machine: local settings + git worktrees)
+.claude/settings.local.json
+.claude/worktrees/
+
+# Session scratch (ad-hoc drafts; promoted to docs/ or deleted before merge)
+docs/tmp/
+
 # Logs
 *.log
 npm-debug.log*
@@ -28,3 +35,5 @@ docs/acceptance/modified-files-drawer/round-2/*.png
 docs/acceptance/modified-files-drawer/round-3/*.png
 docs/acceptance/version-update-notice/round-1/screenshots/
 docs/acceptance/version-update-notice/round-1/verdict.json
+docs/acceptance/message-content-display/round-1/*.png
+docs/acceptance/message-content-display/round-2/*.png
