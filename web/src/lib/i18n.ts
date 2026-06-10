@@ -181,6 +181,10 @@ const DICT = {
     'tool.thinking': 'thinking',
     'tool.thinkingEncrypted': 'Content is encrypted, no readable text.',
     'tool.image': 'image',
+    'tool.copy': 'copy',
+    'tool.copied': 'copied',
+    'tool.moreLines': '… {{n}} more lines',
+    'tool.replaceAll': 'replace all',
 
     'status.working': 'working',
     'status.live': 'live · pid {{pid}}',
@@ -575,6 +579,10 @@ const DICT = {
     'tool.thinking': '思考',
     'tool.thinkingEncrypted': '内容被加密，无可读文本。',
     'tool.image': '图片',
+    'tool.copy': '复制',
+    'tool.copied': '已复制',
+    'tool.moreLines': '… 还有 {{n}} 行',
+    'tool.replaceAll': '全部替换',
 
     'status.working': '工作中',
     'status.live': '运行中 · pid {{pid}}',

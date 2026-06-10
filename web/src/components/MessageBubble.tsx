@@ -1,15 +1,26 @@
+import { lazy, Suspense } from 'react';
 import type { Block, Message } from '../lib/api.ts';
 import { formatDateTime } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
 import HighlightedText from './HighlightedText.tsx';
 import { ThinkingBlock, ToolResultBlock, ToolUseBlock } from './ToolBlock.tsx';
 
+// markdown 渲染按需加载（remark/micromark 在独立 chunk），加载完成前
+// Suspense fallback 退回纯文本——内容始终可见，不闪空白。
+const MarkdownContent = lazy(() => import('./MarkdownContent.tsx'));
+
+/** toolUseId → 工具名。tool_use 与其 tool_result 分属两条消息，调用方
+ *  （时间线 / 弹窗对话栏）从已加载的全量消息构建后传入，用于 result 头部标注来源。 */
+export type ToolNameLookup = ReadonlyMap<string, string>;
+
 export default function MessageBubble({
   message,
   query,
+  toolNames,
 }: {
   message: Message;
   query: string;
+  toolNames?: ToolNameLookup;
 }) {
   if (message.isMeta) return <SystemMessage message={message} query={query} />;
   if (
@@ -17,19 +28,25 @@ export default function MessageBubble({
     message.blocks.length > 0 &&
     message.blocks.every((b) => b.type === 'tool_result')
   ) {
-    return <AssistantMessage message={message} query={query} variant="tool" />;
+    return (
+      <AssistantMessage message={message} query={query} toolNames={toolNames} variant="tool" />
+    );
   }
-  if (message.type === 'user') return <UserMessage message={message} query={query} />;
-  return <AssistantMessage message={message} query={query} />;
+  if (message.type === 'user') {
+    return <UserMessage message={message} query={query} toolNames={toolNames} />;
+  }
+  return <AssistantMessage message={message} query={query} toolNames={toolNames} />;
 }
 
 function AssistantMessage({
   message,
   query,
+  toolNames,
   variant = 'assistant',
 }: {
   message: Message;
   query: string;
+  toolNames?: ToolNameLookup;
   variant?: 'assistant' | 'tool';
 }) {
   const t = useT();
@@ -55,14 +72,27 @@ function AssistantMessage({
             borderClass
           }
         >
-          <Blocks blocks={message.blocks} query={query} />
+          <Blocks
+            blocks={message.blocks}
+            query={query}
+            toolNames={toolNames}
+            markdown={!isTool && !query}
+          />
         </article>
       </div>
     </div>
   );
 }
 
-function UserMessage({ message, query }: { message: Message; query: string }) {
+function UserMessage({
+  message,
+  query,
+  toolNames,
+}: {
+  message: Message;
+  query: string;
+  toolNames?: ToolNameLookup;
+}) {
   const t = useT();
   return (
     <div className="flex items-start justify-end gap-3" data-uuid={message.uuid}>
@@ -74,7 +104,7 @@ function UserMessage({ message, query }: { message: Message; query: string }) {
           ts={message.ts}
         />
         <article className="mt-1.5 rounded-2xl rounded-tr-sm bg-[var(--color-accent-soft)] px-4 py-3 text-[var(--color-accent-ink)] dark:text-[var(--color-fg-primary)]">
-          <Blocks blocks={message.blocks} query={query} />
+          <Blocks blocks={message.blocks} query={query} toolNames={toolNames} />
         </article>
       </div>
       <Avatar role="user" />
@@ -154,14 +184,25 @@ function Header({
   );
 }
 
-function Blocks({ blocks, query }: { blocks: Block[]; query: string }) {
+function Blocks({
+  blocks,
+  query,
+  toolNames,
+  markdown = false,
+}: {
+  blocks: Block[];
+  query: string;
+  toolNames?: ToolNameLookup;
+  /** true=assistant 回复且非搜索态，text block 走 markdown 排版；否则纯文本+高亮。 */
+  markdown?: boolean;
+}) {
   const t = useT();
   return (
     <div className="space-y-2.5">
       {blocks.map((block, i) => {
         switch (block.type) {
-          case 'text':
-            return (
+          case 'text': {
+            const plain = (
               <p
                 key={i}
                 className="whitespace-pre-wrap break-words text-[14.5px] leading-relaxed"
@@ -169,10 +210,24 @@ function Blocks({ blocks, query }: { blocks: Block[]; query: string }) {
                 <HighlightedText text={block.text} query={query} />
               </p>
             );
+            if (!markdown) return plain;
+            return (
+              <Suspense key={i} fallback={plain}>
+                <MarkdownContent text={block.text} />
+              </Suspense>
+            );
+          }
           case 'tool_use':
             return <ToolUseBlock key={i} block={block} query={query} />;
           case 'tool_result':
-            return <ToolResultBlock key={i} block={block} query={query} />;
+            return (
+              <ToolResultBlock
+                key={i}
+                block={block}
+                query={query}
+                toolName={toolNames?.get(block.toolUseId)}
+              />
+            );
           case 'thinking':
             return <ThinkingBlock key={i} block={block} query={query} />;
           case 'image':
