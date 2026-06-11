@@ -870,7 +870,7 @@ function SplitLine({ row, side }: { row: SplitRow; side: 'left' | 'right' }) {
   if (row.kind === 'gap') {
     return (
       <div className="flex bg-[var(--color-sunken)] leading-[1.65] text-[var(--color-fg-faint)]">
-        <span className="sticky left-0 z-[1] w-[3em] shrink-0 select-none border-r border-[var(--color-hairline)] bg-[inherit] px-1.5 text-center font-mono text-[11px]">
+        <span className="w-[3em] shrink-0 select-none border-r border-[var(--color-hairline)] bg-[inherit] px-1.5 text-center font-mono text-[11px]">
           ⋯
         </span>
         <span className="whitespace-nowrap px-3 font-mono text-[10px] italic tracking-[0.04em]">
@@ -899,7 +899,7 @@ function SplitLine({ row, side }: { row: SplitRow; side: 'left' | 'right' }) {
   const hl = cell.kind === 'del' ? 'bg-[var(--color-danger)]/25' : 'bg-[var(--color-moss)]/30';
   return (
     <div className={`flex leading-[1.65] ${bg}`}>
-      <span className="sticky left-0 z-[1] w-[3em] shrink-0 select-none border-r border-[var(--color-hairline)] bg-[inherit] px-1.5 text-right font-mono text-[10px] tabular-nums text-[var(--color-fg-faint)]">
+      <span className="w-[3em] shrink-0 select-none border-r border-[var(--color-hairline)] bg-[inherit] px-1.5 text-right font-mono text-[10px] tabular-nums text-[var(--color-fg-faint)]">
         {cell.no ?? ''}
       </span>
       <span className={`w-4 shrink-0 select-none text-center font-mono text-[11.5px] ${markerColor}`}>
