@@ -87,6 +87,7 @@ export default function SessionDetailRoute() {
 
   const [showMeta, setShowMeta] = useState(false);
   const [onlyUser, setOnlyUser] = useState(false);
+  const [onlyError, setOnlyError] = useState(false);
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
@@ -215,14 +216,15 @@ export default function SessionDetailRoute() {
     let list = indexed;
     if (!showMeta) list = list.filter((m) => !m.message.isMeta);
     if (onlyUser) list = list.filter((m) => isUserTyped(m.message));
+    if (onlyError) list = list.filter((m) => hasError(m.message));
     if (deferredQuery) {
       const q = deferredQuery.toLowerCase();
       list = list.filter((m) => m.haystack.includes(q));
     }
     return list;
-  }, [indexed, showMeta, onlyUser, deferredQuery]);
+  }, [indexed, showMeta, onlyUser, onlyError, deferredQuery]);
 
-  const skipWindowing = !!deferredQuery || onlyUser;
+  const skipWindowing = !!deferredQuery || onlyUser || onlyError;
   const renderList = useMemo(() => {
     if (skipWindowing) return visibleMessages;
     return visibleMessages.slice(-windowSize);
@@ -444,6 +446,8 @@ export default function SessionDetailRoute() {
         onShowMeta={setShowMeta}
         onlyUser={onlyUser}
         onOnlyUser={setOnlyUser}
+        onlyError={onlyError}
+        onOnlyError={setOnlyError}
         shown={renderList.length}
         total={visibleMessages.length}
         hasData={!!data}
@@ -823,6 +827,8 @@ function FilterLedger({
   onShowMeta,
   onlyUser,
   onOnlyUser,
+  onlyError,
+  onOnlyError,
   shown,
   total,
   hasData,
@@ -833,6 +839,8 @@ function FilterLedger({
   onShowMeta: (v: boolean) => void;
   onlyUser: boolean;
   onOnlyUser: (v: boolean) => void;
+  onlyError: boolean;
+  onOnlyError: (v: boolean) => void;
   shown: number;
   total: number;
   hasData: boolean;
@@ -864,6 +872,11 @@ function FilterLedger({
             checked={onlyUser}
             onChange={onOnlyUser}
             label={t('common.onlyUser')}
+          />
+          <ToggleSwitch
+            checked={onlyError}
+            onChange={onOnlyError}
+            label={t('common.onlyError')}
           />
         </div>
 
@@ -940,6 +953,10 @@ function isUserTyped(m: Message): boolean {
   if (m.type !== 'user') return false;
   if (m.blocks.length === 0) return true;
   return m.blocks.some((b) => b.type !== 'tool_result');
+}
+
+function hasError(m: Message): boolean {
+  return m.blocks.some((b) => b.type === 'tool_result' && b.isError);
 }
 
 function indexMessage(message: Message): string {

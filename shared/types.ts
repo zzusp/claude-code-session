@@ -26,6 +26,8 @@ export interface SessionSummary {
   /** Last activity: max(latest record timestamp, file mtime) — matches `claude code resume`. */
   lastAt: string | null;
   messageCount: number;
+  /** Count of tool_result blocks flagged `is_error` across the whole session. */
+  errorCount: number;
   bytes: number;
   relatedBytes: RelatedBytes;
   isLivePid: boolean;

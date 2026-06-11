@@ -10,6 +10,8 @@ export interface JsonlMeta {
   firstAt: string | null;
   lastAt: string | null;
   messageCount: number;
+  /** Count of tool_result blocks flagged `is_error` across the session. */
+  errorCount: number;
   cwdFromMessages: string | null;
   /**
    * The last conversation turn is unfinished — Claude still owes output. True when
@@ -27,6 +29,7 @@ export async function parseJsonlMeta(filePath: string): Promise<JsonlMeta> {
   let firstAt: string | null = null;
   let lastAt: string | null = null;
   let messageCount = 0;
+  let errorCount = 0;
   let cwdFromMessages: string | null = null;
   // Re-evaluated on every conversation record so it reflects the *last* turn once
   // the scan finishes.
@@ -69,6 +72,7 @@ export async function parseJsonlMeta(filePath: string): Promise<JsonlMeta> {
     if (obj.type === 'user' || obj.type === 'assistant') {
       messageCount += 1;
       const msg = obj.message as { content?: unknown } | undefined;
+      errorCount += countErrorResults(msg?.content);
 
       if (obj.type === 'assistant') {
         lastTurnIncomplete = endsWithToolUse(msg?.content);
@@ -100,6 +104,7 @@ export async function parseJsonlMeta(filePath: string): Promise<JsonlMeta> {
     firstAt,
     lastAt: reconciledLastAt,
     messageCount,
+    errorCount,
     cwdFromMessages,
     lastTurnIncomplete,
   };
@@ -136,4 +141,20 @@ function extractUserText(content: unknown): string {
     }
   }
   return '';
+}
+
+function countErrorResults(content: unknown): number {
+  if (!Array.isArray(content)) return 0;
+  let n = 0;
+  for (const block of content) {
+    if (
+      block &&
+      typeof block === 'object' &&
+      (block as { type?: unknown }).type === 'tool_result' &&
+      (block as { is_error?: unknown }).is_error === true
+    ) {
+      n += 1;
+    }
+  }
+  return n;
 }
