@@ -229,7 +229,7 @@ See [`docs/spec/session-manager-design.md`](docs/spec/session-manager-design.md)
 
 ## Contributing & releases
 
-Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (enforced by a `commit-msg` hook), versions follow [SemVer](https://semver.org/), and releases are cut locally with `release-it`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and [docs/spec/release-process.md](docs/spec/release-process.md) for the full policy.
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (enforced by a `commit-msg` hook), versions follow [SemVer](https://semver.org/), and releases are tag-triggered: run `npm version` locally, then `git push --follow-tags` fires a GitHub Actions workflow that publishes to npm and cuts a GitHub Release. See [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and [docs/spec/release-process.md](docs/spec/release-process.md) for the full policy.
 
 ## License
 

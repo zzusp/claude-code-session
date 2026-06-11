@@ -42,75 +42,76 @@ npm 发布的**单一事实源**；[`CONTRIBUTING.md`](../../CONTRIBUTING.md) �
   钩子 `.husky/commit-msg`。**只校验 commit message**，不挂 pre-commit 重活
   （项目无 lint，`typecheck` 较慢不适合每次提交）。
 
-## 四、CHANGELOG
+> 版本号不再自动从 commits 计算——由发版者用 `npm version <x.y.z>` 显式指定（见五、六）。
+> 但 commit 规范仍是硬约束：它是 CI 生成 release notes 的唯一输入。
 
-- `CHANGELOG.md`，Keep a Changelog 格式。
-- 从 `1.0.1` 起由 `release-it` 在发版时**自动**从 commits 生成 / 更新；`1.0.0` 为手工回填基线。
-- 日常无需手改；只在历史 commit 不规范、需要补全描述时手工编辑 `[Unreleased]` 段。
+## 四、CHANGELOG / Release Notes
 
-## 五、工具链：release-it（本地一键）
+- 历史版本（`1.0.0`–`1.0.2`）的中文分组 changelog 保留在 `CHANGELOG.md`，作为归档。
+- **自 tag 触发发布起，每版 release notes 由 CI 用 `conventional-changelog`（`conventionalcommits`
+  preset）从 commits 现算，发布在对应的 GitHub Release**，不再回写仓库内 `CHANGELOG.md`
+  （它定格在 `1.0.2`）。
+- notes 质量仍取决于 commit message 是否守 Conventional Commits——这是唯一输入。
 
-采用 [`release-it`](https://github.com/release-it/release-it) +
-[`@release-it/conventional-changelog`](https://github.com/release-it/conventional-changelog)，
-配置见 `.release-it.json`。
+## 五、工具链：tag 触发 + GitHub Actions
 
-**为什么是它（而非其他）：**
+发版 = **本地 `npm version` 打 tag → `git push --follow-tags` → CI 自动 publish**。
+配置见 `.github/workflows/release.yml`（`on: push: tags: ['v*']`）。
 
-- ✅ 单人、无需搭 CI；一条命令端到端；交互确认 + `--dry-run`，出错好回退。
-- ❌ `semantic-release` + GitHub Actions：需搭 CI + 配 `NPM_TOKEN`，每次合 main 即发，对当前无 CI / 单人现状过重；将来需要时可平滑升级到这条路。
-- ❌ `changesets`：核心价值在多包 monorepo / 多人协作；本项目**单包单人**，"每次先写 .changeset" 仪式价值打折。
-- ❌ `standard-version`：已废弃。
+**为什么这样（而非本地 release-it）：** npm 账号开了 **2FA**，本地非交互 `npm publish` 会被
+`403`（需 OTP 或 bypass-2FA token）。把 publish 放到 CI、用 environment `NPM_PUBLISH` 下的
+bypass-2FA token，一推 tag 全自动，本地不再碰 OTP。release-it 这类「本地驱动整个发布」的工具
+与「人打 tag 触发」模型冲突（它要打的 tag 已存在），故已移除（连同 `.release-it.json` 与两个
+`@release-it/*` 依赖）。
 
-`npm run release` 依次执行：
+**职责划分：**
 
-1. **发布前闸门**（`hooks.before:init`）：`npm run typecheck` + `npm run build`，失败即停。
-2. 读 commits（`conventionalcommits` preset）→ 自动算新版本号。
-3. 更新 `CHANGELOG.md` + bump `package.json`。
-4. git commit `chore: release v${version}` + 打 tag `v${version}`。
-5. `git push --follow-tags`。
-6. `npm publish`（`publishConfig.access=public` 已就位，`prepublishOnly` 自动 build `dist/`）。
-7. 建 GitHub Release（附本版 CHANGELOG 片段）。
+- **本地 `npm version <x.y.z>`**：bump `package.json` + `package-lock.json` → commit → 打 tag
+  `v<x.y.z>`，三者天然一致。
+- **CI（tag push 触发）**：
+  1. 校验 tag 名 == `package.json` version（不一致直接 fail，防发错版本）。
+  2. `npm ci` → `npm test` → `npm run typecheck`（闸门）。
+  3. 生成本版 release notes（`conventional-changelog` 取最新一段；本版若只有 `ci`/`chore` 等
+     不入 changelog 的 commit，回退 GitHub 自动生成的 notes，避免空 / 错位）。
+  4. `npm publish`（`prepublishOnly` 自动 build `dist/`；token 来自 secret `NPM_PUBLISH_TOKEN`）。
+  5. `gh release create <tag>` 附 release notes。
+- CI **不写回 main**：不 commit、不改 `CHANGELOG.md`。
 
-`requireBranch: "main"` 确保只能在 main 发版；`requireCleanWorkingDir` 确保工作区干净。
-`npm run release:dry` 为预演，不产生任何副作用。
+**认证（一次性配置）：**
 
-### CI 发布（GitHub Actions，推荐）
-
-npm 账号开启 **2FA** 后，本地非交互 `npm publish` 会被 `403`（需 OTP 或 bypass-2FA token）拦下。
-为此把同一套 release-it 搬到 CI：`.github/workflows/release.yml`，`workflow_dispatch` 手动触发。
-
-- **怎么发**：仓库 **Actions** 页 → **Release** workflow → **Run workflow** → `version` 填具体版本
-  （如 `1.0.2`）或 `patch`/`minor`/`major`，**留空** = 按 commits 自动算 → Run。
-- **它干了什么**：与本地完全一致——`npm ci` → `npm test` → release-it（typecheck + build 闸门 →
-  生成 CHANGELOG → commit `chore: release v${version}` + tag → `npm publish` → 建 GitHub Release）。
-- **认证（一次性配置）**：
-  1. npmjs.com → **Access Tokens** → 建 **Granular Access Token**（Packages: Read and write，
-     scope 含 `@zzusp/ccsm`）或 classic **Automation** token——这两类 **bypass 2FA**，专供 CI。
-  2. 存为 **Environment Secret**：仓库 Settings → Environments → `NPM_PUBLISH` → secret `NPM_PUBLISH_TOKEN`。
-     workflow 的 `release` job 声明了 `environment: NPM_PUBLISH` 才能取到它。`GITHUB_TOKEN` 由 Actions 自带，无需配。
-- workflow 用 `--npm.skipChecks` 跳过 release-it 的 `npm whoami` 前置（granular token 不一定支持
-  whoami，否则会被误判为未登录而跳过 publish）；`npm publish` 本身仍用 token 正常认证。
-
-本地 `npm run release` 仍可用作备选，但需在交互式终端输入 npm OTP（不能带 `--ci`）。
+1. npmjs.com → **Access Tokens** → **Generate New Token** → **Granular Access Token**，
+   **务必勾选「Bypass two-factor authentication」**（在 Description 之后、Packages 之前的独立一节），
+   Permissions 选 **Read and Write**、scope 含 `@zzusp/ccsm`。classic **Automation** token 亦可
+   （类型即 bypass 2FA，但 npm 计划移除 classic token）。
+2. 存为 **Environment Secret**：仓库 Settings → Environments → `NPM_PUBLISH` → secret
+   `NPM_PUBLISH_TOKEN`。workflow 的 `release` job 声明了 `environment: NPM_PUBLISH` 才能取到。
+   `GITHUB_TOKEN` 由 Actions 自带，无需配。
 
 ## 六、端到端 SOP（每次迭代）
 
 1. `git fetch && git checkout -b feature/<name> origin/main`。
 2. 按 Conventional Commits 提交（`commit-msg` 钩子把关）。
 3. PR → 合并 main（merge / squash 标题也遵守规范）。
-4. 发版（二选一）：
-   - **CI（推荐）**：Actions 页 → Release workflow → Run workflow → 填版本号。见「五 · CI 发布」。
-   - **本地**：`npm run release:dry` 预演 → `npm run release`，在终端按提示输入 npm OTP（2FA）。
-5. 发版后 npm 与 GitHub Release 自动就绪。
+4. **发版**（在最新 main 上）：
 
-**发布前置**：
-- **CI 发布**：Environment `NPM_PUBLISH` 下的 secret `NPM_PUBLISH_TOKEN`（bypass-2FA 的 Granular / Automation token）。一次性配置。
-- **本地发布**：`npm login`（`@zzusp` 发布权限）+ 交互式输入 2FA OTP；`gh auth login` 或环境变量
-  `GITHUB_TOKEN`（建 GitHub Release 用）。
+   ```bash
+   git checkout main && git pull --ff-only
+   npm version <x.y.z>          # bump package.json + commit + 打 tag v<x.y.z>
+   git push --follow-tags       # 推 commit + tag；tag 即触发 CI 发布
+   ```
+
+   `<x.y.z>` 按「二、版本号怎么算」定；也可用 `npm version patch|minor|major` 让它自增。
+5. 去 **Actions** 看 Release run 跑完；npm 与 GitHub Release 自动就绪。
+
+**发布前置**：Environment `NPM_PUBLISH` 下的 secret `NPM_PUBLISH_TOKEN`（bypass-2FA token），
+一次性配置。开发者本地只需 git 推送权限，**不需要** npm login / OTP。
 
 ## 七、纪律
 
-- **所有新分支基于最新 `origin/main`**。本地旧分支可能落后于已发布身份（package.json 仍是
-  旧包名 / `private:true`），在其上发版会失败或发错——确认无用应及时清理。
-- 发布只在 `main` 上、走 release-it（CI 的 Release workflow 或本地 `npm run release`），不手动
-  `npm version` / `npm publish`，以保证版本号、tag、CHANGELOG、发布产物始终一致。
+- **所有新分支基于最新 `origin/main`**；发版前确保本地 main 已 `git pull --ff-only` 到最新，
+  否则 `npm version` 会基于旧代码打 tag。
+- 发版只走 **`npm version` + `git push --follow-tags`**，由 CI 完成 publish + GitHub Release；
+  不在本地手动 `npm publish`，以保证版本号、tag、发布产物始终一致。
+- **tag 必须由 `npm version` 创建**（保证 tag == `package.json` version）；不要手写 `git tag`
+  再改 package.json，CI 的一致性校验会拒绝不匹配的发布。
+- 发错 / 想撤：删远程 tag + 对应 GitHub Release 即可；npm 已发布版本不可覆盖，只能发新 patch 修。
