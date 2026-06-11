@@ -43,3 +43,30 @@ export function useTheme(): {
 
   return { theme, setTheme, toggle };
 }
+
+/** Resolve CSS custom properties off `<html>` into concrete color strings, re-reading
+ *  whenever the theme class flips. Canvas / SVG need concrete colors — CSS vars don't
+ *  traverse them. (The disk-usage page keeps its own local copy for Recharts.) */
+export function useThemeColors<T extends readonly string[]>(
+  vars: T,
+): Record<T[number], string> {
+  const [snapshot, setSnapshot] = useState(() => readVars(vars));
+  useEffect(() => {
+    const observer = new MutationObserver(() => setSnapshot(readVars(vars)));
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    });
+    return () => observer.disconnect();
+  }, [vars]);
+  return snapshot;
+}
+
+function readVars<T extends readonly string[]>(vars: T): Record<T[number], string> {
+  const cs = getComputedStyle(document.documentElement);
+  const out = {} as Record<T[number], string>;
+  for (const v of vars) {
+    (out as Record<string, string>)[v] = cs.getPropertyValue(v).trim() || '#888';
+  }
+  return out;
+}
