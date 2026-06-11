@@ -37,17 +37,18 @@
 
 ## 发版（在 `main` 上进行）
 
-版本号、`CHANGELOG.md`、git tag、npm 发布、GitHub Release 全部由 `release-it` 自动完成。
+发版 = 本地用 `npm version` 打 tag，`git push --follow-tags` 即触发 GitHub Actions
+自动 publish（`.github/workflows/release.yml`）。
 
 ```bash
-git checkout main && git pull        # 确保在最新 main
-npm run release:dry                  # 预演：确认推算的版本号 + CHANGELOG 片段
-npm run release                      # 正式发布
+git checkout main && git pull --ff-only   # 确保在最新 main
+npm version <x.y.z>                        # bump package.json + commit + 打 tag v<x.y.z>
+git push --follow-tags                     # 推 commit + tag；tag 即触发 CI 发布
 ```
 
-`npm run release` 会依次：跑 `typecheck` + `build` 闸门 → 按 commits 算版本 →
-更新 `CHANGELOG.md` 与 `package.json` → 提交并打 tag `vX.Y.Z` → push →
-`npm publish` → 建 GitHub Release。
+`<x.y.z>` 按 SemVer 定，或用 `npm version patch|minor|major` 自增。CI 会：校验 tag ==
+package.json 版本 → `npm test` + `typecheck` 闸门 → `npm publish` → 建 GitHub Release
+（release notes 由 conventional-changelog 从 commits 现算）。
 
-**首次发布前置**：`npm login`（具备 `@zzusp` 发布权限）、`gh auth login` 或设置环境变量
-`GITHUB_TOKEN`（供建 GitHub Release）。
+**发布前置**：仓库 Environment `NPM_PUBLISH` 下配 secret `NPM_PUBLISH_TOKEN`（bypass-2FA 的
+npm token），一次性。开发者本地只需 git 推送权限，**不需要** npm login / OTP。

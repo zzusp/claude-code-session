@@ -60,12 +60,9 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本 SemVer](https://semver.org/lang/zh-CN/)。
 
-从 `1.0.1` 起，本文件由 [`release-it`](https://github.com/release-it/release-it) 依据
-[Conventional Commits](https://www.conventionalcommits.org/zh-hans/) 在发版时自动生成。
-
-## [Unreleased]
-
-_（下一版发布时，本节内容会被 `release-it` 根据自上次 tag 以来的 Conventional Commits 自动填充。）_
+`1.0.0`–`1.0.2` 的条目依 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/)
+生成并归档于此。自 `1.0.3` 起改为 **tag 触发发布**，每版 release notes 由 CI 现算并发布在对应的
+[GitHub Release](https://github.com/zzusp/claude-code-session/releases)，本文件不再更新（定格在 `1.0.2`）。
 
 ## [1.0.0] - 2026-06-08
 
