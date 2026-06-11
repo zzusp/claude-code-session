@@ -141,6 +141,7 @@ export async function listSessionsForProject(projectId: string): Promise<Session
     let firstAt: string | null = null;
     let lastAt: string | null = null;
     let messageCount = 0;
+    let errorCount = 0;
     let lastTurnIncomplete = false;
 
     if (fs.existsSync(jsonlPath)) {
@@ -150,6 +151,7 @@ export async function listSessionsForProject(projectId: string): Promise<Session
       firstAt = meta.firstAt;
       lastAt = meta.lastAt;
       messageCount = meta.messageCount;
+      errorCount = meta.errorCount;
       lastTurnIncomplete = meta.lastTurnIncomplete;
     }
 
@@ -172,6 +174,7 @@ export async function listSessionsForProject(projectId: string): Promise<Session
       firstAt,
       lastAt,
       messageCount,
+      errorCount,
       bytes: related.jsonl,
       relatedBytes: related,
       isLivePid: livePid !== null,
