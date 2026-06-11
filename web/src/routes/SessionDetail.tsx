@@ -16,7 +16,6 @@ import DeleteDialog from '../components/DeleteDialog.tsx';
 import { Loading } from '../components/Loading.tsx';
 import MessageBubble, { WorkingIndicator } from '../components/MessageBubble.tsx';
 import ModifiedFilesDrawer, { type EditLookup } from '../components/ModifiedFilesDrawer.tsx';
-import NeuralChainOverlay from '../components/NeuralChainOverlay.tsx';
 import {
   api,
   type Block,
@@ -35,7 +34,6 @@ import {
 import { formatBytes, formatDateTime, formatRelativeTime } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
 import { fadeUpItem, staggerParent } from '../lib/motion.ts';
-import { buildChain } from '../lib/neural-chain.ts';
 import { queryKeys } from '../lib/query-keys.ts';
 
 interface IndexedMessage {
@@ -97,7 +95,6 @@ export default function SessionDetailRoute() {
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showModifiedDrawer, setShowModifiedDrawer] = useState(false);
-  const [showChain, setShowChain] = useState(false);
   // Sticky masthead follower: while reading down the timeline, a compact
   // breadcrumb + card overlay pins above the (already sticky) search bar. The
   // overlay is absolutely positioned so revealing it never reflows the page;
@@ -218,9 +215,6 @@ export default function SessionDetailRoute() {
     return m;
   }, [editLookup]);
 
-  // 思维/执行链节点（块级）：浮层神经放电可视化的数据源，复用已加载的全量消息。
-  const chainNodes = useMemo(() => (data ? buildChain(data.messages) : []), [data]);
-
   // 抽屉左栏的对话：默认隐去 meta/system 噪声行，留下真正的对话与工具调用。
   // 跳转目标都是 assistant 的 tool_use 消息，不在 meta 之列，过滤后仍可定位。
   const conversationMessages = useMemo(
@@ -247,27 +241,6 @@ export default function SessionDetailRoute() {
   }, [visibleMessages, skipWindowing, windowSize]);
 
   const hasMoreEarlier = !skipWindowing && renderList.length < visibleMessages.length;
-
-  // 从神经链浮层点节点跳回时间线：关浮层 → 确保目标进渲染窗口 → 滚动居中 + flash。
-  // 复用既有 data-uuid + flash-focus 机制（镜像 271-279），但走独立路径以支持重复跳转。
-  const handleChainJump = (uuid: string) => {
-    setShowChain(false);
-    const idx = visibleMessages.findIndex((m) => m.message.uuid === uuid);
-    if (idx !== -1 && !skipWindowing) {
-      const needed = visibleMessages.length - idx;
-      setWindowSize((w) => (needed > w ? needed : w));
-    }
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        const el = document.querySelector<HTMLElement>(`[data-uuid="${CSS.escape(uuid)}"]`);
-        if (!el) return;
-        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        const flashTarget = el.closest('li') ?? el;
-        flashTarget.classList.add('flash-focus');
-        window.setTimeout(() => flashTarget.classList.remove('flash-focus'), 1300);
-      }),
-    );
-  };
 
   useEffect(() => {
     if (!data) return;
@@ -478,7 +451,6 @@ export default function SessionDetailRoute() {
             onOpenModified={() => setShowModifiedDrawer(true)}
             modifiedCount={modifiedFiles.length}
             modifiedLoading={modifiedFilesQuery.isLoading}
-            onOpenChain={() => setShowChain(true)}
           />
         </div>
       )}
@@ -515,19 +487,6 @@ export default function SessionDetailRoute() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showChain && data && (
-          <NeuralChainOverlay
-            key="neural-chain-overlay"
-            nodes={chainNodes}
-            toolNames={toolNames}
-            isWorking={isWorking}
-            onClose={() => setShowChain(false)}
-            onJump={handleChainJump}
-          />
-        )}
-      </AnimatePresence>
-
       <div
         ref={railRef}
         className="sticky top-2 z-30 mt-6 lg:top-[var(--ccsm-pin-top)]"
@@ -553,7 +512,6 @@ export default function SessionDetailRoute() {
               onOpenModified={() => setShowModifiedDrawer(true)}
               modifiedCount={modifiedFiles.length}
               modifiedLoading={modifiedFilesQuery.isLoading}
-              onOpenChain={() => setShowChain(true)}
               onDelete={currentSummary ? () => setShowDeleteDialog(true) : undefined}
               deleteDisabled={!currentSummary}
               deleteTooltip={deleteTooltip}
@@ -673,7 +631,6 @@ function SessionMasthead({
   onOpenModified,
   modifiedCount,
   modifiedLoading,
-  onOpenChain,
 }: {
   sid: string;
   isLive: boolean;
@@ -696,7 +653,6 @@ function SessionMasthead({
   onOpenModified: () => void;
   modifiedCount: number;
   modifiedLoading: boolean;
-  onOpenChain: () => void;
 }) {
   const t = useT();
   const dateline = formatDateline(firstAt);
@@ -746,14 +702,6 @@ function SessionMasthead({
           <div className="hidden font-mono text-[10px] uppercase tracking-[0.22em] tabular-nums text-[var(--color-fg-muted)] sm:block">
             {dateline}
           </div>
-          <button
-            type="button"
-            onClick={onOpenChain}
-            aria-label={t('session.chain.openAria')}
-            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
-          >
-            <NeuralIcon /> {t('session.chain.title')}
-          </button>
           <button
             type="button"
             onClick={onOpenModified}
@@ -823,7 +771,6 @@ function CompactMasthead({
   onOpenModified,
   modifiedCount,
   modifiedLoading,
-  onOpenChain,
   onDelete,
   deleteDisabled,
   deleteTooltip,
@@ -835,7 +782,6 @@ function CompactMasthead({
   onOpenModified: () => void;
   modifiedCount: number;
   modifiedLoading: boolean;
-  onOpenChain: () => void;
   onDelete?: () => void;
   deleteDisabled?: boolean;
   deleteTooltip?: string;
@@ -848,14 +794,6 @@ function CompactMasthead({
       <span className="min-w-0 flex-1 truncate font-display text-[15px] font-light tracking-[-0.01em] text-[var(--color-fg-primary)]">
         {title}
       </span>
-      <button
-        type="button"
-        onClick={onOpenChain}
-        aria-label={t('session.chain.openAria')}
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
-      >
-        <NeuralIcon /> {t('session.chain.title')}
-      </button>
       <button
         type="button"
         onClick={onOpenModified}
@@ -1263,27 +1201,6 @@ function FilesIcon() {
     >
       <path d="M3 5h6l2 2h10" />
       <path d="M3 5v14h18V9H3" />
-    </svg>
-  );
-}
-
-function NeuralIcon() {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M8 7l8 4M8 17l8-4" />
-      <circle cx="6" cy="6" r="2.1" />
-      <circle cx="6" cy="18" r="2.1" />
-      <circle cx="18" cy="12" r="2.1" />
     </svg>
   );
 }
