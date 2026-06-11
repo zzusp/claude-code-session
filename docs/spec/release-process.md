@@ -96,8 +96,9 @@ bypass-2FA token，一推 tag 全自动，本地不再碰 OTP。release-it 这�
 
    ```bash
    git checkout main && git pull --ff-only
-   npm version <x.y.z>          # bump package.json + commit + 打 tag v<x.y.z>
-   git push --follow-tags       # 推 commit + tag；tag 即触发 CI 发布
+   # -m 必带：commit-msg 钩子（commitlint）要求 conventional message，裸版本号会被拒。
+   npm version <x.y.z> -m "chore(release): v%s"   # bump package.json + commit + 打 tag v<x.y.z>
+   git push --follow-tags                         # 推 commit + tag；tag 即触发 CI 发布
    ```
 
    `<x.y.z>` 按「二、版本号怎么算」定；也可用 `npm version patch|minor|major` 让它自增。

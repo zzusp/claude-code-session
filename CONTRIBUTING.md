@@ -41,9 +41,9 @@
 自动 publish（`.github/workflows/release.yml`）。
 
 ```bash
-git checkout main && git pull --ff-only   # 确保在最新 main
-npm version <x.y.z>                        # bump package.json + commit + 打 tag v<x.y.z>
-git push --follow-tags                     # 推 commit + tag；tag 即触发 CI 发布
+git checkout main && git pull --ff-only          # 确保在最新 main
+npm version <x.y.z> -m "chore(release): v%s"     # bump + commit + tag；-m 必带（commitlint 拒裸版本号）
+git push --follow-tags                           # 推 commit + tag；tag 即触发 CI 发布
 ```
 
 `<x.y.z>` 按 SemVer 定，或用 `npm version patch|minor|major` 自增。CI 会：校验 tag ==
