@@ -43,8 +43,8 @@ interface Props {
   files: ModifiedFileSummary[];
   cwd: string | null;
   editLookup: EditLookup;
-  /** Session conversation, rendered in the drawer's left column so edits can be
-   *  read alongside the dialogue that drove them. Already meta-filtered upstream. */
+  /** Session conversation, rendered in the left column so edits can be read
+   *  alongside the dialogue that drove them. Already meta-filtered upstream. */
   messages: Message[];
   /** Active search query, forwarded to MessageBubble for in-message highlight. */
   query: string;
@@ -53,12 +53,13 @@ interface Props {
   isWorking: boolean;
   loading: boolean;
   error: Error | null;
+  /** 返回会话页（Esc 与右上角 ✕ 都走它）。 */
   onClose: () => void;
   /** Open the real file on disk in the OS default app. */
   onOpenFile: (filePath: string) => void;
 }
 
-export default function ModifiedFilesDrawer({
+export default function ModifiedFilesView({
   files,
   cwd,
   editLookup,
@@ -128,12 +129,12 @@ export default function ModifiedFilesDrawer({
   const prevMsgCount = useRef(messages.length);
   const prevIsWorking = useRef(isWorking);
 
-  // 打开抽屉时把对话栏滚到底——最新一条消息就是落点。messages 已就绪，commit 后
+  // 打开页面时把对话栏滚到底——最新一条消息就是落点。messages 已就绪，commit 后
   // scrollHeight 即为准确值，用 layout effect 在绘制前定位，避免可见的跳动。
   useLayoutEffect(() => {
     const el = convScrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-    // 只在首次挂载（抽屉打开）时落到底部。
+    // 只在首次挂载（页面打开）时落到底部。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -148,10 +149,17 @@ export default function ModifiedFilesDrawer({
   }, [visibleCount]);
 
   // 滚动时记录是否停在底部，供下面的实时跟随判断「该不该追新」。
+  // 用 rAF 把 layout 读延到下一帧：直接在 scroll handler 里读 scrollHeight 会强制 flush layout，
+  // 一旦 layout 脏（拉新消息 / lazy markdown 解析）就吃几 ms 同步重排，连续滚动下足够丢帧。
+  const stickRafRef = useRef<number | null>(null);
   function onConvScroll() {
-    const el = convScrollRef.current;
-    if (!el) return;
-    stickToBottom.current = el.scrollHeight - (el.scrollTop + el.clientHeight) < CONV_BOTTOM_STICK_PX;
+    if (stickRafRef.current != null) return;
+    stickRafRef.current = requestAnimationFrame(() => {
+      stickRafRef.current = null;
+      const el = convScrollRef.current;
+      if (!el) return;
+      stickToBottom.current = el.scrollHeight - (el.scrollTop + el.clientHeight) < CONV_BOTTOM_STICK_PX;
+    });
   }
 
   // 实时轮询追加了新消息、或 Claude 刚开始处理（WorkingIndicator 出现）时，若用户停在
@@ -186,6 +194,7 @@ export default function ModifiedFilesDrawer({
     return () => {
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
+      if (stickRafRef.current != null) cancelAnimationFrame(stickRafRef.current);
     };
   }, [onClose]);
 
@@ -195,28 +204,9 @@ export default function ModifiedFilesDrawer({
       ? t('session.modified.count', { n: count })
       : t('session.modified.countPlural', { n: count });
 
-  return (
+  const content = (
     <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.18 }}
-        onClick={onClose}
-        className="fixed inset-0 z-[55] bg-[oklch(0.16_0.006_85_/_0.5)] backdrop-blur-[2px]"
-        aria-hidden
-      />
-      <motion.aside
-        initial={{ x: '100%' }}
-        animate={{ x: 0 }}
-        exit={{ x: '100%' }}
-        transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-        role="dialog"
-        aria-modal="true"
-        aria-label={t('session.modified.title')}
-        className="fixed inset-0 z-[60] flex w-full flex-col bg-[var(--color-surface)] shadow-[var(--shadow-pop)]"
-      >
-        <header className="flex items-center justify-between gap-3 border-b border-[var(--color-hairline)] px-5 py-1.5">
+      <header className="flex items-center justify-between gap-3 border-b border-[var(--color-hairline)] px-5 py-1.5">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="text-[var(--color-accent)]">
               <TreeGlyph />
@@ -281,7 +271,7 @@ export default function ModifiedFilesDrawer({
               <div
                 ref={convScrollRef}
                 onScroll={onConvScroll}
-                className="min-h-0 flex-1 overflow-auto px-4 py-2"
+                className="min-h-0 flex-1 overflow-auto px-4 py-2 [contain:paint]"
               >
                 {messages.length === 0 && !isWorking ? (
                   <p className="px-1 py-3 text-sm italic text-[var(--color-fg-muted)]">
@@ -319,7 +309,7 @@ export default function ModifiedFilesDrawer({
             />
 
             {/* ② 文件内容栏：中间，吃掉剩余空间。 */}
-            <div className="min-w-0 flex-1 overflow-auto">
+            <div className="min-w-0 flex-1 overflow-auto [contain:paint]">
               {selectedFile ? (
                 <FileDetail
                   key={selectedFile.filePath}
@@ -371,7 +361,7 @@ export default function ModifiedFilesDrawer({
                   </button>
                 )}
               </div>
-              <div className="min-h-0 flex-1 overflow-auto py-1.5">
+              <div className="min-h-0 flex-1 overflow-auto py-1.5 [contain:paint]">
                 <ul role="tree" className="w-max min-w-full select-none">
                   {tree.map((node) => (
                     <TreeRow
@@ -390,8 +380,14 @@ export default function ModifiedFilesDrawer({
             </motion.div>
           </div>
         )}
-      </motion.aside>
     </>
+  );
+
+  // 独立整页：占满整个标签页，自身就是顶层视图（无 backdrop / 无模态外壳）。
+  return (
+    <div className="fixed inset-0 z-[40] flex h-[100dvh] w-full flex-col bg-[var(--color-surface)]">
+      {content}
+    </div>
   );
 }
 
@@ -425,7 +421,7 @@ function Splitter({
         dragging.current = false;
         e.currentTarget.releasePointerCapture(e.pointerId);
       }}
-      className="relative w-px shrink-0 cursor-col-resize touch-none bg-[var(--color-hairline)] transition-colors hover:bg-[var(--color-accent)]"
+      className="relative w-px shrink-0 cursor-col-resize touch-none bg-[var(--color-hairline)] hover:bg-[var(--color-accent)]"
     >
       {/* 加宽命中区，但不挤占布局。 */}
       <span className="absolute inset-y-0 -left-1.5 -right-1.5" aria-hidden />
@@ -684,7 +680,7 @@ function FileDetail({
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-0 z-10 border-b border-[var(--color-hairline)] bg-[var(--color-surface)]/95 px-5 py-3 backdrop-blur">
+      <div className="sticky top-0 z-10 border-b border-[var(--color-hairline)] bg-[var(--color-surface)] px-5 py-3">
         <div className="flex items-center gap-2">
           <FileIcon errored={file.errorCount > 0} tone={changeType} />
           <h3
