@@ -86,7 +86,8 @@ npm 账号开启 **2FA** 后，本地非交互 `npm publish` 会被 `403`（需 
 - **认证（一次性配置）**：
   1. npmjs.com → **Access Tokens** → 建 **Granular Access Token**（Packages: Read and write，
      scope 含 `@zzusp/ccsm`）或 classic **Automation** token——这两类 **bypass 2FA**，专供 CI。
-  2. 存为仓库 Secret：`gh secret set NPM_TOKEN`（粘贴 token）。`GITHUB_TOKEN` 由 Actions 自带，无需配。
+  2. 存为 **Environment Secret**：仓库 Settings → Environments → `NPM_PUBLISH` → secret `NPM_PUBLISH_TOKEN`。
+     workflow 的 `release` job 声明了 `environment: NPM_PUBLISH` 才能取到它。`GITHUB_TOKEN` 由 Actions 自带，无需配。
 - workflow 用 `--npm.skipChecks` 跳过 release-it 的 `npm whoami` 前置（granular token 不一定支持
   whoami，否则会被误判为未登录而跳过 publish）；`npm publish` 本身仍用 token 正常认证。
 
@@ -103,7 +104,7 @@ npm 账号开启 **2FA** 后，本地非交互 `npm publish` 会被 `403`（需 
 5. 发版后 npm 与 GitHub Release 自动就绪。
 
 **发布前置**：
-- **CI 发布**：仓库 Secret `NPM_TOKEN`（bypass-2FA 的 Granular / Automation token）。一次性配置。
+- **CI 发布**：Environment `NPM_PUBLISH` 下的 secret `NPM_PUBLISH_TOKEN`（bypass-2FA 的 Granular / Automation token）。一次性配置。
 - **本地发布**：`npm login`（`@zzusp` 发布权限）+ 交互式输入 2FA OTP；`gh auth login` 或环境变量
   `GITHUB_TOKEN`（建 GitHub Release 用）。
 
