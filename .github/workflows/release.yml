@@ -1,0 +1,63 @@
+name: Release
+
+# 手动触发发布：Actions 页 → 选本 workflow → "Run workflow" → 填版本号（或留空自动算）。
+# 发布沿用本地同一套 release-it（.release-it.json）：typecheck + build 闸门 → 生成 CHANGELOG
+# → commit "chore: release vX" + 打 tag → npm publish → 建 GitHub Release。
+#
+# 为什么搬到 CI：npm 账号开了 2FA，本地非交互 publish 会被 403 拦下。CI 上用 npm
+# Automation token（bypass 2FA）即可全自动发布，本地 `npm run release` 仍可作为备选。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号：具体如 1.0.2，或 patch / minor / major，留空 = 按 conventional commits 自动算'
+        required: false
+        default: ''
+
+# release-it 要 push 本版 commit + tag 回 main，并建 GitHub Release。
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # npm 发布 token 存在该 environment 的 secret（NPM_PUBLISH_TOKEN）里，需声明才能取到。
+    environment: NPM_PUBLISH
+    steps:
+      - name: Checkout main (full history — conventional-changelog 需要全部 tag)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          # 写入 .npmrc，让 `npm publish` 读 NODE_AUTH_TOKEN 认证。
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Unit tests (server safety-net；release-it before:init 只跑 typecheck+build)
+        run: npm test
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Release
+        # --npm.skipChecks 跳过 release-it 的 npm whoami 前置检查（granular token 不一定支持
+        # whoami，会让 release-it 误跳过 publish）；npm publish 本身仍用 token 正常认证。
+        run: |
+          if [ -n "$VERSION" ]; then
+            npx release-it "$VERSION" --ci --npm.skipChecks
+          else
+            npx release-it --ci --npm.skipChecks
+          fi
+        env:
+          VERSION: ${{ inputs.version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

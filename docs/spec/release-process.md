@@ -74,19 +74,43 @@ npm 发布的**单一事实源**；[`CONTRIBUTING.md`](../../CONTRIBUTING.md) �
 `requireBranch: "main"` 确保只能在 main 发版；`requireCleanWorkingDir` 确保工作区干净。
 `npm run release:dry` 为预演，不产生任何副作用。
 
+### CI 发布（GitHub Actions，推荐）
+
+npm 账号开启 **2FA** 后，本地非交互 `npm publish` 会被 `403`（需 OTP 或 bypass-2FA token）拦下。
+为此把同一套 release-it 搬到 CI：`.github/workflows/release.yml`，`workflow_dispatch` 手动触发。
+
+- **怎么发**：仓库 **Actions** 页 → **Release** workflow → **Run workflow** → `version` 填具体版本
+  （如 `1.0.2`）或 `patch`/`minor`/`major`，**留空** = 按 commits 自动算 → Run。
+- **它干了什么**：与本地完全一致——`npm ci` → `npm test` → release-it（typecheck + build 闸门 →
+  生成 CHANGELOG → commit `chore: release v${version}` + tag → `npm publish` → 建 GitHub Release）。
+- **认证（一次性配置）**：
+  1. npmjs.com → **Access Tokens** → 建 **Granular Access Token**（Packages: Read and write，
+     scope 含 `@zzusp/ccsm`）或 classic **Automation** token——这两类 **bypass 2FA**，专供 CI。
+  2. 存为 **Environment Secret**：仓库 Settings → Environments → `NPM_PUBLISH` → secret `NPM_PUBLISH_TOKEN`。
+     workflow 的 `release` job 声明了 `environment: NPM_PUBLISH` 才能取到它。`GITHUB_TOKEN` 由 Actions 自带，无需配。
+- workflow 用 `--npm.skipChecks` 跳过 release-it 的 `npm whoami` 前置（granular token 不一定支持
+  whoami，否则会被误判为未登录而跳过 publish）；`npm publish` 本身仍用 token 正常认证。
+
+本地 `npm run release` 仍可用作备选，但需在交互式终端输入 npm OTP（不能带 `--ci`）。
+
 ## 六、端到端 SOP（每次迭代）
 
 1. `git fetch && git checkout -b feature/<name> origin/main`。
 2. 按 Conventional Commits 提交（`commit-msg` 钩子把关）。
 3. PR → 合并 main（merge / squash 标题也遵守规范）。
-4. 在 main：`npm run release:dry` 预演确认版本号与 CHANGELOG → `npm run release` 正式发。
+4. 发版（二选一）：
+   - **CI（推荐）**：Actions 页 → Release workflow → Run workflow → 填版本号。见「五 · CI 发布」。
+   - **本地**：`npm run release:dry` 预演 → `npm run release`，在终端按提示输入 npm OTP（2FA）。
 5. 发版后 npm 与 GitHub Release 自动就绪。
 
-**发布前置**：`npm login`（`@zzusp` 发布权限）、`gh auth login` 或环境变量 `GITHUB_TOKEN`。
+**发布前置**：
+- **CI 发布**：Environment `NPM_PUBLISH` 下的 secret `NPM_PUBLISH_TOKEN`（bypass-2FA 的 Granular / Automation token）。一次性配置。
+- **本地发布**：`npm login`（`@zzusp` 发布权限）+ 交互式输入 2FA OTP；`gh auth login` 或环境变量
+  `GITHUB_TOKEN`（建 GitHub Release 用）。
 
 ## 七、纪律
 
 - **所有新分支基于最新 `origin/main`**。本地旧分支可能落后于已发布身份（package.json 仍是
   旧包名 / `private:true`），在其上发版会失败或发错——确认无用应及时清理。
-- 发布只在 `main` 上、用 `npm run release` 进行，不手动 `npm version` / `npm publish`，
-  以保证版本号、tag、CHANGELOG、发布产物始终一致。
+- 发布只在 `main` 上、走 release-it（CI 的 Release workflow 或本地 `npm run release`），不手动
+  `npm version` / `npm publish`，以保证版本号、tag、CHANGELOG、发布产物始终一致。
