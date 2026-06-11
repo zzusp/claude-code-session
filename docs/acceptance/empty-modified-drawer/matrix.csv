@@ -1,0 +1,10 @@
+case,description,round-1
+C1,零修改文件时抽屉仍可打开,PASS
+C2,对话栏表头在,PASS
+C3,文件树栏表头在,PASS
+C4,两条可拖拽分割线在（三栏框架完整）,PASS
+C5,对话栏渲染用户消息,PASS
+C6,对话栏渲染助手回复,PASS
+C7,中间内容栏显示空态文案,PASS
+C8,列顺序：对话在文件树左侧,PASS
+C9,Esc 可关闭抽屉,PASS
