@@ -3,9 +3,11 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   useDeferredValue,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -92,6 +94,14 @@ export default function SessionDetailRoute() {
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showModifiedDrawer, setShowModifiedDrawer] = useState(false);
+  // Sticky masthead follower: while reading down the timeline, a compact
+  // breadcrumb + card overlay pins above the (already sticky) search bar. The
+  // overlay is absolutely positioned so revealing it never reflows the page;
+  // `pinTop` reserves room above the search for it, `stuck` toggles its fade-in.
+  const railRef = useRef<HTMLDivElement>(null);
+  const followerRef = useRef<HTMLDivElement>(null);
+  const [pinTop, setPinTop] = useState(0);
+  const [stuck, setStuck] = useState(false);
   const urlAppliedRef = useRef<string | null>(null);
   const flashedKeyRef = useRef<string | null>(null);
   // Live-tail follow state: whether the reader is parked at the bottom, and the
@@ -282,6 +292,42 @@ export default function SessionDetailRoute() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Measure the compact follower so the search bar can pin low enough to leave
+  // room for it above (the +8 mirrors the `mb-2` gap between them). ResizeObserver
+  // keeps it correct across locale/title changes and when the card mounts.
+  useLayoutEffect(() => {
+    const el = followerRef.current;
+    if (!el) return;
+    const measure = () => setPinTop(el.offsetHeight + 8);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // The rail is "stuck" once it has scrolled up to its pin line — that's when the
+  // compact follower fades in above the search. Compared against the lg pin
+  // offset; on smaller screens the follower is hidden so the exact value is moot.
+  useEffect(() => {
+    let frame = 0;
+    const check = () => {
+      frame = 0;
+      const el = railRef.current;
+      if (el) setStuck(el.getBoundingClientRect().top <= pinTop + 1);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(check);
+    };
+    check();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [pinTop]);
+
   // When a live poll appends new messages and the reader is at the bottom — and not
   // mid-search or deep-linked to a specific message — follow the tail downward.
   useEffect(() => {
@@ -346,24 +392,25 @@ export default function SessionDetailRoute() {
     ? t('session.tagline.branch', { branch: data.meta.gitBranch })
     : '';
 
+  const crumbs = [
+    { label: t('session.crumbProjects'), to: '/' },
+    {
+      label: projectTail,
+      to: `/projects/${encodeURIComponent(pid)}`,
+      mono: true,
+      icon: <BreadcrumbFolderIcon />,
+    },
+    {
+      label: sessionTitle ?? sid.slice(0, 8),
+      mono: !sessionTitle,
+      icon: <BreadcrumbFolderIcon />,
+    },
+  ];
+  const compactTitle = sessionTitle ?? sid.slice(0, 12) + '…';
+
   return (
     <section>
-      <Breadcrumbs
-        items={[
-          { label: t('session.crumbProjects'), to: '/' },
-          {
-            label: projectTail,
-            to: `/projects/${encodeURIComponent(pid)}`,
-            mono: true,
-            icon: <BreadcrumbFolderIcon />,
-          },
-          {
-            label: sessionTitle ?? sid.slice(0, 8),
-            mono: !sessionTitle,
-            icon: <BreadcrumbFolderIcon />,
-          },
-        ]}
-      />
+      <Breadcrumbs items={crumbs} />
 
       {data && (
         <div className="surface-card mt-4 p-6">
@@ -437,17 +484,51 @@ export default function SessionDetailRoute() {
         )}
       </AnimatePresence>
 
-      <FilterLedger
-        query={query}
-        onQuery={setQuery}
-        showMeta={showMeta}
-        onShowMeta={setShowMeta}
-        onlyUser={onlyUser}
-        onOnlyUser={setOnlyUser}
-        shown={renderList.length}
-        total={visibleMessages.length}
-        hasData={!!data}
-      />
+      <div
+        ref={railRef}
+        className="sticky top-2 z-30 mt-6 lg:top-[var(--ccsm-pin-top)]"
+        style={{ '--ccsm-pin-top': `${pinTop}px` } as CSSProperties}
+      >
+        {/* Compact follower (lg+): the breadcrumb + a one-line card pinned above
+            the search. Absolutely positioned so toggling it never reflows the
+            timeline; it just fades in once the rail sticks. */}
+        <div
+          ref={followerRef}
+          aria-hidden={!stuck}
+          className={
+            'absolute inset-x-0 bottom-full mb-2 hidden flex-col gap-2 transition-opacity duration-200 lg:flex ' +
+            (stuck ? 'opacity-100' : 'pointer-events-none opacity-0')
+          }
+        >
+          <Breadcrumbs items={crumbs} />
+          {data && (
+            <CompactMasthead
+              title={compactTitle}
+              isLive={isLive}
+              isWorking={isWorking}
+              onOpenModified={() => setShowModifiedDrawer(true)}
+              modifiedCount={modifiedFiles.length}
+              modifiedLoading={modifiedFilesQuery.isLoading}
+              onDelete={currentSummary ? () => setShowDeleteDialog(true) : undefined}
+              deleteDisabled={!currentSummary}
+              deleteTooltip={deleteTooltip}
+              deleteLabel={t('session.action.delete')}
+            />
+          )}
+        </div>
+
+        <FilterLedger
+          query={query}
+          onQuery={setQuery}
+          showMeta={showMeta}
+          onShowMeta={setShowMeta}
+          onlyUser={onlyUser}
+          onOnlyUser={setOnlyUser}
+          shown={renderList.length}
+          total={visibleMessages.length}
+          hasData={!!data}
+        />
+      </div>
 
       <div className="mt-6">
         {data?.truncated && (
@@ -675,6 +756,92 @@ function SessionMasthead({
   );
 }
 
+// Condensed masthead shown in the sticky follower while scrolling: a single row
+// matching the breadcrumb / search-bar height, keeping the live status, title,
+// and the "Modified files" + delete actions; everything else collapses away.
+function CompactMasthead({
+  title,
+  isLive,
+  isWorking,
+  onOpenModified,
+  modifiedCount,
+  modifiedLoading,
+  onDelete,
+  deleteDisabled,
+  deleteTooltip,
+  deleteLabel,
+}: {
+  title: string;
+  isLive: boolean;
+  isWorking: boolean;
+  onOpenModified: () => void;
+  modifiedCount: number;
+  modifiedLoading: boolean;
+  onDelete?: () => void;
+  deleteDisabled?: boolean;
+  deleteTooltip?: string;
+  deleteLabel?: string;
+}) {
+  const t = useT();
+  return (
+    <div className="flex items-center gap-3 rounded-[var(--radius-input)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 sm:px-5 py-2 shadow-[var(--shadow-rise)]">
+      <StatusBeacon isLive={isLive} isWorking={isWorking} />
+      <span className="min-w-0 flex-1 truncate font-display text-[15px] font-light tracking-[-0.01em] text-[var(--color-fg-primary)]">
+        {title}
+      </span>
+      <button
+        type="button"
+        onClick={onOpenModified}
+        disabled={modifiedLoading}
+        aria-label={t('session.modified.openAria')}
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-[var(--color-accent)]"
+      >
+        <FilesIcon /> {t('session.modified.title')}
+        {modifiedCount > 0 && (
+          <span className="rounded-full bg-[var(--color-accent-soft)] px-1.5 font-mono text-[10px] tabular-nums text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
+            {modifiedCount}
+          </span>
+        )}
+      </button>
+      {(onDelete || deleteDisabled) && (
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={deleteDisabled || !onDelete}
+          title={deleteTooltip}
+          aria-label={deleteLabel}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-danger)] transition hover:border-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <TrashIcon /> {deleteLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Compact live/working/idle indicator for the condensed masthead — mirrors the
+// full masthead's beacon (animated dots while working, pulsing dot while live).
+function StatusBeacon({ isLive, isWorking }: { isLive: boolean; isWorking: boolean }) {
+  if (isWorking) {
+    return (
+      <span aria-hidden className="loading-dots shrink-0 text-[var(--color-accent)]">
+        <span />
+        <span />
+        <span />
+      </span>
+    );
+  }
+  if (isLive) {
+    return (
+      <span aria-hidden className="relative inline-flex h-2 w-2 shrink-0">
+        <span className="absolute inset-0 rounded-full bg-[var(--color-accent)] pulse-amber" />
+        <span className="absolute inset-0 rounded-full bg-[var(--color-accent)]" />
+      </span>
+    );
+  }
+  return <span aria-hidden className="shrink-0 text-[10px] text-[var(--color-accent)]">●</span>;
+}
+
 const MASTHEAD_TITLE_CLASS =
   'font-display text-[clamp(1.5rem,3vw,2rem)] font-light leading-[1.15] tracking-[-0.018em] text-[var(--color-fg-primary)]';
 
@@ -839,7 +1006,7 @@ function FilterLedger({
 }) {
   const t = useT();
   return (
-    <div className="sticky top-2 z-30 mt-6 rounded-[var(--radius-input)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 sm:px-5 py-2.5 shadow-[var(--shadow-rise)]">
+    <div className="rounded-[var(--radius-input)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 sm:px-5 py-2.5 shadow-[var(--shadow-rise)]">
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex flex-1 min-w-[14rem] items-center gap-2 border-b border-[var(--color-hairline)] py-1 transition focus-within:border-[var(--color-accent)]">
           <SearchIcon className="text-[var(--color-fg-muted)]" />
