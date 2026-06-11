@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.2](https://github.com/zzusp/claude-code-session/compare/v1.0.1...v1.0.2) (2026-06-11)
+
+### Features
+
+* **message:** 会话消息 markdown 渲染 + tool 块摘要化，时间线与弹窗统一 ([6d5eb6b](https://github.com/zzusp/claude-code-session/commit/6d5eb6b54655d545ea98cb51d7e2a9adeee19edc))
+* **session:** 会话列表错误数列 + 详情页错误筛选 ([31a3d85](https://github.com/zzusp/claude-code-session/commit/31a3d85fdcab25b4cbad97faa342733853e9a131))
+* **session:** 会话详情新增思维/执行链神经放电可视化浮层 ([378d2df](https://github.com/zzusp/claude-code-session/commit/378d2df180567d9be1f117d2b6fac576d7dee5ae))
+* **session:** 会话详情滚动时面包屑+卡片+搜索栏整体粘顶 ([7b66d60](https://github.com/zzusp/claude-code-session/commit/7b66d6042c2aee716e9081726840f55e566d9ae7))
+* **version:** 新版本红点提示 + 弹窗信息展示优化 ([7f66e9d](https://github.com/zzusp/claude-code-session/commit/7f66e9d93487720e8ecfd3e284eef052424d191f))
+
+### Bug Fixes
+
+* **modified-files:** 空修改文件时保留三栏框架与对话栏 ([72404bc](https://github.com/zzusp/claude-code-session/commit/72404bc9bd4a033000d34546ec617e50336f1a95))
+
+### Performance Improvements
+
+* **modified-files:** 去掉 diff 行号 per-row sticky 消除滚动卡顿 ([afc9f40](https://github.com/zzusp/claude-code-session/commit/afc9f40e5686c1c9e177fbb4ec39f69bf7f0b62d))
+
+### Reverts
+
+* **session:** 移除思维/执行链神经放电可视化浮层 ([e91359e](https://github.com/zzusp/claude-code-session/commit/e91359e5d13abd280d329573dec97f14ece61d95)), closes [#59](https://github.com/zzusp/claude-code-session/issues/59)
+
 ## [1.0.1](https://github.com/zzusp/claude-code-session/compare/v1.0.0...v1.0.1) (2026-06-09)
 
 ### Features
