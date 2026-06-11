@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AnimatePresence, motion } from 'motion/react';
+import { motion } from 'motion/react';
 import {
   useDeferredValue,
   useEffect,
@@ -15,13 +15,12 @@ import Breadcrumbs, { BreadcrumbFolderIcon } from '../components/Breadcrumbs.tsx
 import DeleteDialog from '../components/DeleteDialog.tsx';
 import { Loading } from '../components/Loading.tsx';
 import MessageBubble, { WorkingIndicator } from '../components/MessageBubble.tsx';
-import ModifiedFilesDrawer, { type EditLookup } from '../components/ModifiedFilesDrawer.tsx';
+import { type EditLookup } from '../components/ModifiedFilesView.tsx';
 import {
   api,
   type Block,
   type Message,
   type ModifiedFilesResponse,
-  type OpenFileResult,
   type ProjectSummary,
   type SessionDetail,
   type SessionSummary,
@@ -94,7 +93,6 @@ export default function SessionDetailRoute() {
   const deferredQuery = useDeferredValue(query);
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showModifiedDrawer, setShowModifiedDrawer] = useState(false);
   // Sticky masthead follower: while reading down the timeline, a compact
   // breadcrumb + card overlay pins above the (already sticky) search bar. The
   // overlay is absolutely positioned so revealing it never reflows the page;
@@ -174,17 +172,14 @@ export default function SessionDetailRoute() {
   });
   const modifiedFiles = modifiedFilesQuery.data?.files ?? [];
 
-  // 在系统默认程序里打开会话改过的某个文件（后端校验该路径属于本会话）。
-  const openFileMutation = useMutation({
-    mutationFn: (filePath: string) =>
-      api<OpenFileResult>(
-        `/api/sessions/${encodeURIComponent(pid)}/${encodeURIComponent(sid)}/open-file`,
-        { method: 'POST', body: JSON.stringify({ filePath }) },
-      ),
-    onError: (err: Error) => {
-      window.alert(t('session.modified.openFailed', { msg: err.message }));
-    },
-  });
+  // 「修改的文件」改为在新标签里打开独立整页（见 ModifiedFilesPage）——脱离本会话页
+  // 的实时轮询 / 大时间线 DOM / 滚动监听，验证抽屉滚动卡顿是否来自这层并存渲染。
+  const openModifiedInNewTab = () =>
+    window.open(
+      `/projects/${encodeURIComponent(pid)}/sessions/${encodeURIComponent(sid)}/modified`,
+      '_blank',
+      'noopener',
+    );
 
   const indexed: IndexedMessage[] = useMemo(() => {
     if (!data) return [];
@@ -214,13 +209,6 @@ export default function SessionDetailRoute() {
     for (const [id, v] of editLookup) m.set(id, v.name);
     return m;
   }, [editLookup]);
-
-  // 抽屉左栏的对话：默认隐去 meta/system 噪声行，留下真正的对话与工具调用。
-  // 跳转目标都是 assistant 的 tool_use 消息，不在 meta 之列，过滤后仍可定位。
-  const conversationMessages = useMemo(
-    () => data?.messages.filter((m) => !m.isMeta) ?? [],
-    [data],
-  );
 
   const visibleMessages = useMemo(() => {
     let list = indexed;
@@ -448,7 +436,7 @@ export default function SessionDetailRoute() {
             deleteDisabled={!currentSummary}
             deleteTooltip={deleteTooltip}
             deleteLabel={t('session.action.delete')}
-            onOpenModified={() => setShowModifiedDrawer(true)}
+            onOpenModified={openModifiedInNewTab}
             modifiedCount={modifiedFiles.length}
             modifiedLoading={modifiedFilesQuery.isLoading}
           />
@@ -468,24 +456,6 @@ export default function SessionDetailRoute() {
           }}
         />
       )}
-
-      <AnimatePresence>
-        {showModifiedDrawer && (
-          <ModifiedFilesDrawer
-            key="modified-files-drawer"
-            files={modifiedFiles}
-            cwd={modifiedFilesQuery.data?.cwd ?? data?.meta.cwd ?? null}
-            editLookup={editLookup}
-            messages={conversationMessages}
-            query={deferredQuery}
-            isWorking={isWorking}
-            loading={modifiedFilesQuery.isLoading}
-            error={modifiedFilesQuery.error as Error | null}
-            onOpenFile={(filePath) => openFileMutation.mutate(filePath)}
-            onClose={() => setShowModifiedDrawer(false)}
-          />
-        )}
-      </AnimatePresence>
 
       <div
         ref={railRef}
@@ -509,7 +479,7 @@ export default function SessionDetailRoute() {
               title={compactTitle}
               isLive={isLive}
               isWorking={isWorking}
-              onOpenModified={() => setShowModifiedDrawer(true)}
+              onOpenModified={openModifiedInNewTab}
               modifiedCount={modifiedFiles.length}
               modifiedLoading={modifiedFilesQuery.isLoading}
               onDelete={currentSummary ? () => setShowDeleteDialog(true) : undefined}
