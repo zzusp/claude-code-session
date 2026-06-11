@@ -54,10 +54,20 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: 生成本版 release notes（中文 conventional 分组，取最新一段）
+      - name: 生成本版 release notes（中文 conventional；无实质条目则回退 GitHub 自动生成）
+        # 取 conventional-changelog 最新一段；仅当「首段标题确为当前版本」且「除标题外有实质条目」
+        # 时才用它，否则置 USE_CONV=false（如本版只有 ci/chore 等不入 changelog 的 commit，
+        # 避免拿到空 notes 或错位成上一版内容）。
         run: |
+          VER="$(node -p "require('./package.json').version")"
           npx --yes conventional-changelog-cli -p conventionalcommits -r 2 \
             | awk 'BEGIN{n=0} /^## /{n++} n>=2{exit} {print}' > RELEASE_NOTES.md
+          BODY="$(grep -v '^#' RELEASE_NOTES.md | grep -v '^[[:space:]]*$' || true)"
+          if head -n 3 RELEASE_NOTES.md | grep -q "\[${VER}\]" && [ -n "$BODY" ]; then
+            echo "USE_CONV=true" >> "$GITHUB_ENV"
+          else
+            echo "USE_CONV=false" >> "$GITHUB_ENV"
+          fi
           echo "----- RELEASE_NOTES.md -----"
           cat RELEASE_NOTES.md
 
@@ -68,6 +78,11 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
 
       - name: 建 GitHub Release
-        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md --verify-tag
+        run: |
+          if [ "$USE_CONV" = "true" ]; then
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md --verify-tag
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

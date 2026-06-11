@@ -71,7 +71,8 @@ bypass-2FA token，一推 tag 全自动，本地不再碰 OTP。release-it 这�
 - **CI（tag push 触发）**：
   1. 校验 tag 名 == `package.json` version（不一致直接 fail，防发错版本）。
   2. `npm ci` → `npm test` → `npm run typecheck`（闸门）。
-  3. 生成本版 release notes（`conventional-changelog -p conventionalcommits -r 2` 取最新一段）。
+  3. 生成本版 release notes（`conventional-changelog` 取最新一段；本版若只有 `ci`/`chore` 等
+     不入 changelog 的 commit，回退 GitHub 自动生成的 notes，避免空 / 错位）。
   4. `npm publish`（`prepublishOnly` 自动 build `dist/`；token 来自 secret `NPM_PUBLISH_TOKEN`）。
   5. `gh release create <tag>` 附 release notes。
 - CI **不写回 main**：不 commit、不改 `CHANGELOG.md`。
