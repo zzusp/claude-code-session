@@ -61,6 +61,7 @@ const DICT = {
     'common.collapse': 'collapse',
     'common.system': 'system',
     'common.onlyUser': 'only me',
+    'common.onlyError': 'errors',
     'common.missing': 'missing',
     'common.noSessions': 'No sessions in this project.',
     'common.noProjects': 'No projects found.',
@@ -119,6 +120,7 @@ const DICT = {
     'project.col.last': 'Last',
     'project.col.size': 'Size',
     'project.col.status': 'Status',
+    'project.col.errors': 'Errors',
 
     'session.crumbProjects': 'Projects',
     'session.action.delete': 'Delete',
@@ -461,6 +463,7 @@ const DICT = {
     'common.collapse': '收起',
     'common.system': '系统',
     'common.onlyUser': '仅我',
+    'common.onlyError': '错误',
     'common.missing': '已不存在',
     'common.noSessions': '该项目下暂无会话。',
     'common.noProjects': '未发现项目。',
@@ -519,6 +522,7 @@ const DICT = {
     'project.col.last': '最近',
     'project.col.size': '大小',
     'project.col.status': '状态',
+    'project.col.errors': '错误',
 
     'session.crumbProjects': '项目',
     'session.action.delete': '删除',

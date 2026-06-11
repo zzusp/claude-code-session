@@ -260,13 +260,9 @@ export default function ModifiedFilesDrawer({
           </p>
         )}
 
-        {!loading && !error && count === 0 && (
-          <p className="m-6 text-sm italic text-[var(--color-fg-muted)]">
-            {t('session.modified.empty')}
-          </p>
-        )}
-
-        {!loading && !error && count > 0 && (
+        {/* 无修改文件时仍保留三栏框架与左侧对话栏——右两栏走各自的空态，
+            而不是把整页塌成一句提示。 */}
+        {!loading && !error && (
           <div ref={splitRef} className="flex min-h-0 flex-1">
             {/* ① 对话栏：左侧，入场时从左缘滑入——读作「对话流进了弹窗」。 */}
             <motion.div
@@ -334,7 +330,9 @@ export default function ModifiedFilesDrawer({
               ) : (
                 <div className="flex h-full items-center justify-center px-6">
                   <p className="text-center text-sm italic text-[var(--color-fg-muted)]">
-                    {t('session.modified.selectFile')}
+                    {count === 0
+                      ? t('session.modified.empty')
+                      : t('session.modified.selectFile')}
                   </p>
                 </div>
               )}

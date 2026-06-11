@@ -89,6 +89,7 @@ export default function SessionDetailRoute() {
 
   const [showMeta, setShowMeta] = useState(false);
   const [onlyUser, setOnlyUser] = useState(false);
+  const [onlyError, setOnlyError] = useState(false);
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
@@ -225,14 +226,15 @@ export default function SessionDetailRoute() {
     let list = indexed;
     if (!showMeta) list = list.filter((m) => !m.message.isMeta);
     if (onlyUser) list = list.filter((m) => isUserTyped(m.message));
+    if (onlyError) list = list.filter((m) => hasError(m.message));
     if (deferredQuery) {
       const q = deferredQuery.toLowerCase();
       list = list.filter((m) => m.haystack.includes(q));
     }
     return list;
-  }, [indexed, showMeta, onlyUser, deferredQuery]);
+  }, [indexed, showMeta, onlyUser, onlyError, deferredQuery]);
 
-  const skipWindowing = !!deferredQuery || onlyUser;
+  const skipWindowing = !!deferredQuery || onlyUser || onlyError;
   const renderList = useMemo(() => {
     if (skipWindowing) return visibleMessages;
     return visibleMessages.slice(-windowSize);
@@ -293,12 +295,13 @@ export default function SessionDetailRoute() {
   }, []);
 
   // Measure the compact follower so the search bar can pin low enough to leave
-  // room for it above (the +8 mirrors the `mb-2` gap between them). ResizeObserver
-  // keeps it correct across locale/title changes and when the card mounts.
+  // room for it above (the follower sits flush atop the search; its own `pb-2`
+  // is the gap). ResizeObserver keeps it correct across locale/title changes and
+  // when the card mounts.
   useLayoutEffect(() => {
     const el = followerRef.current;
     if (!el) return;
-    const measure = () => setPinTop(el.offsetHeight + 8);
+    const measure = () => setPinTop(el.offsetHeight);
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -496,7 +499,7 @@ export default function SessionDetailRoute() {
           ref={followerRef}
           aria-hidden={!stuck}
           className={
-            'absolute inset-x-0 bottom-full mb-2 hidden flex-col gap-2 transition-opacity duration-200 lg:flex ' +
+            'topbar-glass absolute inset-x-0 bottom-full pb-2 hidden flex-col gap-2 transition-opacity duration-200 lg:flex ' +
             (stuck ? 'opacity-100' : 'pointer-events-none opacity-0')
           }
         >
@@ -524,6 +527,8 @@ export default function SessionDetailRoute() {
           onShowMeta={setShowMeta}
           onlyUser={onlyUser}
           onOnlyUser={setOnlyUser}
+          onlyError={onlyError}
+          onOnlyError={setOnlyError}
           shown={renderList.length}
           total={visibleMessages.length}
           hasData={!!data}
@@ -990,6 +995,8 @@ function FilterLedger({
   onShowMeta,
   onlyUser,
   onOnlyUser,
+  onlyError,
+  onOnlyError,
   shown,
   total,
   hasData,
@@ -1000,6 +1007,8 @@ function FilterLedger({
   onShowMeta: (v: boolean) => void;
   onlyUser: boolean;
   onOnlyUser: (v: boolean) => void;
+  onlyError: boolean;
+  onOnlyError: (v: boolean) => void;
   shown: number;
   total: number;
   hasData: boolean;
@@ -1031,6 +1040,11 @@ function FilterLedger({
             checked={onlyUser}
             onChange={onOnlyUser}
             label={t('common.onlyUser')}
+          />
+          <ToggleSwitch
+            checked={onlyError}
+            onChange={onOnlyError}
+            label={t('common.onlyError')}
           />
         </div>
 
@@ -1107,6 +1121,10 @@ function isUserTyped(m: Message): boolean {
   if (m.type !== 'user') return false;
   if (m.blocks.length === 0) return true;
   return m.blocks.some((b) => b.type !== 'tool_result');
+}
+
+function hasError(m: Message): boolean {
+  return m.blocks.some((b) => b.type === 'tool_result' && b.isError);
 }
 
 function indexMessage(message: Message): string {

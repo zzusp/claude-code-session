@@ -341,6 +341,7 @@ export default function ProjectDetail() {
                   {selectMode && <th className="w-9 px-2 py-3" />}
                   <th className="px-2 py-3 eyebrow">{t('project.col.title')}</th>
                   <th className="px-2 py-3 eyebrow text-right">{t('project.col.msgs')}</th>
+                  <th className="px-2 py-3 eyebrow text-right">{t('project.col.errors')}</th>
                   <th className="px-2 py-3 eyebrow text-right">{t('project.col.last')}</th>
                   <th className="px-2 py-3 eyebrow text-right">{t('project.col.size')}</th>
                   <th className="px-2 py-3 eyebrow">{t('project.col.status')}</th>
@@ -393,6 +394,13 @@ export default function ProjectDetail() {
                       </td>
                       <td className="px-2 py-3 text-right align-top font-mono tabular-nums text-[var(--color-fg-secondary)]">
                         {s.messageCount.toLocaleString()}
+                      </td>
+                      <td className="px-2 py-3 text-right align-top font-mono tabular-nums">
+                        {s.errorCount > 0 ? (
+                          <span className="text-[var(--color-danger)]">{s.errorCount.toLocaleString()}</span>
+                        ) : (
+                          <span className="text-[var(--color-fg-faint)]">0</span>
+                        )}
                       </td>
                       <td className="px-2 py-3 text-right align-top font-mono text-[12.5px] text-[var(--color-fg-secondary)]">
                         {formatRelativeTime(s.lastAt)}
