@@ -46,3 +46,24 @@ export function formatDateTime(iso: string | null): string {
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString();
 }
+
+/** Wall-clock span between two timestamps for the session footer: first → last
+ *  activity. Coarsens with magnitude (12s · 7m · 2h 15m · 3d 4h). */
+export function formatDuration(fromIso: string | null, toIso: string | null): string {
+  if (!fromIso || !toIso) return '—';
+  const from = new Date(fromIso).getTime();
+  const to = new Date(toIso).getTime();
+  if (Number.isNaN(from) || Number.isNaN(to) || to < from) return '—';
+  const sec = Math.round((to - from) / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) {
+    const remMin = min % 60;
+    return remMin ? `${hr}h ${remMin}m` : `${hr}h`;
+  }
+  const day = Math.floor(hr / 24);
+  const remHr = hr % 24;
+  return remHr ? `${day}d ${remHr}h` : `${day}d`;
+}

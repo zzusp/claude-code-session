@@ -10,7 +10,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import DeleteDialog from '../components/DeleteDialog.tsx';
 import FilePreviewPanel from '../components/FilePreviewPanel.tsx';
 import FileThumb from '../components/FileThumb.tsx';
 import { Loading } from '../components/Loading.tsx';
@@ -36,7 +37,7 @@ import {
   type FilePreviewContextValue,
   type FilePreviewTarget,
 } from '../lib/file-preview.ts';
-import { formatBytes, formatDateTime, formatTokens } from '../lib/format.ts';
+import { formatBytes, formatDateTime, formatDuration, formatTokens } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
 import { fadeUpItem, staggerParent } from '../lib/motion.ts';
 import { queryKeys } from '../lib/query-keys.ts';
@@ -49,7 +50,7 @@ interface IndexedMessage {
 // Mutually-exclusive message view modes for the footer's single-select filter.
 type MessageFilter = 'all' | 'system' | 'user' | 'error';
 
-const INITIAL_WINDOW = 50;
+const INITIAL_WINDOW = 300;
 const LOAD_STEP = 50;
 
 // Live tail: while a session is still being written, poll the detail endpoint so
@@ -115,6 +116,7 @@ function lastTurnIncomplete(messages: Message[]): boolean {
 
 export default function SessionDetailRoute() {
   const t = useT();
+  const navigate = useNavigate();
   const { projectId, sessionId } = useParams<{ projectId: string; sessionId: string }>();
   const [searchParams] = useSearchParams();
   const pid = projectId ?? '';
@@ -132,6 +134,8 @@ export default function SessionDetailRoute() {
   const [query, setQuery] = useState('');
   // Search is collapsed to a button in the title row; clicking reveals the input.
   const [searchOpen, setSearchOpen] = useState(false);
+  // Delete confirm dialog for the current session (opened from the title menu).
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const deferredQuery = useDeferredValue(query);
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
   const urlAppliedRef = useRef<string | null>(null);
@@ -453,16 +457,12 @@ export default function SessionDetailRoute() {
   });
 
   return (
-    <section
-      className={
-        'mx-auto flex min-h-[calc(100dvh-6rem)] flex-col ' +
-        // 预览打开时撑到内容区满宽，给左侧时间线 + 右侧文件面板腾出横向空间。
-        (paneOpen ? 'max-w-none' : 'max-w-4xl')
-      }
-    >
+    <section className="flex min-h-[calc(100dvh-6rem)] flex-col">
       {/* Title as a claude.ai-style breadcrumb on the canvas (project / session),
-          no card. The in-session search sits beneath; both stick to the top. The
-          session metadata + Modified-files entry move to the sticky footer below. */}
+          no card. The bar spans the full content width (like every other page's
+          breadcrumb) so it lines up with the canvas edges. The in-session search
+          sits beneath; both stick to the top. Session metadata + the Modified-files
+          entry live in the sticky footer below. */}
       <div
         ref={topbarRef}
         className="z-30 lg:sticky lg:top-0 topbar-glass border-b border-[var(--color-hairline)]"
@@ -484,6 +484,9 @@ export default function SessionDetailRoute() {
               ? t('session.action.renameTooltipLive', { pid: currentSummary.livePid ?? '?' })
               : undefined
           }
+          onDelete={() => setDeleteOpen(true)}
+          deleteDisabled={!currentSummary}
+          deleteTooltip={!currentSummary ? t('session.action.deleteTooltipBlocked') : undefined}
           searchOpen={searchOpen}
           onToggleSearch={() => setSearchOpen((v) => !v)}
         />
@@ -610,8 +613,8 @@ export default function SessionDetailRoute() {
           branch={data.meta.gitBranch}
           model={sessionModel}
           bytes={data.meta.bytes}
-          version={data.meta.version}
           startedAt={data.meta.firstAt}
+          lastAt={data.meta.lastAt}
           messageCount={data.meta.messageCount}
           modifiedCount={modifiedFiles.length}
           modifiedLoading={modifiedFilesQuery.isLoading}
@@ -624,6 +627,19 @@ export default function SessionDetailRoute() {
       )}
 
       {data && <ScrollToEdges />}
+
+      {deleteOpen && currentSummary && (
+        <DeleteDialog
+          projectId={pid}
+          selected={[currentSummary]}
+          onClose={() => setDeleteOpen(false)}
+          // 删除成功后此会话已不存在，直接退回项目页（避免本页继续轮询 404）。
+          onDeleted={() => {
+            setDeleteOpen(false);
+            navigate(`/projects/${encodeURIComponent(pid)}`);
+          }}
+        />
+      )}
     </section>
   );
 }
@@ -645,6 +661,9 @@ function SessionTitleBar({
   onTitleEdit,
   renameDisabled,
   renameTooltip,
+  onDelete,
+  deleteDisabled,
+  deleteTooltip,
   searchOpen,
   onToggleSearch,
 }: {
@@ -658,6 +677,9 @@ function SessionTitleBar({
   onTitleEdit: (next: string) => Promise<void>;
   renameDisabled?: boolean;
   renameTooltip?: string;
+  onDelete: () => void;
+  deleteDisabled?: boolean;
+  deleteTooltip?: string;
   searchOpen: boolean;
   onToggleSearch: () => void;
 }) {
@@ -686,6 +708,9 @@ function SessionTitleBar({
           isFallback={isFallback}
           disabled={renameDisabled}
           disabledTooltip={renameTooltip}
+          onDelete={onDelete}
+          deleteDisabled={deleteDisabled}
+          deleteTooltip={deleteTooltip}
         />
       </div>
       <button
@@ -708,15 +733,15 @@ function SessionTitleBar({
 }
 
 // Sticky bottom info bar — claude.ai's footer. Carries the session metadata
-// (folder / branch / model / size / version / started) plus the Modified-files
+// (folder / branch / model / size / started / duration) plus the Modified-files
 // entry, which moved here off the header. Stays reachable while scrolling.
 function SessionFooter({
   cwd,
   branch,
   model,
   bytes,
-  version,
   startedAt,
+  lastAt,
   messageCount,
   modifiedCount,
   modifiedLoading,
@@ -730,8 +755,8 @@ function SessionFooter({
   branch: string | null;
   model: string | null;
   bytes: number;
-  version: string | null;
   startedAt: string | null;
+  lastAt: string | null;
   messageCount: number;
   modifiedCount: number;
   modifiedLoading: boolean;
@@ -753,9 +778,11 @@ function SessionFooter({
           {model && <FooterFact icon={<ModelGlyph />} value={model} mono />}
           <FooterFact label={t('session.meta.size')} value={formatBytes(bytes)} />
           <FooterFact label={t('session.meta.messages')} value={messageCount.toLocaleString()} />
-          {version && <FooterFact label={t('session.meta.version')} value={version} />}
           {startedAt && (
             <FooterFact label={t('session.meta.started')} value={formatDateTime(startedAt)} />
+          )}
+          {startedAt && lastAt && (
+            <FooterFact label={t('session.meta.duration')} value={formatDuration(startedAt, lastAt)} />
           )}
           {contextTokens !== null && (
             <ContextRing tokens={contextTokens} window={contextWindow} />
@@ -856,6 +883,9 @@ function TitleSlot({
   isFallback,
   disabled,
   disabledTooltip,
+  onDelete,
+  deleteDisabled,
+  deleteTooltip,
 }: {
   title: ReactNode;
   editableValue: string;
@@ -863,6 +893,9 @@ function TitleSlot({
   isFallback: boolean;
   disabled?: boolean;
   disabledTooltip?: string;
+  onDelete: () => void;
+  deleteDisabled?: boolean;
+  deleteTooltip?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(editableValue);
@@ -940,21 +973,143 @@ function TitleSlot({
   }
 
   return (
-    <div className="group flex min-w-0 items-baseline gap-2">
+    <div className="flex min-w-0 items-center gap-1">
       <h1 className={HEADER_TITLE_CLASS + ' truncate' + (isFallback ? ' font-mono' : '')}>
         {title}
       </h1>
+      <TitleMenu
+        onRename={startEdit}
+        renameDisabled={disabled}
+        renameTooltip={disabledTooltip}
+        onDelete={onDelete}
+        deleteDisabled={deleteDisabled}
+        deleteTooltip={deleteTooltip}
+      />
+    </div>
+  );
+}
+
+// claude.ai-style caret menu next to the session title. Replaces the old inline
+// pencil: a down-caret opens a small dropdown with Rename (inline edit) + Delete
+// (confirm dialog). Closes on outside-click / Escape. No portal needed — the
+// sticky header has no transform and nothing clips it (topbar-glass is blur-only).
+function TitleMenu({
+  onRename,
+  renameDisabled,
+  renameTooltip,
+  onDelete,
+  deleteDisabled,
+  deleteTooltip,
+}: {
+  onRename: () => void;
+  renameDisabled?: boolean;
+  renameTooltip?: string;
+  onDelete: () => void;
+  deleteDisabled?: boolean;
+  deleteTooltip?: string;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative shrink-0">
       <button
         type="button"
-        onClick={startEdit}
-        aria-label={disabled ? disabledTooltip ?? 'Rename unavailable' : 'Rename'}
-        title={disabled ? disabledTooltip ?? 'Rename unavailable' : 'Rename'}
-        disabled={disabled}
-        className="flex-shrink-0 rounded-md p-1 text-[var(--color-fg-muted)] opacity-0 transition hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)] focus:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[var(--color-fg-muted)] disabled:opacity-40 disabled:group-hover:opacity-40"
+        onClick={() => setOpen((v) => !v)}
+        aria-label={t('session.action.menu')}
+        title={t('session.action.menu')}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className={
+          'inline-flex h-6 w-6 items-center justify-center rounded-md transition hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)] ' +
+          (open
+            ? 'bg-[var(--color-sunken)] text-[var(--color-fg-primary)]'
+            : 'text-[var(--color-fg-muted)]')
+        }
       >
-        <PencilIcon />
+        <CaretDownIcon />
       </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-0 top-full z-40 mt-1.5 min-w-[8.5rem] overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] py-1 shadow-[var(--shadow-pop)]"
+        >
+          <TitleMenuItem
+            icon={<PencilIcon />}
+            label={t('session.action.rename')}
+            disabled={renameDisabled}
+            title={renameDisabled ? renameTooltip : undefined}
+            onClick={() => {
+              setOpen(false);
+              onRename();
+            }}
+          />
+          <TitleMenuItem
+            icon={<MenuTrashIcon />}
+            label={t('session.action.delete')}
+            danger
+            disabled={deleteDisabled}
+            title={deleteDisabled ? deleteTooltip : undefined}
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+          />
+        </div>
+      )}
     </div>
+  );
+}
+
+function TitleMenuItem({
+  icon,
+  label,
+  onClick,
+  disabled,
+  danger,
+  title,
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={
+        'flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[13px] transition disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent ' +
+        (danger
+          ? 'text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)]'
+          : 'text-[var(--color-fg-secondary)] hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)]')
+      }
+    >
+      <span className="shrink-0">{icon}</span>
+      {label}
+    </button>
   );
 }
 
@@ -1249,6 +1404,46 @@ function PencilIcon() {
     >
       <path d="M12 20h9" />
       <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+    </svg>
+  );
+}
+
+// Down-caret marking the session-title menu trigger — echoes the chevron beside
+// claude.ai's conversation title.
+function CaretDownIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+function MenuTrashIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
+      <path d="M5.5 6l1.1 13.2A1.5 1.5 0 0 0 8.1 20.5h7.8a1.5 1.5 0 0 0 1.5-1.3L18.5 6" />
     </svg>
   );
 }
