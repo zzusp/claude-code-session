@@ -46,9 +46,11 @@ export async function loadSessionDetail(
   let aiTitle: string | null = null;
   // Context-window occupancy. `lastContextTokens` follows the most recent
   // assistant turn (records are chronological), `peakContextTokens` the high
-  // water mark — the latter auto-detects a 1M-context session.
+  // water mark, `lastModel` the model that turn ran on — together they size the
+  // ring's ceiling (see `contextWindowFor`).
   let lastContextTokens: number | null = null;
   let peakContextTokens = 0;
+  let lastModel: string | null = null;
 
   const rl = readline.createInterface({
     input: fs.createReadStream(jsonlPath, { encoding: 'utf8' }),
@@ -70,6 +72,8 @@ export async function loadSessionDetail(
       aiTitle = obj.aiTitle;
     }
     if (obj.type === 'assistant') {
+      const model = (obj.message as { model?: unknown } | undefined)?.model;
+      if (typeof model === 'string' && model) lastModel = model;
       const used = contextTokensOf(obj);
       if (used !== null) {
         lastContextTokens = used;
@@ -99,10 +103,22 @@ export async function loadSessionDetail(
   meta.messageCount = messages.length;
   meta.title = aiTitle || deriveAutoTitle(messages);
   meta.contextTokens = lastContextTokens;
-  // The `[1m]` model suffix is stripped from records, so a peak past the 200K
-  // standard window is the only reliable tell of a 1M-context session.
-  meta.contextWindow = peakContextTokens > 200_000 ? 1_000_000 : 200_000;
+  meta.contextWindow = contextWindowFor(lastModel, peakContextTokens);
   return { meta, messages, truncated };
+}
+
+const STANDARD_CONTEXT_WINDOW = 200_000;
+const LARGE_CONTEXT_WINDOW = 1_000_000;
+
+/** Context window the ring is scaled against, derived from the session's model.
+ *  Claude's standard window is 200K; the `[1m]` alias bumps it to 1M. Claude Code
+ *  usually strips that suffix from logged records, so we also bump to 1M when a
+ *  turn's input-side total provably exceeded the standard window — the ceiling is
+ *  never scaled below what the session actually consumed. */
+function contextWindowFor(model: string | null, peakTokens: number): number {
+  const declaredLarge = model !== null && /\[1m\]|[-_]1m\b/i.test(model);
+  const base = declaredLarge ? LARGE_CONTEXT_WINDOW : STANDARD_CONTEXT_WINDOW;
+  return peakTokens > base ? LARGE_CONTEXT_WINDOW : base;
 }
 
 /** Input-side token total of an assistant record's `message.usage`
