@@ -17,9 +17,14 @@ const MAX_DIFF_ROWS = 160;
 export function ToolUseBlock({
   block,
   query,
+  result,
 }: {
   block: Extract<Block, { type: 'tool_use' }>;
   query: string;
+  /** 配对的 tool_result（由调用方按 toolUseId 反查）。有则渲染在展开体尾部，
+   *  与命令/参数之间留出空隙——「调用 + 空行 + 返回」一体。preview-host 文件卡除外
+   *  （其返回正文走右侧预览面板）。 */
+  result?: { content: string; isError: boolean };
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -30,7 +35,7 @@ export function ToolUseBlock({
   // 否则走分工具的富展开体（diff / checklist / 命令块）。
   const searching = query.length > 0;
 
-  // 展开体两种头部共用：搜索态 JSON 原文，否则分工具富展开体。
+  // 展开体两种头部共用：搜索态 JSON 原文，否则分工具富展开体；尾部接配对返回。
   const body = open && (
     <div className="border-t border-[var(--color-hairline)] bg-[var(--color-surface)]">
       {searching ? (
@@ -38,6 +43,7 @@ export function ToolUseBlock({
       ) : (
         <ToolUseBody name={block.name} input={input} />
       )}
+      {result && <PairedResult result={result} query={query} />}
     </div>
   );
 
@@ -154,6 +160,7 @@ export function ToolUseBlock({
           ) : (
             <ToolUseBody name={block.name} input={input} />
           )}
+          {result && <PairedResult result={result} query={query} />}
         </div>
       )}
     </div>
@@ -277,6 +284,7 @@ function buildToolBody(name: string, input: Record<string, unknown>): ToolBody {
       };
     }
     case 'Bash':
+    case 'PowerShell':
       return { kind: 'bash', command: strOf(input.command) };
     case 'TodoWrite': {
       const todos = todosOf(input);
@@ -293,6 +301,7 @@ function buildToolBody(name: string, input: Record<string, unknown>): ToolBody {
 function toolVerb(t: ReturnType<typeof useT>, name: string): string {
   switch (name) {
     case 'Bash':
+    case 'PowerShell':
       return t('tool.verb.ran');
     case 'Glob':
     case 'Grep':
@@ -317,6 +326,7 @@ function toolVerb(t: ReturnType<typeof useT>, name: string): string {
 function toolSummary(name: string, input: Record<string, unknown>): string | null {
   switch (name) {
     case 'Bash':
+    case 'PowerShell':
       return firstLine(strOf(input.description) || strOf(input.command));
     case 'Edit':
     case 'Write':
@@ -447,6 +457,56 @@ function JsonDump({ input, query }: { input: Record<string, unknown>; query?: st
     <pre className="overflow-x-auto px-3 py-2 font-mono text-[11.5px] text-[var(--color-fg-primary)]">
       {query ? <HighlightedText text={json} query={query} /> : json}
     </pre>
+  );
+}
+
+/** 配对的工具返回：渲染在调用展开体尾部。与上方命令/参数之间留出空隙（用户要的
+ *  「空行隔开」），自带「工具返回 / 工具错误」小标头；错误用 danger 色；过长截断可展开。
+ *  搜索态下 query 透传给 HighlightedText，保证 result 命中可见高亮。 */
+function PairedResult({
+  result,
+  query,
+}: {
+  result: { content: string; isError: boolean };
+  query: string;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const long = result.content.length > PREVIEW_CHARS;
+  const visible = open || !long ? result.content : result.content.slice(0, PREVIEW_CHARS) + '…';
+  return (
+    <div className="px-2.5 pb-2.5 pt-2">
+      <div className="mb-1 flex items-center justify-between gap-2 px-0.5">
+        <span
+          className={
+            'flex items-center gap-1.5 text-[11px] font-medium ' +
+            (result.isError ? 'text-[var(--color-danger)]' : 'text-[var(--color-fg-muted)]')
+          }
+        >
+          <Glyph kind={result.isError ? 'error' : 'result'} />
+          {result.isError ? t('tool.error') : t('tool.result')}
+        </span>
+        {long && (
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            className="text-[11px] text-[var(--color-fg-muted)] underline-offset-2 hover:underline"
+          >
+            {open ? t('common.collapse') : t('common.expand')}
+          </button>
+        )}
+      </div>
+      <pre
+        className={
+          'overflow-x-auto whitespace-pre-wrap break-words rounded-[var(--radius-control)] border px-3 py-2 font-mono text-[11.5px] ' +
+          (result.isError
+            ? 'border-[var(--color-danger)]/30 bg-[var(--color-danger-soft)] text-[var(--color-danger)]'
+            : 'border-[var(--color-hairline)] bg-[var(--color-sunken)] text-[var(--color-fg-primary)]')
+        }
+      >
+        <HighlightedText text={visible} query={query} />
+      </pre>
+    </div>
   );
 }
 

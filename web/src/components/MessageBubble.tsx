@@ -13,14 +13,20 @@ const MarkdownContent = lazy(() => import('./MarkdownContent.tsx'));
  *  （时间线 / 弹窗对话栏）从已加载的全量消息构建后传入，用于 result 头部标注来源。 */
 export type ToolNameLookup = ReadonlyMap<string, string>;
 
+/** toolUseId → 配对的 tool_result。传入时（会话时间线），调用块在展开体尾部内联其返回，
+ *  独立的「工具」返回消息由调用方提前剔除。不传时（如修改文件视图）维持原样。 */
+export type ToolResultLookup = ReadonlyMap<string, { content: string; isError: boolean }>;
+
 export default function MessageBubble({
   message,
   query,
   toolNames,
+  toolResults,
 }: {
   message: Message;
   query: string;
   toolNames?: ToolNameLookup;
+  toolResults?: ToolResultLookup;
 }) {
   if (message.isMeta) return <SystemMessage message={message} query={query} />;
   if (
@@ -35,7 +41,14 @@ export default function MessageBubble({
   if (message.type === 'user') {
     return <UserMessage message={message} query={query} toolNames={toolNames} />;
   }
-  return <AssistantMessage message={message} query={query} toolNames={toolNames} />;
+  return (
+    <AssistantMessage
+      message={message}
+      query={query}
+      toolNames={toolNames}
+      toolResults={toolResults}
+    />
+  );
 }
 
 // Assistant turn — claude.ai renders this as full-width prose, no bubble / card /
@@ -45,11 +58,13 @@ function AssistantMessage({
   message,
   query,
   toolNames,
+  toolResults,
   variant = 'assistant',
 }: {
   message: Message;
   query: string;
   toolNames?: ToolNameLookup;
+  toolResults?: ToolResultLookup;
   variant?: 'assistant' | 'tool';
 }) {
   const t = useT();
@@ -69,6 +84,7 @@ function AssistantMessage({
           blocks={message.blocks}
           query={query}
           toolNames={toolNames}
+          toolResults={toolResults}
           markdown={!isTool && !query}
         />
       </div>
@@ -158,11 +174,13 @@ function Blocks({
   blocks,
   query,
   toolNames,
+  toolResults,
   markdown = false,
 }: {
   blocks: Block[];
   query: string;
   toolNames?: ToolNameLookup;
+  toolResults?: ToolResultLookup;
   /** true=assistant 回复且非搜索态，text block 走 markdown 排版；否则纯文本+高亮。 */
   markdown?: boolean;
 }) {
@@ -188,7 +206,14 @@ function Blocks({
             );
           }
           case 'tool_use':
-            return <ToolUseBlock key={i} block={block} query={query} />;
+            return (
+              <ToolUseBlock
+                key={i}
+                block={block}
+                query={query}
+                result={block.id ? toolResults?.get(block.id) : undefined}
+              />
+            );
           case 'tool_result':
             return (
               <ToolResultBlock

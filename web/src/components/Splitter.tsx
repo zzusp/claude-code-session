@@ -3,9 +3,9 @@ import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 /** 竖向可拖拽分割线。拖动时把指针 clientX 连同容器矩形回传，由调用方换算出某侧宽度。
  *  用 setPointerCapture 锁指针，拖出分割线也不丢事件。
  *
- *  分割线本身是整列高的细线（命中区更宽），中间叠一枚抓手（grip）。会话页的左栏是
- *  window 滚动的长时间线，列高可达数千 px，所以抓手用 sticky 钉在视口竖直中线上，
- *  滚到哪都够得着、不必先把页面滚到列中点。 */
+ *  分割线本身是整列高的细线（命中区更宽），中间叠一枚抓手（grip）。会话页是定高三层、
+ *  分割条随中间层 `self-stretch` 等高且自身不滚动，所以抓手在分割条内竖直居中即可，
+ *  始终落在可视中线上。 */
 export function Splitter({
   getRect,
   onResize,
@@ -47,11 +47,10 @@ export function Splitter({
         }
         aria-hidden
       />
-      {/* 抓手：sticky 钉在视口竖直中线，长列里始终可见可拖。 */}
+      {/* 抓手：在分割条内竖直居中（定高中间层，分割条不滚动）。 */}
       <span
-        style={{ top: 'calc(50dvh - 1.25rem)' }}
         className={
-          'pointer-events-none sticky mx-auto flex h-10 w-[6px] flex-col items-center justify-center gap-[3px] rounded-full border transition-colors ' +
+          'pointer-events-none absolute left-1/2 top-1/2 flex h-10 w-[6px] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-[3px] rounded-full border transition-colors ' +
           (dragging
             ? 'border-[var(--color-accent)] bg-[var(--color-accent)]'
             : 'border-[var(--color-hairline-strong)] bg-[var(--color-surface)] group-hover:border-[var(--color-accent)] group-hover:bg-[var(--color-accent-soft)]')
