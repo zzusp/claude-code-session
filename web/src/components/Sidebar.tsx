@@ -169,8 +169,7 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
                 onSearchOpen();
               }}
               aria-label={t('search.action.open')}
-              className="surface-card is-interactive flex w-full items-center gap-2.5 px-3 py-3 text-left"
-              style={{ borderRadius: 'var(--radius-input)' }}
+              className="flex w-full items-center gap-2.5 rounded-[var(--radius-input)] border border-[var(--color-hairline)] px-3 py-2.5 text-left transition hover:border-[var(--color-hairline-strong)] hover:bg-[var(--sidebar-hover)]"
             >
               <SearchIcon className="text-[var(--color-fg-muted)]" />
               <span className="flex-1 truncate text-[13px] text-[var(--color-fg-muted)]">
@@ -195,18 +194,18 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
                     aria-current={isActive ? 'page' : undefined}
                     onClick={() => setOpen(false)}
                     className={
-                      'group flex items-center gap-3 rounded-[var(--radius-input)] border px-3.5 py-2.5 text-sm transition ' +
+                      'group flex items-center gap-3 rounded-[var(--radius-input)] px-3.5 py-2.5 text-sm transition ' +
                       (isActive
-                        ? 'border-transparent bg-[var(--color-accent-soft)] font-medium text-[var(--color-accent-ink)] dark:text-[var(--color-fg-primary)]'
-                        : 'border-transparent text-[var(--color-fg-secondary)] hover:bg-[var(--color-surface)] hover:text-[var(--color-fg-primary)]')
+                        ? 'bg-[var(--sidebar-active)] font-medium text-[var(--color-fg-primary)]'
+                        : 'text-[var(--color-fg-secondary)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--color-fg-primary)]')
                     }
                   >
                     <span
                       className={
                         'transition-colors ' +
                         (isActive
-                          ? 'text-[var(--color-accent)]'
-                          : 'text-[var(--color-fg-muted)] group-hover:text-[var(--color-accent)]')
+                          ? 'text-[var(--color-fg-primary)]'
+                          : 'text-[var(--color-fg-muted)] group-hover:text-[var(--color-fg-secondary)]')
                       }
                     >
                       {item.icon}
@@ -305,8 +304,8 @@ function RecentRow({
       className={
         'group flex items-center gap-2.5 rounded-[var(--radius-input)] px-2.5 py-2 text-[13px] transition ' +
         (active
-          ? 'bg-[var(--color-accent-soft)] font-medium text-[var(--color-accent-ink)] dark:text-[var(--color-fg-primary)]'
-          : 'text-[var(--color-fg-secondary)] hover:bg-[var(--color-surface)] hover:text-[var(--color-fg-primary)]')
+          ? 'bg-[var(--sidebar-active)] font-medium text-[var(--color-fg-primary)]'
+          : 'text-[var(--color-fg-secondary)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--color-fg-primary)]')
       }
     >
       <span className="shrink-0">
