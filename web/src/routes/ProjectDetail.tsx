@@ -162,9 +162,10 @@ export default function ProjectDetail() {
     setBulkDetailOpen(outcome.skipped.length + outcome.failed.length > 0);
     setSelectMode(false);
     setSelected(new Set());
-    // 刷新列表 / 项目元数据 / 磁盘统计
+    // 刷新列表 / 项目元数据 / 最近会话 / 磁盘统计
     queryClient.invalidateQueries({ queryKey: queryKeys.projects() });
     queryClient.invalidateQueries({ queryKey: queryKeys.projectSessions(id) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.recentSessions() });
     queryClient.invalidateQueries({ queryKey: queryKeys.diskUsage() });
   }
 

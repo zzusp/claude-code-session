@@ -5,8 +5,22 @@ import { loadModifiedFiles } from '../lib/modified-files.ts';
 import { openFile } from '../lib/open-folder.ts';
 import { renameSession } from '../lib/rename-session.ts';
 import { isSafeId } from '../lib/safe-id.ts';
+import { listRecentSessions } from '../lib/scan.ts';
 
 export const sessionsRoute = new Hono();
+
+// 跨全部项目的「最近会话」——侧栏 Recents。单段静态路由，注册在 /:projectId/:sessionId
+// 等通配段之前，避免被两段通配路由误匹配。?limit= 可选（1..50，默认 12）。
+sessionsRoute.get('/recent', async (c) => {
+  const raw = c.req.query('limit');
+  let limit = 12;
+  if (raw !== undefined) {
+    const n = Number(raw);
+    if (Number.isInteger(n) && n > 0 && n <= 50) limit = n;
+  }
+  const sessions = await listRecentSessions(limit);
+  return c.json(sessions);
+});
 
 // 注意：放在 /:projectId/:sessionId 之前——Hono trie 对静态后缀的具体路由优先匹配，
 // 但显式按"更具体的路由先注册"是最稳的写法，避免日后引入其他通配段时被错位拦截。

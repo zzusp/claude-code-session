@@ -3,11 +3,9 @@ import { motion } from 'motion/react';
 import {
   useDeferredValue,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ReactNode,
 } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -93,14 +91,6 @@ export default function SessionDetailRoute() {
   const deferredQuery = useDeferredValue(query);
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  // Sticky masthead follower: while reading down the timeline, a compact
-  // breadcrumb + card overlay pins above the (already sticky) search bar. The
-  // overlay is absolutely positioned so revealing it never reflows the page;
-  // `pinTop` reserves room above the search for it, `stuck` toggles its fade-in.
-  const railRef = useRef<HTMLDivElement>(null);
-  const followerRef = useRef<HTMLDivElement>(null);
-  const [pinTop, setPinTop] = useState(0);
-  const [stuck, setStuck] = useState(false);
   const urlAppliedRef = useRef<string | null>(null);
   const flashedKeyRef = useRef<string | null>(null);
   // Live-tail follow state: whether the reader is parked at the bottom, and the
@@ -160,8 +150,8 @@ export default function SessionDetailRoute() {
     : undefined;
 
   // Modified-files summary (aggregated from a full jsonl scan, server-side). Fetched
-  // eagerly at route level so the masthead trigger can show the count; the drawer
-  // reuses this same data instead of querying again.
+  // eagerly at route level so the header trigger can show the count; the page reuses
+  // this same data instead of querying again.
   const modifiedFilesQuery = useQuery({
     queryKey: queryKeys.sessionModifiedFiles(pid, sid),
     queryFn: () =>
@@ -173,7 +163,7 @@ export default function SessionDetailRoute() {
   const modifiedFiles = modifiedFilesQuery.data?.files ?? [];
 
   // 「修改的文件」改为在新标签里打开独立整页（见 ModifiedFilesPage）——脱离本会话页
-  // 的实时轮询 / 大时间线 DOM / 滚动监听，验证抽屉滚动卡顿是否来自这层并存渲染。
+  // 的实时轮询 / 大时间线 DOM / 滚动监听。
   const openModifiedInNewTab = () =>
     window.open(
       `/projects/${encodeURIComponent(pid)}/sessions/${encodeURIComponent(sid)}/modified`,
@@ -282,43 +272,6 @@ export default function SessionDetailRoute() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Measure the compact follower so the search bar can pin low enough to leave
-  // room for it above (the follower sits flush atop the search; its own `pb-2`
-  // is the gap). ResizeObserver keeps it correct across locale/title changes and
-  // when the card mounts.
-  useLayoutEffect(() => {
-    const el = followerRef.current;
-    if (!el) return;
-    const measure = () => setPinTop(el.offsetHeight);
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // The rail is "stuck" once it has scrolled up to its pin line — that's when the
-  // compact follower fades in above the search. Compared against the lg pin
-  // offset; on smaller screens the follower is hidden so the exact value is moot.
-  useEffect(() => {
-    let frame = 0;
-    const check = () => {
-      frame = 0;
-      const el = railRef.current;
-      if (el) setStuck(el.getBoundingClientRect().top <= pinTop + 1);
-    };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(check);
-    };
-    check();
-    window.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', schedule);
-      window.removeEventListener('resize', schedule);
-      if (frame) cancelAnimationFrame(frame);
-    };
-  }, [pinTop]);
-
   // When a live poll appends new messages and the reader is at the bottom — and not
   // mid-search or deep-linked to a specific message — follow the tail downward.
   useEffect(() => {
@@ -376,6 +329,7 @@ export default function SessionDetailRoute() {
       );
       void queryClient.invalidateQueries({ queryKey: queryKeys.session(pid, sid) });
       void queryClient.invalidateQueries({ queryKey: queryKeys.projectSessions(pid) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.recentSessions() });
     },
   });
 
@@ -397,29 +351,36 @@ export default function SessionDetailRoute() {
       icon: <BreadcrumbFolderIcon />,
     },
   ];
-  const compactTitle = sessionTitle ?? sid.slice(0, 12) + '…';
 
   return (
-    <section>
+    <section className="mx-auto max-w-4xl">
       <Breadcrumbs items={crumbs} />
 
       {data && (
-        <div className="mt-4">
-          <SessionMasthead
+        <MetaLine
+          sid={sid}
+          tagline={t('session.tagline', {
+            started: formatRelativeTime(data.meta.firstAt),
+            lastTouched: formatRelativeTime(data.meta.lastAt),
+            branchPart: taglineBranchPart,
+          })}
+          messageCount={data.meta.messageCount}
+          bytes={data.meta.bytes}
+          version={data.meta.version}
+          firstAt={data.meta.firstAt}
+        />
+      )}
+
+      {/* Chat-style sticky header: live status + editable title + actions, with the
+          in-session search / filter row tucked beneath. One sticky element, so the
+          title stays in view while the breadcrumb + meta line scroll away. */}
+      <div className="z-30 mt-3 lg:sticky lg:top-0">
+        <div className="overflow-hidden rounded-[var(--radius-input)] border border-[var(--color-hairline)] bg-[var(--color-surface)] shadow-[var(--shadow-rise)]">
+          <ChatHeader
             sid={sid}
             isLive={isLive}
             isWorking={isWorking}
             title={sessionTitle}
-            tagline={t('session.tagline', {
-              started: formatRelativeTime(data.meta.firstAt),
-              lastTouched: formatRelativeTime(data.meta.lastAt),
-              branchPart: taglineBranchPart,
-            })}
-            firstAt={data.meta.firstAt}
-            messageCount={data.meta.messageCount}
-            bytes={data.meta.bytes}
-            version={data.meta.version}
-            branch={data.meta.gitBranch}
             editableValue={sessionTitle ?? ''}
             onTitleEdit={async (next) => {
               await renameMutation.mutateAsync(next);
@@ -440,8 +401,21 @@ export default function SessionDetailRoute() {
             modifiedCount={modifiedFiles.length}
             modifiedLoading={modifiedFilesQuery.isLoading}
           />
+          <FilterRow
+            query={query}
+            onQuery={setQuery}
+            showMeta={showMeta}
+            onShowMeta={setShowMeta}
+            onlyUser={onlyUser}
+            onOnlyUser={setOnlyUser}
+            onlyError={onlyError}
+            onOnlyError={setOnlyError}
+            shown={renderList.length}
+            total={visibleMessages.length}
+            hasData={!!data}
+          />
         </div>
-      )}
+      </div>
 
       {showDeleteDialog && currentSummary && (
         <DeleteDialog
@@ -456,54 +430,6 @@ export default function SessionDetailRoute() {
           }}
         />
       )}
-
-      <div
-        ref={railRef}
-        className="sticky top-2 z-30 mt-6 lg:top-[var(--ccsm-pin-top)]"
-        style={{ '--ccsm-pin-top': `${pinTop}px` } as CSSProperties}
-      >
-        {/* Compact follower (lg+): the breadcrumb + a one-line card pinned above
-            the search. Absolutely positioned so toggling it never reflows the
-            timeline; it just fades in once the rail sticks. */}
-        <div
-          ref={followerRef}
-          aria-hidden={!stuck}
-          className={
-            'topbar-glass absolute inset-x-0 bottom-full pb-2 hidden flex-col gap-2 transition-opacity duration-200 lg:flex ' +
-            (stuck ? 'opacity-100' : 'pointer-events-none opacity-0')
-          }
-        >
-          <Breadcrumbs items={crumbs} />
-          {data && (
-            <CompactMasthead
-              title={compactTitle}
-              isLive={isLive}
-              isWorking={isWorking}
-              onOpenModified={openModifiedInNewTab}
-              modifiedCount={modifiedFiles.length}
-              modifiedLoading={modifiedFilesQuery.isLoading}
-              onDelete={currentSummary ? () => setShowDeleteDialog(true) : undefined}
-              deleteDisabled={!currentSummary}
-              deleteTooltip={deleteTooltip}
-              deleteLabel={t('session.action.delete')}
-            />
-          )}
-        </div>
-
-        <FilterLedger
-          query={query}
-          onQuery={setQuery}
-          showMeta={showMeta}
-          onShowMeta={setShowMeta}
-          onlyUser={onlyUser}
-          onOnlyUser={setOnlyUser}
-          onlyError={onlyError}
-          onOnlyError={setOnlyError}
-          shown={renderList.length}
-          total={visibleMessages.length}
-          hasData={!!data}
-        />
-      </div>
 
       <div className="mt-6">
         {data?.truncated && (
@@ -520,13 +446,13 @@ export default function SessionDetailRoute() {
         )}
 
         {data && visibleMessages.length === 0 && (
-          <p className="mt-2 max-w-2xl text-[14px] text-[var(--color-fg-muted)]">
+          <p className="mt-2 max-w-2xl font-display text-[15px] italic text-[var(--color-fg-muted)]">
             {t('common.noMessagesMatch')}
           </p>
         )}
 
         {data && visibleMessages.length > 0 && (
-          <ol className="border-t border-[var(--color-hairline-strong)]">
+          <ol>
             {hasMoreEarlier && (
               <li className="flex justify-center border-b border-[var(--color-hairline)] py-3">
                 <button
@@ -579,17 +505,14 @@ export default function SessionDetailRoute() {
 
 /* ─────────────────────────────────────────────────────────────────── */
 
-function SessionMasthead({
+// Compact chat header — a single slim row: live/working beacon, the editable
+// session title, then the "Modified files" + delete actions. Replaces the old
+// editorial masthead; the heavier metadata moves to the non-sticky MetaLine above.
+function ChatHeader({
   sid,
   isLive,
   isWorking,
   title,
-  tagline,
-  firstAt,
-  messageCount,
-  bytes,
-  version,
-  branch,
   editableValue,
   onTitleEdit,
   renameDisabled,
@@ -606,12 +529,6 @@ function SessionMasthead({
   isLive: boolean;
   isWorking: boolean;
   title: string | null;
-  tagline: string;
-  firstAt: string | null;
-  messageCount: number;
-  bytes: number;
-  version: string | null;
-  branch: string | null;
   editableValue: string;
   onTitleEdit: (next: string) => Promise<void>;
   renameDisabled?: boolean;
@@ -625,177 +542,56 @@ function SessionMasthead({
   modifiedLoading: boolean;
 }) {
   const t = useT();
-  const dateline = formatDateline(firstAt);
-
   return (
-    <header className="relative">
-      <div className="flex items-center justify-between gap-4 border-b border-[var(--color-hairline)] pb-3">
-        <div className="flex min-w-0 items-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--color-fg-muted)]">
-          <span className="text-[var(--color-accent)]">●</span>
-          <span>§ SESSION</span>
-          {isWorking ? (
-            <span
-              title={t('session.working.tooltip')}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 normal-case tracking-[0.14em] text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]"
-            >
-              <span aria-hidden className="loading-dots text-[var(--color-accent)]">
-                <span />
-                <span />
-                <span />
-              </span>
-              {t('session.working')}
+    <header className="flex items-center gap-3 px-4 py-2.5">
+      <StatusBeacon isLive={isLive} isWorking={isWorking} />
+      <div className="min-w-0 flex-1">
+        <TitleSlot
+          title={title ?? sid.slice(0, 12) + '…'}
+          editableValue={editableValue}
+          onTitleEdit={onTitleEdit}
+          isFallback={!title}
+          disabled={renameDisabled}
+          disabledTooltip={renameTooltip}
+        />
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenModified}
+          disabled={modifiedLoading}
+          aria-label={t('session.modified.openAria')}
+          title={t('session.modified.title')}
+          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-[var(--color-accent)]"
+        >
+          <FilesIcon />
+          <span className="hidden sm:inline">{t('session.modified.title')}</span>
+          {modifiedCount > 0 && (
+            <span className="rounded-full bg-[var(--color-accent-soft)] px-1.5 font-mono text-[10px] tabular-nums text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
+              {modifiedCount}
             </span>
-          ) : isLive ? (
-            <span
-              title={t('session.live.tooltip')}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-accent-soft)] px-2 py-0.5 normal-case tracking-[0.14em] text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]"
-            >
-              <span aria-hidden className="relative inline-flex h-1.5 w-1.5">
-                <span className="absolute inset-0 rounded-full bg-[var(--color-accent)] pulse-amber" />
-                <span className="absolute inset-0 rounded-full bg-[var(--color-accent)]" />
-              </span>
-              {t('session.live')}
-            </span>
-          ) : null}
-          <span className="hidden h-3 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
-          <span className="hidden truncate normal-case tracking-[0.05em] text-[var(--color-fg-faint)] sm:inline">
-            {sid}
-          </span>
-          {branch && (
-            <>
-              <span className="hidden h-3 w-px bg-[var(--color-hairline-strong)] md:inline-block" />
-              <span className="hidden truncate md:inline">{branch}</span>
-            </>
           )}
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <div className="hidden font-mono text-[10px] uppercase tracking-[0.22em] tabular-nums text-[var(--color-fg-muted)] sm:block">
-            {dateline}
-          </div>
+        </button>
+        {(onDelete || deleteDisabled) && (
           <button
             type="button"
-            onClick={onOpenModified}
-            disabled={modifiedLoading}
-            aria-label={t('session.modified.openAria')}
-            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-[var(--color-accent)]"
+            onClick={onDelete}
+            disabled={deleteDisabled || !onDelete}
+            title={deleteTooltip}
+            aria-label={deleteLabel}
+            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-danger)] transition hover:border-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <FilesIcon /> {t('session.modified.title')}
-            {modifiedCount > 0 && (
-              <span className="rounded-full bg-[var(--color-accent-soft)] px-1.5 font-mono text-[10px] tabular-nums text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
-                {modifiedCount}
-              </span>
-            )}
+            <TrashIcon />
+            <span className="hidden sm:inline">{deleteLabel}</span>
           </button>
-          {(onDelete || deleteDisabled) && (
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={deleteDisabled || !onDelete}
-              title={deleteTooltip}
-              aria-label={deleteLabel}
-              className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-danger)] transition hover:border-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <TrashIcon /> {deleteLabel}
-            </button>
-          )}
-        </div>
+        )}
       </div>
-
-      <div className="grid grid-cols-1 gap-x-10 gap-y-6 pt-5 pb-2 lg:grid-cols-12">
-        <div className="lg:col-span-8">
-          <TitleSlot
-            title={title ?? sid.slice(0, 12) + '…'}
-            editableValue={editableValue}
-            onTitleEdit={onTitleEdit}
-            isFallback={!title}
-            disabled={renameDisabled}
-            disabledTooltip={renameTooltip}
-          />
-        </div>
-
-        <div className="lg:col-span-4 lg:pt-3">
-          <p className="text-[14px] leading-[1.6] text-[var(--color-fg-muted)]">
-            {tagline}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-6 h-px bg-[var(--color-hairline)]" aria-hidden />
-      <dl className="mt-3 flex flex-wrap items-baseline gap-x-8 gap-y-2">
-        <Fact label={t('session.meta.messages')} value={messageCount.toLocaleString()} />
-        <Fact label={t('session.meta.size')} value={formatBytes(bytes)} />
-        {version && <Fact label={t('session.meta.version')} value={version} />}
-        <Fact label={t('session.meta.started')} value={formatDateTime(firstAt)} />
-      </dl>
     </header>
   );
 }
 
-// Condensed masthead shown in the sticky follower while scrolling: a single row
-// matching the breadcrumb / search-bar height, keeping the live status, title,
-// and the "Modified files" + delete actions; everything else collapses away.
-function CompactMasthead({
-  title,
-  isLive,
-  isWorking,
-  onOpenModified,
-  modifiedCount,
-  modifiedLoading,
-  onDelete,
-  deleteDisabled,
-  deleteTooltip,
-  deleteLabel,
-}: {
-  title: string;
-  isLive: boolean;
-  isWorking: boolean;
-  onOpenModified: () => void;
-  modifiedCount: number;
-  modifiedLoading: boolean;
-  onDelete?: () => void;
-  deleteDisabled?: boolean;
-  deleteTooltip?: string;
-  deleteLabel?: string;
-}) {
-  const t = useT();
-  return (
-    <div className="flex items-center gap-3 rounded-[var(--radius-input)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 sm:px-5 py-2 shadow-[var(--shadow-rise)]">
-      <StatusBeacon isLive={isLive} isWorking={isWorking} />
-      <span className="min-w-0 flex-1 truncate font-display text-[15px] font-light tracking-[-0.01em] text-[var(--color-fg-primary)]">
-        {title}
-      </span>
-      <button
-        type="button"
-        onClick={onOpenModified}
-        disabled={modifiedLoading}
-        aria-label={t('session.modified.openAria')}
-        className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-[var(--color-accent)]"
-      >
-        <FilesIcon /> {t('session.modified.title')}
-        {modifiedCount > 0 && (
-          <span className="rounded-full bg-[var(--color-accent-soft)] px-1.5 font-mono text-[10px] tabular-nums text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
-            {modifiedCount}
-          </span>
-        )}
-      </button>
-      {(onDelete || deleteDisabled) && (
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={deleteDisabled || !onDelete}
-          title={deleteTooltip}
-          aria-label={deleteLabel}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-danger)] transition hover:border-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <TrashIcon /> {deleteLabel}
-        </button>
-      )}
-    </div>
-  );
-}
-
-// Compact live/working/idle indicator for the condensed masthead — mirrors the
-// full masthead's beacon (animated dots while working, pulsing dot while live).
+// Compact live/working/idle indicator — animated dots while working, pulsing dot
+// while live, a quiet dot when idle.
 function StatusBeacon({ isLive, isWorking }: { isLive: boolean; isWorking: boolean }) {
   if (isWorking) {
     return (
@@ -817,8 +613,44 @@ function StatusBeacon({ isLive, isWorking }: { isLive: boolean; isWorking: boole
   return <span aria-hidden className="shrink-0 text-[10px] text-[var(--color-accent)]">●</span>;
 }
 
-const MASTHEAD_TITLE_CLASS =
-  'font-display text-[clamp(1.5rem,3vw,2rem)] font-medium leading-[1.15] tracking-[-0.018em] text-[var(--color-fg-primary)]';
+// Non-sticky subtitle under the breadcrumb: the editorial tagline plus a compact
+// fact row (messages / size / version / started) and the raw session id.
+function MetaLine({
+  sid,
+  tagline,
+  messageCount,
+  bytes,
+  version,
+  firstAt,
+}: {
+  sid: string;
+  tagline: string;
+  messageCount: number;
+  bytes: number;
+  version: string | null;
+  firstAt: string | null;
+}) {
+  const t = useT();
+  return (
+    <div className="mt-2 space-y-1.5">
+      <p className="font-display text-[13.5px] italic leading-snug text-[var(--color-fg-muted)]">
+        {tagline}
+      </p>
+      <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+        <Fact label={t('session.meta.messages')} value={messageCount.toLocaleString()} />
+        <Fact label={t('session.meta.size')} value={formatBytes(bytes)} />
+        {version && <Fact label={t('session.meta.version')} value={version} />}
+        <Fact label={t('session.meta.started')} value={formatDateTime(firstAt)} />
+      </dl>
+      <p className="truncate font-mono text-[10.5px] tracking-[0.04em] text-[var(--color-fg-faint)]">
+        {sid}
+      </p>
+    </div>
+  );
+}
+
+const HEADER_TITLE_CLASS =
+  'font-display text-[18px] sm:text-[19px] font-medium leading-tight tracking-[-0.01em] text-[var(--color-fg-primary)]';
 
 function TitleSlot({
   title,
@@ -901,7 +733,7 @@ function TitleSlot({
           }}
           maxLength={200}
           className={
-            MASTHEAD_TITLE_CLASS +
+            HEADER_TITLE_CLASS +
             ' w-full bg-transparent border-b border-[var(--color-accent)] outline-none focus:outline-none disabled:opacity-60'
           }
         />
@@ -911,17 +743,18 @@ function TitleSlot({
   }
 
   return (
-    <div className="group flex items-baseline gap-3">
-      <h1 className={MASTHEAD_TITLE_CLASS + (isFallback ? ' font-mono' : '')}>
+    <div className="group flex min-w-0 items-baseline gap-2">
+      <h1 className={HEADER_TITLE_CLASS + ' truncate' + (isFallback ? ' font-mono' : '')}>
         {title}
+        <span className="text-[var(--color-accent)]">.</span>
       </h1>
       <button
         type="button"
         onClick={startEdit}
-        aria-label="Rename"
+        aria-label={disabled ? disabledTooltip ?? 'Rename unavailable' : 'Rename'}
         title={disabled ? disabledTooltip ?? 'Rename unavailable' : 'Rename'}
         disabled={disabled}
-        className="flex-shrink-0 rounded-md p-1.5 text-[var(--color-fg-muted)] opacity-0 transition hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)] focus:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[var(--color-fg-muted)] disabled:opacity-40 disabled:group-hover:opacity-40"
+        className="flex-shrink-0 rounded-md p-1 text-[var(--color-fg-muted)] opacity-0 transition hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)] focus:opacity-100 group-hover:opacity-100 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[var(--color-fg-muted)] disabled:opacity-40 disabled:group-hover:opacity-40"
       >
         <PencilIcon />
       </button>
@@ -940,24 +773,9 @@ function Fact({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function formatDateline(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d
-    .toLocaleDateString('en-GB', {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    })
-    .toUpperCase()
-    .replace(/,/g, ' ·');
-}
-
 /* ─────────────────────────────────────────────────────────────────── */
 
-function FilterLedger({
+function FilterRow({
   query,
   onQuery,
   showMeta,
@@ -984,48 +802,34 @@ function FilterLedger({
 }) {
   const t = useT();
   return (
-    <div className="rounded-[var(--radius-input)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 sm:px-5 py-2.5 shadow-[var(--shadow-rise)]">
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex flex-1 min-w-[14rem] items-center gap-2 border-b border-[var(--color-hairline)] py-1 transition focus-within:border-[var(--color-accent)]">
-          <SearchIcon className="text-[var(--color-fg-muted)]" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => onQuery(e.target.value)}
-            placeholder={t('common.searchPlaceholder')}
-            className="w-full bg-transparent text-sm text-[var(--color-fg-primary)] placeholder:text-[var(--color-fg-faint)] focus:outline-none"
-          />
-        </div>
-
-        <span className="hidden h-4 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
-
-        <div className="flex items-center gap-4">
-          <ToggleSwitch
-            checked={showMeta}
-            onChange={onShowMeta}
-            label={t('common.system')}
-          />
-          <ToggleSwitch
-            checked={onlyUser}
-            onChange={onOnlyUser}
-            label={t('common.onlyUser')}
-          />
-          <ToggleSwitch
-            checked={onlyError}
-            onChange={onOnlyError}
-            label={t('common.onlyError')}
-          />
-        </div>
-
-        {hasData && (
-          <>
-            <span className="hidden h-4 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
-            <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
-              {t('session.shown', { shown, total })}
-            </span>
-          </>
-        )}
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--color-hairline)] px-4 py-2">
+      <div className="flex flex-1 min-w-[12rem] items-center gap-2 border-b border-[var(--color-hairline)] py-1 transition focus-within:border-[var(--color-accent)]">
+        <SearchIcon className="text-[var(--color-fg-muted)]" />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder={t('common.searchPlaceholder')}
+          className="w-full bg-transparent text-sm text-[var(--color-fg-primary)] placeholder:text-[var(--color-fg-faint)] focus:outline-none"
+        />
       </div>
+
+      <span className="hidden h-4 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
+
+      <div className="flex items-center gap-4">
+        <ToggleSwitch checked={showMeta} onChange={onShowMeta} label={t('common.system')} />
+        <ToggleSwitch checked={onlyUser} onChange={onOnlyUser} label={t('common.onlyUser')} />
+        <ToggleSwitch checked={onlyError} onChange={onOnlyError} label={t('common.onlyError')} />
+      </div>
+
+      {hasData && (
+        <>
+          <span className="hidden h-4 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
+          <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
+            {t('session.shown', { shown, total })}
+          </span>
+        </>
+      )}
     </div>
   );
 }
@@ -1177,8 +981,8 @@ function FilesIcon() {
 function PencilIcon() {
   return (
     <svg
-      width="16"
-      height="16"
+      width="14"
+      height="14"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
