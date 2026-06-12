@@ -16,13 +16,15 @@
   --font-display: "Fraunces Variable", "Songti SC", "Noto Serif SC", Georgia, "Times New Roman", serif;
   --font-mono: "Geist Mono Variable", "PingFang SC", ui-monospace, "JetBrains Mono", monospace;
 
-  /* Light theme — matched to claude.ai's actual palette. Warm *near-neutral*
-     canvas (#F8F8F6), white surfaces, clay accent (#D97757 ↔ #C6613F). Greys sit
-     at very low chroma in the warm 75–95 hue band — warm paper, not cold neutral,
-     but far less cream than a styled homage. See docs/spec/claude-desktop-redesign. */
-  --color-canvas: oklch(0.974 0.0025 95);
-  --color-surface: oklch(0.998 0.0012 95);
-  --color-sunken: oklch(0.942 0.003 95);
+  /* Light theme — matched to claude.ai's actual palette. Warm *ivory* canvas
+     (#FAF9F5, claude.ai's real chat background — warmer/creamier than the earlier
+     near-neutral #F8F8F6), near-white surfaces, a slightly deeper warm sunken for
+     the sidebar (#F0EEE6). Clay accent (#D97757 ↔ #C6613F). Greys sit at low
+     chroma in the warm 90–95 hue band — warm paper, not cold neutral. See
+     docs/spec/claude-desktop-redesign. */
+  --color-canvas: oklch(0.972 0.0078 92);
+  --color-surface: oklch(0.996 0.0035 92);
+  --color-sunken: oklch(0.945 0.0105 92);
   --color-fg-primary: oklch(0.252 0.005 75);
   --color-fg-secondary: oklch(0.420 0.006 72);
   --color-fg-muted: oklch(0.565 0.008 75);

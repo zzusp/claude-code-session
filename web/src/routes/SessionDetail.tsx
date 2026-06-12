@@ -27,7 +27,7 @@ import {
   MAX_SESSION_MESSAGES,
   RECENT_ACTIVITY_WINDOW_MIN,
 } from '../lib/constants.ts';
-import { formatBytes, formatDateTime } from '../lib/format.ts';
+import { formatBytes, formatDateTime, formatTokens } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
 import { fadeUpItem, staggerParent } from '../lib/motion.ts';
 import { queryKeys } from '../lib/query-keys.ts';
@@ -36,6 +36,9 @@ interface IndexedMessage {
   message: Message;
   haystack: string;
 }
+
+// Mutually-exclusive message view modes for the footer's single-select filter.
+type MessageFilter = 'all' | 'system' | 'user' | 'error';
 
 const INITIAL_WINDOW = 50;
 const LOAD_STEP = 50;
@@ -82,9 +85,13 @@ export default function SessionDetailRoute() {
   const urlFocus = searchParams.get('focus');
   const urlQuery = searchParams.get('q');
 
-  const [showMeta, setShowMeta] = useState(false);
-  const [onlyUser, setOnlyUser] = useState(false);
-  const [onlyError, setOnlyError] = useState(false);
+  // Message view filter — single-select (claude.ai-style segmented control), so
+  // the four modes are mutually exclusive rather than three independent toggles.
+  // 'system' surfaces meta rows; 'user'/'error' narrow to those; 'all' is default.
+  const [filter, setFilter] = useState<MessageFilter>('all');
+  const showMeta = filter === 'system';
+  const onlyUser = filter === 'user';
+  const onlyError = filter === 'error';
   const [query, setQuery] = useState('');
   // Search is collapsed to a button in the title row; clicking reveals the input.
   const [searchOpen, setSearchOpen] = useState(false);
@@ -224,7 +231,7 @@ export default function SessionDetailRoute() {
     }
     if (urlFocus) {
       const target = data.messages.find((m) => m.uuid === urlFocus);
-      if (target?.isMeta) setShowMeta(true);
+      if (target?.isMeta) setFilter('system');
     }
   }, [data, sid, urlFocus, urlQuery]);
 
@@ -380,7 +387,7 @@ export default function SessionDetailRoute() {
         )}
       </div>
 
-      <div className="mt-6 flex-1 pb-24">
+      <div className="mt-6 flex-1 px-3 pb-24">
         {data?.truncated && (
           <Admonition tone="warn" className="mb-6">
             {t('session.truncated', { n: MAX_SESSION_MESSAGES.toLocaleString() })}
@@ -462,12 +469,10 @@ export default function SessionDetailRoute() {
           modifiedCount={modifiedFiles.length}
           modifiedLoading={modifiedFilesQuery.isLoading}
           onOpenModified={openModifiedInNewTab}
-          showMeta={showMeta}
-          onShowMeta={setShowMeta}
-          onlyUser={onlyUser}
-          onOnlyUser={setOnlyUser}
-          onlyError={onlyError}
-          onOnlyError={setOnlyError}
+          filter={filter}
+          onFilter={setFilter}
+          contextTokens={data.meta.contextTokens}
+          contextWindow={data.meta.contextWindow}
         />
       )}
 
@@ -569,12 +574,10 @@ function SessionFooter({
   modifiedCount,
   modifiedLoading,
   onOpenModified,
-  showMeta,
-  onShowMeta,
-  onlyUser,
-  onOnlyUser,
-  onlyError,
-  onOnlyError,
+  filter,
+  onFilter,
+  contextTokens,
+  contextWindow,
 }: {
   cwd: string | null;
   branch: string | null;
@@ -586,12 +589,10 @@ function SessionFooter({
   modifiedCount: number;
   modifiedLoading: boolean;
   onOpenModified: () => void;
-  showMeta: boolean;
-  onShowMeta: (v: boolean) => void;
-  onlyUser: boolean;
-  onOnlyUser: (v: boolean) => void;
-  onlyError: boolean;
-  onOnlyError: (v: boolean) => void;
+  filter: MessageFilter;
+  onFilter: (v: MessageFilter) => void;
+  contextTokens: number | null;
+  contextWindow: number;
 }) {
   const t = useT();
   return (
@@ -609,14 +610,13 @@ function SessionFooter({
           {startedAt && (
             <FooterFact label={t('session.meta.started')} value={formatDateTime(startedAt)} />
           )}
+          {contextTokens !== null && (
+            <ContextRing tokens={contextTokens} window={contextWindow} />
+          )}
         </dl>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          {/* Message filters live here (moved off the toolbar): system / only-me / errors. */}
-          <div className="flex items-center gap-3">
-            <ToggleSwitch checked={showMeta} onChange={onShowMeta} label={t('common.system')} />
-            <ToggleSwitch checked={onlyUser} onChange={onOnlyUser} label={t('common.onlyUser')} />
-            <ToggleSwitch checked={onlyError} onChange={onOnlyError} label={t('common.onlyError')} />
-          </div>
+          {/* Message filters live here (moved off the toolbar): single-select. */}
+          <SegmentedFilter value={filter} onChange={onFilter} />
           <span aria-hidden className="hidden h-4 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
           <button
             type="button"
@@ -871,35 +871,98 @@ function SearchReveal({
   );
 }
 
-function ToggleSwitch({
-  checked,
+// Single-select message filter — claude.ai-style segmented control. The four
+// modes are mutually exclusive (was three independent checkboxes); the active
+// segment lifts onto a surface chip, the rest stay quiet.
+const FILTER_OPTIONS: {
+  value: MessageFilter;
+  labelKey: 'common.all' | 'common.system' | 'common.onlyUser' | 'common.onlyError';
+}[] = [
+  { value: 'all', labelKey: 'common.all' },
+  { value: 'system', labelKey: 'common.system' },
+  { value: 'user', labelKey: 'common.onlyUser' },
+  { value: 'error', labelKey: 'common.onlyError' },
+];
+
+function SegmentedFilter({
+  value,
   onChange,
-  label,
 }: {
-  checked: boolean;
-  onChange: (next: boolean) => void;
-  label: string;
+  value: MessageFilter;
+  onChange: (v: MessageFilter) => void;
 }) {
+  const t = useT();
   return (
-    <label className="inline-flex cursor-pointer items-center gap-1.5">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="sr-only"
-      />
-      <span
-        aria-hidden
-        className={
-          'font-mono text-[11px] uppercase tracking-[0.16em] transition ' +
-          (checked
-            ? 'text-[var(--color-accent)] underline underline-offset-[6px] decoration-[var(--color-accent)]/50'
-            : 'text-[var(--color-fg-faint)] hover:text-[var(--color-fg-secondary)]')
-        }
-      >
-        {label}
+    <div
+      role="radiogroup"
+      aria-label={t('common.filterLabel')}
+      className="inline-flex items-center gap-0.5 rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-sunken)] p-0.5"
+    >
+      {FILTER_OPTIONS.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(opt.value)}
+            className={
+              'rounded-[6px] px-2 py-1 font-mono text-[10.5px] uppercase tracking-[0.12em] transition ' +
+              (active
+                ? 'bg-[var(--color-surface)] text-[var(--color-accent-ink)] shadow-[var(--shadow-rise)] dark:text-[var(--color-accent)]'
+                : 'text-[var(--color-fg-faint)] hover:text-[var(--color-fg-secondary)]')
+            }
+          >
+            {t(opt.labelKey)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// Context-window occupancy ring — claude.ai's footer context meter. A small SVG
+// donut filled to `tokens / window`, greening below 70%, clay 70–90%, danger past
+// 90%. Sits with the other footer facts; the full count + percent are in the title.
+function ContextRing({ tokens, window }: { tokens: number; window: number }) {
+  const t = useT();
+  const pct = window > 0 ? Math.min(100, Math.round((tokens / window) * 100)) : 0;
+  const r = 7;
+  const circumference = 2 * Math.PI * r;
+  const dash = (pct / 100) * circumference;
+  const tone =
+    pct >= 90
+      ? 'var(--color-danger)'
+      : pct >= 70
+        ? 'var(--color-accent)'
+        : 'var(--color-moss)';
+  const tip = t('session.context.tooltip', {
+    used: formatTokens(tokens),
+    total: formatTokens(window),
+    pct,
+  });
+  return (
+    <div className="flex items-center gap-1.5" title={tip}>
+      <svg width="18" height="18" viewBox="0 0 18 18" className="-rotate-90" aria-hidden>
+        <circle cx="9" cy="9" r={r} fill="none" stroke="var(--color-hairline-strong)" strokeWidth="2.2" />
+        <circle
+          cx="9"
+          cy="9"
+          r={r}
+          fill="none"
+          stroke={tone}
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeDasharray={`${dash} ${circumference}`}
+        />
+      </svg>
+      <span className="eyebrow shrink-0">{t('session.meta.context')}</span>
+      <span className="font-mono text-[11.5px] tabular-nums text-[var(--color-fg-secondary)]">
+        {formatTokens(tokens)}
+        <span className="text-[var(--color-fg-faint)]">/{formatTokens(window)}</span>
       </span>
-    </label>
+    </div>
   );
 }
 

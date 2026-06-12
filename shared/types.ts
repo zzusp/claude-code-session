@@ -77,6 +77,20 @@ export interface SessionMeta {
   title: string;
   /** User-set name; null if never renamed. */
   customTitle: string | null;
+  /**
+   * Context-window occupancy of the latest assistant turn that carried a usage
+   * record: `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`
+   * (the input side that fills the window). Null when no usage was recorded
+   * (e.g. user-only or synthetic-error sessions). Drives the footer context ring.
+   */
+  contextTokens: number | null;
+  /**
+   * The model context window the ring is scaled against. Auto-detected: 1,000,000
+   * when any turn's input-side total exceeded 200K (a 1M-context session), else
+   * 200,000. The `[1m]` suffix is stripped from the recorded model id, so peak
+   * occupancy is the only reliable signal.
+   */
+  contextWindow: number;
 }
 
 export interface SessionDetail {
