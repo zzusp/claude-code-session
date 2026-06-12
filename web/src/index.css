@@ -16,29 +16,31 @@
   --font-display: "Fraunces Variable", "Songti SC", "Noto Serif SC", Georgia, "Times New Roman", serif;
   --font-mono: "Geist Mono Variable", "PingFang SC", ui-monospace, "JetBrains Mono", monospace;
 
-  /* Light theme — Claude "paper + clay" palette. Warm cream canvas (#F5F4EE-ish),
-     near-white cards, terracotta/coral accent (#C15F3C ↔ #D97757). Hues sit in the
-     warm 40–95 band so greys read as warm paper, not cold neutral. */
-  --color-canvas: oklch(0.971 0.0095 92);
-  --color-surface: oklch(0.992 0.004 92);
-  --color-sunken: oklch(0.948 0.012 90);
-  --color-fg-primary: oklch(0.255 0.012 58);
-  --color-fg-secondary: oklch(0.405 0.013 55);
-  --color-fg-muted: oklch(0.535 0.012 55);
-  --color-fg-faint: oklch(0.675 0.011 58);
-  --color-hairline: oklch(0.895 0.010 82);
-  --color-hairline-strong: oklch(0.815 0.013 72);
-  --color-accent: oklch(0.635 0.118 44);
-  --color-accent-ink: oklch(0.455 0.105 42);
-  --color-accent-soft: oklch(0.925 0.038 62);
+  /* Light theme — matched to claude.ai's actual palette. Warm *near-neutral*
+     canvas (#F8F8F6), white surfaces, clay accent (#D97757 ↔ #C6613F). Greys sit
+     at very low chroma in the warm 75–95 hue band — warm paper, not cold neutral,
+     but far less cream than a styled homage. See docs/spec/claude-desktop-redesign. */
+  --color-canvas: oklch(0.974 0.0025 95);
+  --color-surface: oklch(0.998 0.0012 95);
+  --color-sunken: oklch(0.942 0.003 95);
+  --color-fg-primary: oklch(0.252 0.005 75);
+  --color-fg-secondary: oklch(0.420 0.006 72);
+  --color-fg-muted: oklch(0.565 0.008 75);
+  --color-fg-faint: oklch(0.685 0.008 78);
+  --color-hairline: oklch(0.912 0.003 90);
+  --color-hairline-strong: oklch(0.860 0.004 88);
+  --color-accent: oklch(0.675 0.125 43);
+  --color-accent-ink: oklch(0.550 0.130 41);
+  --color-accent-soft: oklch(0.930 0.026 60);
   --color-danger: oklch(0.555 0.165 28);
   --color-danger-soft: oklch(0.935 0.045 38);
   --color-moss: oklch(0.55 0.064 150);
   --color-moss-soft: oklch(0.93 0.042 145);
   --color-iris: oklch(0.55 0.082 255);
 
-  --shadow-rise: 0 1px 0 0 oklch(0.80 0.012 80 / 0.5), 0 10px 30px -18px oklch(0.36 0.04 50 / 0.20);
-  --shadow-pop: 0 4px 14px -6px oklch(0.36 0.04 50 / 0.18), 0 18px 50px -22px oklch(0.36 0.04 50 / 0.22);
+  /* Soft, low-spread shadows — claude.ai uses barely-there elevation. */
+  --shadow-rise: 0 1px 2px -1px oklch(0.40 0.02 60 / 0.08), 0 1px 0 0 oklch(0.86 0.005 85 / 0.6);
+  --shadow-pop: 0 4px 14px -6px oklch(0.36 0.02 50 / 0.12), 0 12px 40px -18px oklch(0.36 0.02 50 / 0.16);
 
   /* Rounded scale. Pick the token by surface size, not by feel —
      mismatched radii on small elements get clipped to half-height and
@@ -105,22 +107,7 @@
     position: relative;
   }
 
-  /* Atmospheric grain — fixed, behind everything, never blocks pointer events */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0   0 0 0 0 0   0 0 0 0 0   0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-    opacity: 0.03;
-    mix-blend-mode: multiply;
-  }
-
-  .dark body::before {
-    opacity: 0.05;
-    mix-blend-mode: screen;
-  }
+  /* No grain / texture overlay — claude.ai renders a clean flat canvas. */
 
   ::selection {
     background: var(--color-accent);

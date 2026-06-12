@@ -48,15 +48,16 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
 
   return (
     <>
-      <div className="topbar-glass sticky top-0 z-40 flex items-center justify-between border-b border-[var(--color-hairline)] px-4 py-3 lg:hidden">
+      {/* Mobile top bar */}
+      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-[var(--color-hairline)] bg-[var(--color-canvas)] px-4 py-3 lg:hidden">
         <Brand />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {onSearchOpen && (
             <button
               type="button"
               onClick={onSearchOpen}
               aria-label={t('search.action.open')}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--color-hairline)] text-[var(--color-fg-secondary)] hover:border-[var(--color-hairline-strong)] hover:text-[var(--color-accent)]"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-fg-secondary)] hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)]"
             >
               <SearchIcon />
             </button>
@@ -65,7 +66,7 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
             type="button"
             onClick={() => setOpen((v) => !v)}
             aria-label={t('nav.toggleNav')}
-            className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--color-hairline)] text-[var(--color-fg-secondary)] hover:border-[var(--color-hairline-strong)]"
+            className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-[var(--color-fg-secondary)] hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)]"
           >
             <MenuIcon open={open} />
             {hasUpdate && !open && (
@@ -93,16 +94,28 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
 
       <aside
         className={
-          'fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-sunken)] transition-transform duration-300 lg:sticky lg:top-0 lg:h-dvh lg:translate-x-0 ' +
+          'fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-canvas)] transition-transform duration-300 lg:sticky lg:top-0 lg:h-dvh lg:translate-x-0 ' +
           (open ? 'translate-x-0' : '-translate-x-full')
         }
       >
-        <div className="flex h-[68px] items-center px-5">
+        {/* Brand row — serif wordmark + search affordance, claude.ai style */}
+        <div className="flex h-14 items-center justify-between pl-4 pr-3">
           <Brand />
+          {onSearchOpen && (
+            <button
+              type="button"
+              onClick={onSearchOpen}
+              aria-label={t('search.action.open')}
+              className="hidden h-8 w-8 items-center justify-center rounded-lg text-[var(--color-fg-muted)] hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)] lg:inline-flex"
+            >
+              <SearchIcon />
+            </button>
+          )}
         </div>
 
+        {/* Prominent search row — the app's primary action, styled like "New chat" */}
         {onSearchOpen && (
-          <div className="px-4 pb-2">
+          <div className="px-2 pb-1">
             <button
               type="button"
               onClick={() => {
@@ -110,23 +123,24 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
                 onSearchOpen();
               }}
               aria-label={t('search.action.open')}
-              className="surface-card is-interactive flex w-full items-center gap-2.5 px-3 py-3 text-left"
-              style={{ borderRadius: 'var(--radius-input)' }}
+              className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[14px] text-[var(--color-fg-secondary)] transition-colors hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)]"
             >
-              <SearchIcon className="text-[var(--color-fg-muted)]" />
-              <span className="flex-1 truncate text-[13px] text-[var(--color-fg-muted)]">
-                {t('search.action.open')}
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] text-[var(--color-fg-muted)] group-hover:text-[var(--color-fg-primary)]">
+                <SearchIcon className="!h-3.5 !w-3.5" />
               </span>
-              <kbd className="rounded border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--color-fg-faint)]">
+              <span className="flex-1 truncate">{t('search.action.open')}</span>
+              <kbd className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--color-fg-faint)]">
                 {HOTKEY_HINT}
               </kbd>
             </button>
           </div>
         )}
 
-        <nav className="flex-1 overflow-y-auto px-4 py-3">
-          <p className="eyebrow px-2 pb-2">{t('nav.workspace')}</p>
-          <ul className="space-y-1">
+        <nav className="flex-1 overflow-y-auto px-2 py-2">
+          <p className="px-2.5 pb-1.5 pt-2 text-[11px] font-medium text-[var(--color-fg-muted)]">
+            {t('nav.workspace')}
+          </p>
+          <ul className="space-y-0.5">
             {NAV.map((item) => {
               const isActive = item.match(pathname);
               return (
@@ -136,23 +150,23 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
                     aria-current={isActive ? 'page' : undefined}
                     onClick={() => setOpen(false)}
                     className={
-                      'group flex items-center gap-3 rounded-[var(--radius-input)] border px-3.5 py-2.5 text-sm transition ' +
+                      'group flex items-center gap-3 rounded-lg px-2.5 py-2 text-[14px] transition-colors ' +
                       (isActive
-                        ? 'border-transparent bg-[var(--color-accent-soft)] font-medium text-[var(--color-accent-ink)] dark:text-[var(--color-fg-primary)]'
-                        : 'border-transparent text-[var(--color-fg-secondary)] hover:bg-[var(--color-surface)] hover:text-[var(--color-fg-primary)]')
+                        ? 'bg-[var(--color-sunken)] font-medium text-[var(--color-fg-primary)]'
+                        : 'text-[var(--color-fg-secondary)] hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)]')
                     }
                   >
                     <span
                       className={
                         'transition-colors ' +
                         (isActive
-                          ? 'text-[var(--color-accent)]'
-                          : 'text-[var(--color-fg-muted)] group-hover:text-[var(--color-accent)]')
+                          ? 'text-[var(--color-fg-primary)]'
+                          : 'text-[var(--color-fg-muted)] group-hover:text-[var(--color-fg-primary)]')
                       }
                     >
                       {item.icon}
                     </span>
-                    <span className="font-medium tracking-tight">{t(item.labelKey)}</span>
+                    <span>{t(item.labelKey)}</span>
                   </Link>
                 </li>
               );
@@ -160,19 +174,19 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
           </ul>
         </nav>
 
-        <div className="surface-card mx-4 mb-4 space-y-3 p-4">
-          <div className="flex items-center justify-between">
-            <span className="eyebrow">{t('nav.language')}</span>
+        {/* Bottom — flat account-style strip (claude.ai puts the user row here) */}
+        <div className="mt-auto border-t border-[var(--color-hairline)] px-3 py-3">
+          <div className="flex items-center justify-between px-1.5 py-1">
+            <span className="text-[12px] text-[var(--color-fg-muted)]">{t('nav.language')}</span>
             <LocaleToggle />
           </div>
-          <div className="flex items-center justify-between">
-            <span className="eyebrow">{t('nav.theme')}</span>
+          <div className="flex items-center justify-between px-1.5 py-1">
+            <span className="text-[12px] text-[var(--color-fg-muted)]">{t('nav.theme')}</span>
             <ThemeToggle />
           </div>
-          <VersionNotice />
-          <p className="font-mono text-[10px] leading-snug text-[var(--color-fg-faint)]">
-            {t('app.brand.footnote')}
-          </p>
+          <div className="px-1.5 pt-1.5">
+            <VersionNotice />
+          </div>
         </div>
       </aside>
     </>
@@ -182,27 +196,18 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
 function Brand() {
   const t = useT();
   return (
-    <div className="flex items-center gap-2.5">
-      <span
-        aria-hidden
-        className="inline-flex h-9 w-9 items-center justify-center rounded-[0.7rem] bg-[var(--color-accent)] text-[var(--color-surface)] shadow-[var(--shadow-rise)]"
-      >
+    <Link to="/" className="flex items-center gap-2" aria-label={t('app.brand.title')}>
+      <span aria-hidden className="text-[var(--color-accent)]">
         <Glyph />
       </span>
-      <span className="flex flex-col leading-tight">
-        <span className="font-display text-[17px] font-medium tracking-[-0.01em] text-[var(--color-fg-primary)]">
-          {t('app.brand.title')}
-        </span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
-          {t('app.brand.subtitle')}
-        </span>
+      <span className="font-display text-[19px] font-medium leading-none tracking-[-0.01em] text-[var(--color-fg-primary)]">
+        {t('app.brand.title')}
       </span>
-    </div>
+    </Link>
   );
 }
 
-// Claude-style sunburst mark — radiating spokes of alternating length, evoking
-// the Anthropic starburst without copying it.
+// Clay sunburst mark — echoes claude.ai's home glyph; radiating spokes.
 function Glyph() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
@@ -224,7 +229,7 @@ function Glyph() {
 
 function FolderIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2a1.5 1.5 0 0 1 1.05.43l1.34 1.32A1.5 1.5 0 0 0 12.14 7.2H19.5A1.5 1.5 0 0 1 21 8.7v9.3a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z" />
     </svg>
   );
@@ -232,7 +237,7 @@ function FolderIcon() {
 
 function DiskIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <ellipse cx="12" cy="6.5" rx="8" ry="2.5" />
       <path d="M4 6.5v5c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-5" />
       <path d="M4 11.5v5c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-5" />
@@ -242,7 +247,7 @@ function DiskIcon() {
 
 function ImportIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M12 14V3" />
       <path d="M8 10l4 4 4-4" />
       <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15" />
