@@ -11,6 +11,7 @@ import {
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Breadcrumbs, { BreadcrumbFolderIcon } from '../components/Breadcrumbs.tsx';
 import DeleteDialog from '../components/DeleteDialog.tsx';
+import FileThumb from '../components/FileThumb.tsx';
 import { Loading } from '../components/Loading.tsx';
 import MessageBubble, { WorkingIndicator } from '../components/MessageBubble.tsx';
 import { type EditLookup } from '../components/ModifiedFilesView.tsx';
@@ -562,10 +563,12 @@ function ChatHeader({
           disabled={modifiedLoading}
           aria-label={t('session.modified.openAria')}
           title={t('session.modified.title')}
-          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-[var(--color-accent)]"
+          className="group/file inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] py-1 pl-1.5 pr-2.5 transition hover:border-[var(--color-accent)] hover:bg-[var(--color-sunken)] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <FilesIcon />
-          <span className="hidden sm:inline">{t('session.modified.title')}</span>
+          <FileThumb size="sm" />
+          <span className="hidden text-[12px] font-medium text-[var(--color-fg-secondary)] transition-colors group-hover/file:text-[var(--color-fg-primary)] sm:inline">
+            {t('session.modified.title')}
+          </span>
           {modifiedCount > 0 && (
             <span className="rounded-full bg-[var(--color-accent-soft)] px-1.5 font-mono text-[10px] tabular-nums text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
               {modifiedCount}
@@ -955,25 +958,6 @@ function TrashIcon() {
       <path d="M3 6h18" />
       <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
       <path d="M5.5 6l1.1 13.2A1.5 1.5 0 0 0 8.1 20.5h7.8a1.5 1.5 0 0 0 1.5-1.3L18.5 6" />
-    </svg>
-  );
-}
-
-function FilesIcon() {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M3 5h6l2 2h10" />
-      <path d="M3 5v14h18V9H3" />
     </svg>
   );
 }
