@@ -1,0 +1,10 @@
+case,round-1,note
+typecheck (tsc -b),PASS,0 error
+build (vite),PASS,34s; Fraunces woff2 打包; CSS 编译通过
+test (vitest, server 安全网),PASS,9 files / 61 tests
+visual home light,PASS,暖米白 canvas + coral 品牌块 + 衬线 wordmark + coral-soft 活跃 nav
+visual home dark,PASS,暖炭灰(#262624 系) + coral accent
+visual project light,PASS,ledger 表跟随换肤 + coral № / chevron
+visual project dark,PASS,暖炭灰下表格可读
+visual session light,PASS,聊天气泡: 暖奶油用户卡 + coral sunburst Claude 头像 + 衬线 coral 角色名
+visual session dark,PASS,暖炭灰聊天流 + coral 头像 + 工具块 sunken
