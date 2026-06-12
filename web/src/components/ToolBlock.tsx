@@ -167,11 +167,10 @@ export function ToolUseBlock({
   );
 }
 
-/** 文件操作工具 → 文件路径；非文件工具返回 null（仍走通用折叠行）。Read 也算
- *  文件展示，纳入卡片；其展开体维持原样（输入 JSON）。 */
+/** 文件操作工具 → 文件路径；非文件工具返回 null（仍走通用折叠行）。Read 刻意不进
+ *  文件卡 / 右侧预览——它只是只读快照，退回通用「动词 + 路径」折叠行，不喧宾夺主。 */
 function fileOpOf(name: string, input: Record<string, unknown>): { path: string } | null {
   switch (name) {
-    case 'Read':
     case 'Write':
     case 'Edit':
     case 'MultiEdit': {
@@ -303,6 +302,8 @@ function toolVerb(t: ReturnType<typeof useT>, name: string): string {
     case 'Bash':
     case 'PowerShell':
       return t('tool.verb.ran');
+    case 'Read':
+      return t('tool.verb.read');
     case 'Glob':
     case 'Grep':
       return t('tool.verb.searched');
@@ -646,28 +647,35 @@ export function ThinkingBlock({
   const t = useT();
   const [open, setOpen] = useState(false);
   const hasText = block.text.trim() !== '';
+  // 与非文件工具调用（Bash/Grep/…）同款折叠：无外框的「glyph + 标签 + caret」行，悬浮染底；
+  // 展开后正文才落进一张浅边框卡片——不再用整条带边框 + sunken 底的「条状」块。
   return (
-    <div className="overflow-hidden rounded-xl border border-[var(--color-hairline-strong)] bg-[var(--color-sunken)] text-sm text-[var(--color-fg-secondary)]">
+    <div className="text-sm">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left"
+        className="group/think flex w-full items-center gap-1.5 rounded-[var(--radius-control)] px-1.5 py-1 text-left transition hover:bg-[var(--color-sunken)]"
       >
-        <span className="flex items-center gap-2 font-mono text-[11.5px] font-medium uppercase tracking-[0.06em]">
-          <Glyph kind="thinking" /> {t('tool.thinking')}
+        <span className="shrink-0 text-[var(--color-fg-muted)]">
+          <Glyph kind="thinking" />
+        </span>
+        <span className="shrink-0 font-medium text-[var(--color-fg-primary)]">
+          {t('tool.thinking')}
         </span>
         <Caret open={open} />
       </button>
       {open && (
-        hasText ? (
-          <div className="whitespace-pre-wrap break-words border-t border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-2 text-[13px] leading-relaxed text-[var(--color-fg-secondary)]">
-            <HighlightedText text={block.text} query={query} />
-          </div>
-        ) : (
-          <p className="border-t border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-3 py-2 text-[12px] italic text-[var(--color-fg-muted)]">
-            {t('tool.thinkingEncrypted')}
-          </p>
-        )
+        <div className="mt-1 overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)]">
+          {hasText ? (
+            <div className="whitespace-pre-wrap break-words px-3 py-2 text-[13px] leading-relaxed text-[var(--color-fg-secondary)]">
+              <HighlightedText text={block.text} query={query} />
+            </div>
+          ) : (
+            <p className="px-3 py-2 text-[12px] italic text-[var(--color-fg-muted)]">
+              {t('tool.thinkingEncrypted')}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

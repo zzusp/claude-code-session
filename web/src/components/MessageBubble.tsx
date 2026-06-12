@@ -39,6 +39,8 @@ export default function MessageBubble({
     );
   }
   if (message.type === 'user') {
+    const command = commandInfoOf(message);
+    if (command) return <CommandMessage message={message} command={command} query={query} />;
     return <UserMessage message={message} query={query} toolNames={toolNames} />;
   }
   return (
@@ -110,6 +112,81 @@ function UserMessage({
         <Blocks blocks={message.blocks} query={query} toolNames={toolNames} />
       </div>
     </div>
+  );
+}
+
+// 斜杠命令的用户消息（/clear、/model …）在 jsonl 里是一坨 `<command-name>…</command-name>`
+// XML 正文。解析出命令名 / 参数 / 本地输出，渲染成干净的命令胶囊，而不是裸 XML。
+interface CommandInfo {
+  name: string;
+  args: string;
+  stdout: string;
+}
+
+const COMMAND_TAG_RE = /^\s*<command-(?:name|message|args)>/;
+
+function commandInfoOf(message: Message): CommandInfo | null {
+  if (message.type !== 'user') return null;
+  const text = message.blocks
+    .filter((b) => b.type === 'text')
+    .map((b) => (b as Extract<Block, { type: 'text' }>).text)
+    .join('\n');
+  if (!COMMAND_TAG_RE.test(text)) return null;
+  const pick = (tag: string) =>
+    text.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`))?.[1]?.trim() ?? '';
+  const info = {
+    name: pick('command-name'),
+    args: pick('command-args'),
+    stdout: pick('local-command-stdout'),
+  };
+  return info.name || info.args ? info : null;
+}
+
+// 命令胶囊 + 可选参数气泡，靠右对齐（与人类消息同侧，命令也是用户发起的）。
+function CommandMessage({
+  message,
+  command,
+  query,
+}: {
+  message: Message;
+  command: CommandInfo;
+  query: string;
+}) {
+  const t = useT();
+  return (
+    <div className="group flex flex-col items-end" data-uuid={message.uuid}>
+      <MetaRow label={t('message.role.you')} ts={message.ts} align="right" />
+      <div className="mt-0.5 flex max-w-[80%] flex-col items-end gap-1.5">
+        {command.name && (
+          <span className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] bg-[var(--color-sunken)] px-2.5 py-1 font-mono text-[12.5px] font-medium text-[var(--color-fg-primary)]">
+            <span className="text-[var(--color-fg-muted)]">
+              <CommandGlyph />
+            </span>
+            {command.name}
+          </span>
+        )}
+        {command.args && (
+          <div className="rounded-[1.25rem] rounded-tr-md bg-[var(--color-sunken)] px-4 py-2.5 text-[15px] leading-relaxed text-[var(--color-fg-primary)]">
+            <HighlightedText text={command.args} query={query} />
+          </div>
+        )}
+        {command.stdout && (
+          <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-3 py-2 font-mono text-[11.5px] text-[var(--color-fg-secondary)]">
+            <HighlightedText text={command.stdout} query={query} />
+          </pre>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// 终端提示符样式的小图标（`›_`），标记这是一条斜杠命令而非普通消息。
+function CommandGlyph() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M7 8l4 4-4 4" />
+      <path d="M13 16h4" />
+    </svg>
   );
 }
 

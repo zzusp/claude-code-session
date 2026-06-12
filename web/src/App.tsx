@@ -83,8 +83,11 @@ function ChromeLayout() {
       <main className={'min-w-0 flex-1' + (fullBleed ? ' flex min-h-0 flex-col' : '')}>
         <div
           className={
-            'mx-auto w-full max-w-6xl px-5 sm:px-8 lg:px-12' +
-            (fullBleed ? ' flex min-h-0 flex-1 flex-col' : ' py-8')
+            // 会话页（fullBleed）铺满整个主区宽度、不套 max-w 盒、不加外层左右留白——
+            // 三层各自在内部设置 padding。其它路由维持居中 + 带留白的窗口滚动布局。
+            fullBleed
+              ? 'flex min-h-0 w-full flex-1 flex-col'
+              : 'mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 lg:px-12'
           }
         >
           <Outlet />

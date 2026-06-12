@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import {
+  Fragment,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -552,7 +553,7 @@ export default function SessionDetailRoute() {
           Provider 始终包住时间线，让深层的文件卡能拿到「打开预览」的回调。 */}
       <FilePreviewContext.Provider value={previewCtx}>
         <div ref={splitRef} className="flex min-h-0 flex-1">
-          <div ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto px-3 pb-16 pt-6">
+          <div ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto px-8 pb-16 pt-6 lg:px-12">
             {data?.truncated && (
               <Admonition tone="warn" className="mb-6">
                 {t('session.truncated', { n: MAX_SESSION_MESSAGES.toLocaleString() })}
@@ -631,11 +632,12 @@ export default function SessionDetailRoute() {
                   setPaneWidth(clampPaneWidth(rect.right - clientX, rect.width))
                 }
               />
-              {/* 预览面板填满中间层：`self-stretch` 随中间层定高，被页头/页脚夹住，
-                  不压页脚、底部不脱离；内容超出由 FilePreviewPanel 内部滚动。 */}
+              {/* 预览面板贴满中间层：`self-stretch` 随中间层定高、被页头/页脚夹住，左右/上下
+                  都不留边距、不套圆角——左侧分割线已由 Splitter 画出，自身只给一块 surface 底，
+                  从中间层顶贴到底；内容超出由 FilePreviewPanel 内部滚动。 */}
               <aside
                 style={{ width: paneWidth }}
-                className="my-3 shrink-0 self-stretch overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-hairline)] bg-[var(--color-surface)] shadow-[var(--shadow-rise)]"
+                className="shrink-0 self-stretch overflow-hidden bg-[var(--color-surface)]"
               >
                 <FilePreviewPanel
                   target={preview}
@@ -726,7 +728,7 @@ function SessionTitleBar({
 }) {
   const t = useT();
   return (
-    <div className="flex items-center gap-2 px-3 py-2.5">
+    <div className="flex items-center gap-2 px-4 py-2.5">
       <StatusBeacon isLive={isLive} isWorking={isWorking} />
       <span aria-hidden className="shrink-0 text-[var(--color-fg-muted)]">
         <MonitorIcon />
@@ -810,24 +812,34 @@ function SessionFooter({
   const t = useT();
   return (
     <div className="shrink-0 topbar-glass border-t border-[var(--color-hairline)]">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2">
-        <dl className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-          {cwd && (
-            <FooterFact icon={<FolderGlyph />} value={cwd} mono title={cwd} className="max-w-[20rem]" />
-          )}
-          {branch && <FooterFact icon={<BranchGlyph />} value={branch} mono />}
-          {model && <FooterFact icon={<ModelGlyph />} value={model} mono />}
-          <FooterFact label={t('session.meta.size')} value={formatBytes(bytes)} />
-          <FooterFact label={t('session.meta.messages')} value={messageCount.toLocaleString()} />
-          {startedAt && (
-            <FooterFact label={t('session.meta.started')} value={formatDateTime(startedAt)} />
-          )}
-          {startedAt && lastAt && (
-            <FooterFact label={t('session.meta.duration')} value={formatDuration(startedAt, lastAt)} />
-          )}
-          {contextTokens !== null && (
-            <ContextRing tokens={contextTokens} window={contextWindow} />
-          )}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-2">
+        <dl className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+          {/* 各项之间插一道竖发丝线分隔，密排时也能一眼分清字段边界。条件项缺省时不留空隙。 */}
+          {[
+            cwd && (
+              <FooterFact key="cwd" icon={<FolderGlyph />} value={cwd} mono title={cwd} className="max-w-[20rem]" />
+            ),
+            branch && <FooterFact key="branch" icon={<BranchGlyph />} value={branch} mono />,
+            model && <FooterFact key="model" icon={<ModelGlyph />} value={model} mono />,
+            <FooterFact key="size" label={t('session.meta.size')} value={formatBytes(bytes)} />,
+            <FooterFact key="messages" label={t('session.meta.messages')} value={messageCount.toLocaleString()} />,
+            startedAt && (
+              <FooterFact key="started" label={t('session.meta.started')} value={formatDateTime(startedAt)} />
+            ),
+            startedAt && lastAt && (
+              <FooterFact key="duration" label={t('session.meta.duration')} value={formatDuration(startedAt, lastAt)} />
+            ),
+            contextTokens !== null && (
+              <ContextRing key="ctx" tokens={contextTokens} window={contextWindow} />
+            ),
+          ]
+            .filter(Boolean)
+            .map((fact, i) => (
+              <Fragment key={i}>
+                {i > 0 && <FooterDivider />}
+                {fact}
+              </Fragment>
+            ))}
         </dl>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           {/* Message filters live here (moved off the toolbar): single-select. */}
@@ -855,6 +867,11 @@ function SessionFooter({
       </div>
     </div>
   );
+}
+
+// 页脚各信息项之间的竖发丝线分隔。
+function FooterDivider() {
+  return <span aria-hidden className="h-3.5 w-px shrink-0 bg-[var(--color-hairline-strong)]" />;
 }
 
 function FooterFact({
@@ -1176,7 +1193,7 @@ function SearchReveal({
 }) {
   const t = useT();
   return (
-    <div className="flex items-center gap-3 border-t border-[var(--color-hairline)] px-3 py-2">
+    <div className="flex items-center gap-3 border-t border-[var(--color-hairline)] px-4 py-2">
       <div className="flex min-w-0 flex-1 items-center gap-2 border-b border-[var(--color-hairline)] py-1 transition focus-within:border-[var(--color-accent)]">
         <SearchIcon className="text-[var(--color-fg-muted)]" />
         <input

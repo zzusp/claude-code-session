@@ -110,14 +110,21 @@ export async function loadSessionDetail(
 const STANDARD_CONTEXT_WINDOW = 200_000;
 const LARGE_CONTEXT_WINDOW = 1_000_000;
 
+// 已知不支持 1M 上下文、仍是 200K 标准窗口的模型：Haiku 全系，以及 legacy Claude 3.x /
+// 2.x / instant。当前在产的 Opus 4.x / Sonnet 4.x / Fable 5 都是 1M。
+const SUB_LARGE_CONTEXT_RE = /haiku|claude-3|claude-2|claude-instant/i;
+
 /** Context window the ring is scaled against, derived from the session's model.
- *  Claude's standard window is 200K; the `[1m]` alias bumps it to 1M. Claude Code
- *  usually strips that suffix from logged records, so we also bump to 1M when a
- *  turn's input-side total provably exceeded the standard window — the ceiling is
- *  never scaled below what the session actually consumed. */
+ *  Default to Claude's 1M window (Opus 4.x / Sonnet 4.x / Fable 5 all support it,
+ *  and Claude Code strips the `[1m]` suffix from logged records so we can't rely on
+ *  it). Only models known to cap at 200K — Haiku and legacy Claude 3.x / 2.x — fall
+ *  back to the standard window. The ceiling is never scaled below what the session
+ *  actually consumed, so a 200K model that somehow overshot still bumps to 1M. */
 function contextWindowFor(model: string | null, peakTokens: number): number {
-  const declaredLarge = model !== null && /\[1m\]|[-_]1m\b/i.test(model);
-  const base = declaredLarge ? LARGE_CONTEXT_WINDOW : STANDARD_CONTEXT_WINDOW;
+  const base =
+    model !== null && SUB_LARGE_CONTEXT_RE.test(model)
+      ? STANDARD_CONTEXT_WINDOW
+      : LARGE_CONTEXT_WINDOW;
   return peakTokens > base ? LARGE_CONTEXT_WINDOW : base;
 }
 
