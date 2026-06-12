@@ -71,14 +71,19 @@ export function ToolUseBlock({
 
   const summary = toolSummary(block.name, input);
   return (
-    <div className="overflow-hidden rounded-xl border border-[var(--color-hairline)] bg-[var(--color-sunken)] text-sm">
+    <div className="overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] text-sm transition-colors hover:border-[var(--color-hairline-strong)]">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left transition hover:bg-[var(--color-canvas)]"
+        className="flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition hover:bg-[var(--color-sunken)]"
       >
-        <span className="flex shrink-0 items-center gap-2 font-mono text-[11.5px] font-medium uppercase tracking-[0.06em] text-[var(--color-fg-secondary)]">
-          <Glyph kind="tool" /> {block.name}
+        {/* Accent-tinted tool glyph chip — makes tool calls scannable in the
+            timeline (claude.ai tints its tool affordances the same way). */}
+        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] bg-[var(--color-accent-soft)] text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
+          <Glyph kind="tool" />
+        </span>
+        <span className="shrink-0 font-mono text-[11.5px] font-medium uppercase tracking-[0.06em] text-[var(--color-fg-secondary)]">
+          {block.name}
         </span>
         {summary && (
           <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--color-fg-muted)]">

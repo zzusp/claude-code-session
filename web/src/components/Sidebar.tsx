@@ -384,23 +384,26 @@ function Brand() {
   );
 }
 
-// Claude-style sunburst mark — radiating spokes of alternating length, evoking
-// the Anthropic starburst without copying it.
+// Anthropic-style starburst mark — twelve radiating spokes of alternating length
+// converging on a common core, the dense solid burst Claude uses, rendered with
+// round-capped strokes so it stays crisp inside the 18px brand square.
 function Glyph() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
-      <g>
-        <path d="M12 3.5v4.2" />
-        <path d="M12 16.3v4.2" />
-        <path d="M3.5 12h4.2" />
-        <path d="M16.3 12h4.2" />
-      </g>
-      <g opacity="0.6">
-        <path d="M6.3 6.3l2.6 2.6" />
-        <path d="M15.1 15.1l2.6 2.6" />
-        <path d="M6.3 17.7l2.6-2.6" />
-        <path d="M15.1 8.9l2.6-2.6" />
-      </g>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden>
+      {/* long spokes (every 60°) */}
+      <path d="M13.8 12 L21.4 12" />
+      <path d="M12.9 10.44 L16.7 3.86" />
+      <path d="M11.1 10.44 L7.3 3.86" />
+      <path d="M10.2 12 L2.6 12" />
+      <path d="M11.1 13.56 L7.3 20.14" />
+      <path d="M12.9 13.56 L16.7 20.14" />
+      {/* short spokes interleaved (every 60°, offset 30°) */}
+      <path d="M13.56 11.1 L17.89 8.6" />
+      <path d="M12 10.2 L12 5.2" />
+      <path d="M10.44 11.1 L6.11 8.6" />
+      <path d="M10.44 12.9 L6.11 15.4" />
+      <path d="M12 13.8 L12 18.8" />
+      <path d="M13.56 12.9 L17.89 15.4" />
     </svg>
   );
 }

@@ -35,6 +35,8 @@ export async function loadSessionDetail(
     bytes,
     title: '(untitled)',
     customTitle: null,
+    contextTokens: null,
+    contextWindow: 200_000,
   };
 
   const messages: Message[] = [];
@@ -42,6 +44,11 @@ export async function loadSessionDetail(
   // Latest `ai-title` record wins (Claude rewrites it every turn). Kept off
   // the wire shape; just used to seed `meta.title` once parsing finishes.
   let aiTitle: string | null = null;
+  // Context-window occupancy. `lastContextTokens` follows the most recent
+  // assistant turn (records are chronological), `peakContextTokens` the high
+  // water mark — the latter auto-detects a 1M-context session.
+  let lastContextTokens: number | null = null;
+  let peakContextTokens = 0;
 
   const rl = readline.createInterface({
     input: fs.createReadStream(jsonlPath, { encoding: 'utf8' }),
@@ -61,6 +68,13 @@ export async function loadSessionDetail(
     captureMeta(obj, meta);
     if (obj.type === 'ai-title' && typeof obj.aiTitle === 'string') {
       aiTitle = obj.aiTitle;
+    }
+    if (obj.type === 'assistant') {
+      const used = contextTokensOf(obj);
+      if (used !== null) {
+        lastContextTokens = used;
+        if (used > peakContextTokens) peakContextTokens = used;
+      }
     }
 
     if (obj.type !== 'user' && obj.type !== 'assistant') continue;
@@ -84,7 +98,26 @@ export async function loadSessionDetail(
 
   meta.messageCount = messages.length;
   meta.title = aiTitle || deriveAutoTitle(messages);
+  meta.contextTokens = lastContextTokens;
+  // The `[1m]` model suffix is stripped from records, so a peak past the 200K
+  // standard window is the only reliable tell of a 1M-context session.
+  meta.contextWindow = peakContextTokens > 200_000 ? 1_000_000 : 200_000;
   return { meta, messages, truncated };
+}
+
+/** Input-side token total of an assistant record's `message.usage`
+ *  (`input_tokens + cache_creation_input_tokens + cache_read_input_tokens`) — the
+ *  context-window occupancy after that turn. Null when no usage block is present
+ *  or the totals are all zero (synthetic-error records carry a zeroed usage). */
+function contextTokensOf(obj: Record<string, unknown>): number | null {
+  const message = obj.message as { usage?: unknown } | undefined;
+  const usage = message?.usage;
+  if (!usage || typeof usage !== 'object') return null;
+  const u = usage as Record<string, unknown>;
+  const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  const total =
+    num(u.input_tokens) + num(u.cache_creation_input_tokens) + num(u.cache_read_input_tokens);
+  return total > 0 ? total : null;
 }
 
 function captureMeta(obj: Record<string, unknown>, meta: SessionMeta): void {

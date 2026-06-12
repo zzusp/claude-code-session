@@ -10,6 +10,17 @@ export function formatBytes(bytes: number): string {
   return `${bytes} B`;
 }
 
+/** Compact token count for the context ring: 427246 → "427K", 1_000_000 → "1M". */
+export function formatTokens(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return '0';
+  if (n >= 1_000_000) {
+    const m = n / 1_000_000;
+    return `${m >= 10 || Number.isInteger(m) ? m.toFixed(0) : m.toFixed(1)}M`;
+  }
+  if (n >= 1000) return `${Math.round(n / 1000)}K`;
+  return String(n);
+}
+
 export function formatRelativeTime(iso: string | null): string {
   if (!iso) return '—';
   const t = new Date(iso).getTime();
