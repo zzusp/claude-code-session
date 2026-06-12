@@ -1,10 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
 import { HOTKEY_HINT } from '../lib/hotkeys.ts';
 import { api, type SessionSummary } from '../lib/api.ts';
 import { useT } from '../lib/i18n.ts';
 import { queryKeys } from '../lib/query-keys.ts';
+import DeleteDialog from './DeleteDialog.tsx';
 import LocaleToggle from './LocaleToggle.tsx';
 import StatusDot from './StatusDot.tsx';
 import ThemeToggle from './ThemeToggle.tsx';
@@ -260,6 +262,10 @@ function RecentsSection({
       (query.state.data ?? []).some((s) => s.isLivePid || s.isRecentlyActive) ? 5000 : false,
   });
   const recents = data ?? [];
+  // Deletion path from the sidebar (Claude-style Recents hover action). The dialog
+  // is portaled to <body>: rendered inside the <aside> its `transform` would trap
+  // the fixed overlay. DeleteDialog already invalidates the recents query on success.
+  const [toDelete, setToDelete] = useState<SessionSummary | null>(null);
 
   return (
     <div className="mt-6">
@@ -276,11 +282,27 @@ function RecentsSection({
         <ul className="space-y-0.5">
           {recents.map((s) => (
             <li key={s.id}>
-              <RecentRow session={s} active={s.id === activeId} onNavigate={onNavigate} />
+              <RecentRow
+                session={s}
+                active={s.id === activeId}
+                onNavigate={onNavigate}
+                onDelete={() => setToDelete(s)}
+              />
             </li>
           ))}
         </ul>
       )}
+
+      {toDelete &&
+        createPortal(
+          <DeleteDialog
+            projectId={toDelete.projectId}
+            selected={[toDelete]}
+            onClose={() => setToDelete(null)}
+            onDeleted={() => setToDelete(null)}
+          />,
+          document.body,
+        )}
     </div>
   );
 }
@@ -289,30 +311,54 @@ function RecentRow({
   session,
   active,
   onNavigate,
+  onDelete,
 }: {
   session: SessionSummary;
   active: boolean;
   onNavigate: () => void;
+  onDelete: () => void;
 }) {
+  const t = useT();
   const title = session.customTitle ?? session.title;
   return (
-    <Link
-      to={`/projects/${encodeURIComponent(session.projectId)}/sessions/${encodeURIComponent(session.id)}`}
-      onClick={onNavigate}
-      aria-current={active ? 'page' : undefined}
-      title={title}
-      className={
-        'group flex items-center gap-2.5 rounded-[var(--radius-input)] px-2.5 py-2 text-[13px] transition ' +
-        (active
-          ? 'bg-[var(--sidebar-active)] font-medium text-[var(--color-fg-primary)]'
-          : 'text-[var(--color-fg-secondary)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--color-fg-primary)]')
-      }
-    >
-      <span className="shrink-0">
-        <StatusDot session={session} withLabel={false} />
-      </span>
-      <span className="min-w-0 flex-1 truncate tracking-tight">{title}</span>
-    </Link>
+    <div className="group relative">
+      <Link
+        to={`/projects/${encodeURIComponent(session.projectId)}/sessions/${encodeURIComponent(session.id)}`}
+        onClick={onNavigate}
+        aria-current={active ? 'page' : undefined}
+        title={title}
+        className={
+          'flex items-center gap-2.5 rounded-[var(--radius-input)] py-2 pl-2.5 pr-8 text-[13px] transition ' +
+          (active
+            ? 'bg-[var(--sidebar-active)] font-medium text-[var(--color-fg-primary)]'
+            : 'text-[var(--color-fg-secondary)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--color-fg-primary)]')
+        }
+      >
+        <span className="shrink-0">
+          <StatusDot session={session} withLabel={false} />
+        </span>
+        <span className="min-w-0 flex-1 truncate tracking-tight">{title}</span>
+      </Link>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label={t('session.action.delete')}
+        title={t('session.action.delete')}
+        className="absolute right-1 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-[var(--color-fg-faint)] opacity-0 transition hover:bg-[var(--color-surface)] hover:text-[var(--color-danger)] focus:opacity-100 group-hover:opacity-100"
+      >
+        <TrashIcon />
+      </button>
+    </div>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 6h18" />
+      <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
+      <path d="M5.5 6l1.1 13.2A1.5 1.5 0 0 0 8.1 20.5h7.8a1.5 1.5 0 0 0 1.5-1.3L18.5 6" />
+    </svg>
   );
 }
 
