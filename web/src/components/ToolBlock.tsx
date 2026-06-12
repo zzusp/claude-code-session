@@ -20,6 +20,7 @@ export function ToolUseBlock({
   block: Extract<Block, { type: 'tool_use' }>;
   query: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const input = asRecord(block.input);
   // 「读用富渲染，搜用原文高亮」：query 非空＝搜索态，展开体退回 JSON 原文 +
@@ -69,32 +70,38 @@ export function ToolUseBlock({
     );
   }
 
+  // 非文件工具（Bash / Grep / Task / …）：对齐 claude.ai 桌面端的「动词 + 灰色描述」
+  // 折叠行——无外框、贴在助手正文流里读起来像自然语句；展开后才落出一张带工具名
+  // 标签的卡片（工具名移进卡片，不再占折叠行）。
+  const verb = toolVerb(t, block.name);
   const summary = toolSummary(block.name, input);
   return (
-    <div className="overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] text-sm transition-colors hover:border-[var(--color-hairline-strong)]">
+    <div className="text-sm">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition hover:bg-[var(--color-sunken)]"
+        className="group/tool flex w-full items-center gap-1.5 rounded-[var(--radius-control)] px-1.5 py-1 text-left transition hover:bg-[var(--color-sunken)]"
       >
-        {/* Accent-tinted tool glyph chip — makes tool calls scannable in the
-            timeline (claude.ai tints its tool affordances the same way). */}
-        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] bg-[var(--color-accent-soft)] text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
-          <Glyph kind="tool" />
-        </span>
-        <span className="shrink-0 font-mono text-[11.5px] font-medium uppercase tracking-[0.06em] text-[var(--color-fg-secondary)]">
-          {block.name}
-        </span>
+        <span className="shrink-0 font-medium text-[var(--color-fg-primary)]">{verb}</span>
         {summary && (
-          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--color-fg-muted)]">
+          <span className="min-w-0 truncate text-[13px] text-[var(--color-fg-muted)]">
             <HighlightedText text={summary} query={query} />
           </span>
         )}
-        <span className="ml-auto shrink-0">
-          <Caret open={open} />
-        </span>
+        <Caret open={open} />
       </button>
-      {body}
+      {open && (
+        <div className="mt-1 overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)]">
+          <div className="px-3 pb-1 pt-2 font-mono text-[11px] font-medium tracking-[0.02em] text-[var(--color-fg-secondary)]">
+            {block.name}
+          </div>
+          {searching ? (
+            <JsonDump input={input} query={query} />
+          ) : (
+            <ToolUseBody name={block.name} input={input} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -165,7 +172,7 @@ function ToolUseBody({ name, input }: { name: string; input: Record<string, unkn
         </>
       );
     case 'bash':
-      return <BashBody command={body.command} description={body.description} />;
+      return <BashBody command={body.command} />;
     case 'todo':
       return <TodoList todos={body.todos} />;
     default:
@@ -177,7 +184,7 @@ function ToolUseBody({ name, input }: { name: string; input: Record<string, unkn
 type ToolBody =
   | { kind: 'diff'; filePath: string; rows: UnifiedRow[]; replaceAll: boolean }
   | { kind: 'multidiff'; filePath: string; sections: UnifiedRow[][] }
-  | { kind: 'bash'; command: string; description: string }
+  | { kind: 'bash'; command: string }
   | { kind: 'todo'; todos: TodoItem[] }
   | { kind: 'json' };
 
@@ -216,13 +223,39 @@ function buildToolBody(name: string, input: Record<string, unknown>): ToolBody {
       };
     }
     case 'Bash':
-      return { kind: 'bash', command: strOf(input.command), description: strOf(input.description) };
+      return { kind: 'bash', command: strOf(input.command) };
     case 'TodoWrite': {
       const todos = todosOf(input);
       return todos.length > 0 ? { kind: 'todo', todos } : { kind: 'json' };
     }
     default:
       return { kind: 'json' };
+  }
+}
+
+/** 折叠头部的动作动词（claude.ai「Ran / Searched …」式），与灰色描述拼成自然语句。
+ *  文件操作（Read/Edit/Write…）走文件卡不经过这里，故只覆盖命令 / 搜索 / 委派类工具；
+ *  未知工具退回工具名本身，保持可辨识。 */
+function toolVerb(t: ReturnType<typeof useT>, name: string): string {
+  switch (name) {
+    case 'Bash':
+      return t('tool.verb.ran');
+    case 'Glob':
+    case 'Grep':
+      return t('tool.verb.searched');
+    case 'WebSearch':
+      return t('tool.verb.searchedWeb');
+    case 'WebFetch':
+      return t('tool.verb.fetched');
+    case 'Task':
+    case 'Agent':
+      return t('tool.verb.delegated');
+    case 'Skill':
+      return t('tool.verb.skill');
+    case 'TodoWrite':
+      return t('tool.verb.todos');
+    default:
+      return name;
   }
 }
 
@@ -322,18 +355,30 @@ function TodoList({ todos }: { todos: TodoItem[] }) {
   );
 }
 
-function BashBody({ command, description }: { command: string; description: string }) {
+function BashBody({ command }: { command: string }) {
+  // 终端式命令块：`$` 提示符（claude.ai 同款）+ 首 token（程序名）提色。轻量
+  // 「命令高亮」只着色第一个 token，对管道 / 多行命令也安全；description 已上移到
+  // 折叠行摘要，这里不再重复。命令体已嵌在外层卡片内，省去内层边框只留 sunken 底。
+  const m = /^(\s*)(\S+)([\s\S]*)$/.exec(command);
   return (
-    <div className="px-3 py-2">
-      {description && (
-        <p className="mb-1.5 text-[12.5px] text-[var(--color-fg-muted)]">{description}</p>
-      )}
-      <div className="group/cmd relative rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-sunken)]">
+    <div className="px-2.5 pb-2.5 pt-0.5">
+      <div className="group/cmd relative overflow-hidden rounded-[var(--radius-control)] bg-[var(--color-sunken)]">
         <span className="absolute right-1 top-1 opacity-0 transition group-hover/cmd:opacity-100">
           <CopyButton text={command} />
         </span>
         <pre className="overflow-x-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-[11.5px] leading-[1.6] text-[var(--color-fg-primary)]">
-          {command}
+          <span className="select-none text-[var(--color-fg-faint)]">$ </span>
+          {m ? (
+            <>
+              {m[1]}
+              <span className="text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
+                {m[2]}
+              </span>
+              {m[3]}
+            </>
+          ) : (
+            command
+          )}
         </pre>
       </div>
     </div>
@@ -449,11 +494,11 @@ export function ToolResultBlock({
   return (
     <div className={`overflow-hidden rounded-xl border text-sm ${tone}`}>
       <div className="flex items-center justify-between gap-2 px-3 py-2">
-        <span className="flex items-center gap-2 font-mono text-[11.5px] font-medium uppercase tracking-[0.06em]">
+        <span className="flex items-center gap-1.5 text-[12px] font-medium">
           <Glyph kind={block.isError ? 'error' : 'result'} />
           {block.isError ? t('tool.error') : t('tool.result')}
           {toolName && (
-            <span className={block.isError ? 'opacity-70' : 'text-[var(--color-fg-muted)]'}>
+            <span className={block.isError ? 'opacity-70' : 'font-normal text-[var(--color-fg-muted)]'}>
               · {toolName}
             </span>
           )}
@@ -462,7 +507,7 @@ export function ToolResultBlock({
           <button
             type="button"
             onClick={() => setOpen(!open)}
-            className="font-mono text-[10.5px] uppercase tracking-[0.16em] underline-offset-2 hover:underline"
+            className="text-[11px] text-[var(--color-fg-muted)] underline-offset-2 hover:underline"
           >
             {open ? t('common.collapse') : t('common.expand')}
           </button>
@@ -600,7 +645,7 @@ function CheckIcon() {
   );
 }
 
-function Glyph({ kind }: { kind: 'tool' | 'result' | 'error' | 'thinking' }) {
+function Glyph({ kind }: { kind: 'result' | 'error' | 'thinking' }) {
   const common = {
     width: 11,
     height: 11,
@@ -612,13 +657,6 @@ function Glyph({ kind }: { kind: 'tool' | 'result' | 'error' | 'thinking' }) {
     strokeLinejoin: 'round' as const,
     'aria-hidden': true,
   };
-  if (kind === 'tool') {
-    return (
-      <svg {...common}>
-        <path d="M14.7 5.3a3 3 0 1 0 4 4l-2.5 2.5 5 5-2.7 2.7-5-5-2.5 2.5a3 3 0 1 0-4-4z" />
-      </svg>
-    );
-  }
   if (kind === 'result') {
     return (
       <svg {...common}>
