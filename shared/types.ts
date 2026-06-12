@@ -85,10 +85,11 @@ export interface SessionMeta {
    */
   contextTokens: number | null;
   /**
-   * The model context window the ring is scaled against. Auto-detected: 1,000,000
-   * when any turn's input-side total exceeded 200K (a 1M-context session), else
-   * 200,000. The `[1m]` suffix is stripped from the recorded model id, so peak
-   * occupancy is the only reliable signal.
+   * The model context window the ring is scaled against, derived from the
+   * session's model: 200,000 for the standard Claude window, 1,000,000 for the
+   * `[1m]` tier. Claude Code strips the `[1m]` suffix from recorded model ids, so
+   * a session whose peak input-side total exceeded 200K is also treated as 1M
+   * (the ceiling is never scaled below actual usage).
    */
   contextWindow: number;
 }

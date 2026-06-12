@@ -28,7 +28,7 @@ import {
   MAX_SESSION_MESSAGES,
   RECENT_ACTIVITY_WINDOW_MIN,
 } from '../lib/constants.ts';
-import { formatBytes, formatDateTime, formatTokens } from '../lib/format.ts';
+import { formatBytes, formatDateTime, formatDuration, formatTokens } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
 import { fadeUpItem, staggerParent } from '../lib/motion.ts';
 import { queryKeys } from '../lib/query-keys.ts';
@@ -472,8 +472,8 @@ export default function SessionDetailRoute() {
           branch={data.meta.gitBranch}
           model={sessionModel}
           bytes={data.meta.bytes}
-          version={data.meta.version}
           startedAt={data.meta.firstAt}
+          lastAt={data.meta.lastAt}
           messageCount={data.meta.messageCount}
           modifiedCount={modifiedFiles.length}
           modifiedLoading={modifiedFilesQuery.isLoading}
@@ -592,15 +592,15 @@ function SessionTitleBar({
 }
 
 // Sticky bottom info bar — claude.ai's footer. Carries the session metadata
-// (folder / branch / model / size / version / started) plus the Modified-files
+// (folder / branch / model / size / started / duration) plus the Modified-files
 // entry, which moved here off the header. Stays reachable while scrolling.
 function SessionFooter({
   cwd,
   branch,
   model,
   bytes,
-  version,
   startedAt,
+  lastAt,
   messageCount,
   modifiedCount,
   modifiedLoading,
@@ -614,8 +614,8 @@ function SessionFooter({
   branch: string | null;
   model: string | null;
   bytes: number;
-  version: string | null;
   startedAt: string | null;
+  lastAt: string | null;
   messageCount: number;
   modifiedCount: number;
   modifiedLoading: boolean;
@@ -637,9 +637,11 @@ function SessionFooter({
           {model && <FooterFact icon={<ModelGlyph />} value={model} mono />}
           <FooterFact label={t('session.meta.size')} value={formatBytes(bytes)} />
           <FooterFact label={t('session.meta.messages')} value={messageCount.toLocaleString()} />
-          {version && <FooterFact label={t('session.meta.version')} value={version} />}
           {startedAt && (
             <FooterFact label={t('session.meta.started')} value={formatDateTime(startedAt)} />
+          )}
+          {startedAt && lastAt && (
+            <FooterFact label={t('session.meta.duration')} value={formatDuration(startedAt, lastAt)} />
           )}
           {contextTokens !== null && (
             <ContextRing tokens={contextTokens} window={contextWindow} />
