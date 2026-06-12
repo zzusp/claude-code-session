@@ -4,18 +4,21 @@ import {
   useCallback,
   useDeferredValue,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import DeleteDialog from '../components/DeleteDialog.tsx';
 import FilePreviewPanel from '../components/FilePreviewPanel.tsx';
 import FileThumb from '../components/FileThumb.tsx';
 import { Loading } from '../components/Loading.tsx';
-import MessageBubble, { WorkingIndicator } from '../components/MessageBubble.tsx';
+import MessageBubble, {
+  WorkingIndicator,
+  type ToolResultLookup,
+} from '../components/MessageBubble.tsx';
 import { type EditLookup } from '../components/ModifiedFilesView.tsx';
 import { Splitter } from '../components/Splitter.tsx';
 import {
@@ -154,10 +157,10 @@ export default function SessionDetailRoute() {
   const [paneWidth, setPaneWidth] = useState(PREVIEW_DEFAULT_WIDTH);
   const isWide = useMediaQuery(PREVIEW_BREAKPOINT);
   const paneOpen = !!preview && isWide;
-  // 拆分行的矩形（供分割线换算面板宽度）+ 顶栏高度（面板 sticky 贴在顶栏之下）。
+  // 拆分行的矩形（供分割线换算面板宽度）。三层定高布局下，中间层左列时间线是内部滚动
+  // 容器（scrollRef），右列预览面板用 `h-full` 自动填满，不再靠 sticky + 顶栏高度计算。
   const splitRef = useRef<HTMLDivElement>(null);
-  const [topbarH, setTopbarH] = useState(0);
-  const topbarRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setWindowSize(INITIAL_WINDOW);
@@ -173,17 +176,6 @@ export default function SessionDetailRoute() {
   useEffect(() => {
     setPreview(null);
   }, [pid, sid]);
-
-  // 量顶栏实际高度（搜索展开时会变），用于面板 sticky 的 top 与高度计算。
-  useLayoutEffect(() => {
-    const el = topbarRef.current;
-    if (!el) return;
-    const measure = () => setTopbarH(el.offsetHeight);
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   const openPreview = useCallback((target: FilePreviewTarget) => {
     // 再次点同一张卡 = 收起（toggle）；点别的卡 = 切换。
@@ -270,10 +262,35 @@ export default function SessionDetailRoute() {
 
   const indexed: IndexedMessage[] = useMemo(() => {
     if (!data) return [];
-    return data.messages.map((message) => ({
-      message,
-      haystack: indexMessage(message),
-    }));
+    // result 正文 + 全部 tool_use id：用于（a）剔除「将内联配对」的纯 tool_result 消息，
+    // （b）把 result 正文折进拥有该 tool_use 的消息 haystack，保证会话内搜索仍能命中返回正文。
+    const resultText = new Map<string, string>();
+    const toolUseIds = new Set<string>();
+    for (const m of data.messages) {
+      for (const b of m.blocks) {
+        if (b.type === 'tool_result') resultText.set(b.toolUseId, b.content);
+        else if (b.type === 'tool_use' && b.id) toolUseIds.add(b.id);
+      }
+    }
+    const out: IndexedMessage[] = [];
+    for (const message of data.messages) {
+      // 纯 tool_result 且每个 result 都有对应 tool_use → 内联配对到调用块，时间线不再独立渲染。
+      // 孤儿 result（找不到对应 tool_use）仍保留，独立兜底渲染。
+      const pairedAway =
+        message.type === 'user' &&
+        message.blocks.length > 0 &&
+        message.blocks.every((b) => b.type === 'tool_result' && toolUseIds.has(b.toolUseId));
+      if (pairedAway) continue;
+      let haystack = indexMessage(message);
+      for (const b of message.blocks) {
+        if (b.type === 'tool_use' && b.id) {
+          const r = resultText.get(b.id);
+          if (r) haystack += '\n' + r.toLowerCase();
+        }
+      }
+      out.push({ message, haystack });
+    }
+    return out;
   }, [data]);
 
   // tool_use id → { name, input } for the loaded messages, so the drawer can render
@@ -297,30 +314,58 @@ export default function SessionDetailRoute() {
     return m;
   }, [editLookup]);
 
-  // toolUseId → tool_result 正文，供右侧预览面板渲染 Read 操作读到的文件正文
-  // （Read 的 input 只有路径，真正读到的内容在它对应的 tool_result 里）。
-  const resultLookup = useMemo(() => {
-    const m = new Map<string, string>();
+  // toolUseId → tool_result（正文 + 是否错误）。供（a）会话流里把返回配对内联到调用块，
+  // （b）右侧预览面板渲染 Read 读到的文件正文（Read 的 input 只有路径，正文在 result 里）。
+  const toolResults: ToolResultLookup = useMemo(() => {
+    const m = new Map<string, { content: string; isError: boolean }>();
     if (!data) return m;
     for (const msg of data.messages) {
       for (const b of msg.blocks) {
-        if (b.type === 'tool_result') m.set(b.toolUseId, b.content);
+        if (b.type === 'tool_result') m.set(b.toolUseId, { content: b.content, isError: b.isError });
       }
     }
     return m;
   }, [data]);
 
+  // 被配对剔除的 tool_result 消息 uuid → 拥有该 tool_use 的消息 uuid。全局搜索命中
+  // tool_result 正文时给出的 focus 是 result 消息 uuid（现已不独立渲染），跳转时重定向
+  // 到调用块所在消息，避免 deep-link 失焦。
+  const focusRedirect = useMemo(() => {
+    const redirect = new Map<string, string>();
+    if (!data) return redirect;
+    const ownerOf = new Map<string, string>(); // toolUseId → 拥有它的消息 uuid
+    for (const m of data.messages) {
+      for (const b of m.blocks) {
+        if (b.type === 'tool_use' && b.id) ownerOf.set(b.id, m.uuid);
+      }
+    }
+    for (const m of data.messages) {
+      const pairedAway =
+        m.type === 'user' &&
+        m.blocks.length > 0 &&
+        m.blocks.every((b) => b.type === 'tool_result' && ownerOf.has(b.toolUseId));
+      if (!pairedAway) continue;
+      const first = m.blocks[0];
+      if (first?.type === 'tool_result' && m.uuid) {
+        const owner = ownerOf.get(first.toolUseId);
+        if (owner) redirect.set(m.uuid, owner);
+      }
+    }
+    return redirect;
+  }, [data]);
+  const focusUuid = urlFocus ? (focusRedirect.get(urlFocus) ?? urlFocus) : null;
+
   const visibleMessages = useMemo(() => {
     let list = indexed;
     if (!showMeta) list = list.filter((m) => !m.message.isMeta);
     if (onlyUser) list = list.filter((m) => isUserTyped(m.message));
-    if (onlyError) list = list.filter((m) => hasError(m.message));
+    if (onlyError) list = list.filter((m) => hasError(m.message, toolResults));
     if (deferredQuery) {
       const q = deferredQuery.toLowerCase();
       list = list.filter((m) => m.haystack.includes(q));
     }
     return list;
-  }, [indexed, showMeta, onlyUser, onlyError, deferredQuery]);
+  }, [indexed, showMeta, onlyUser, onlyError, deferredQuery, toolResults]);
 
   const skipWindowing = !!deferredQuery || onlyUser || onlyError;
   const renderList = useMemo(() => {
@@ -346,22 +391,22 @@ export default function SessionDetailRoute() {
   }, [data, sid, urlFocus, urlQuery]);
 
   useEffect(() => {
-    if (!urlFocus || !data || skipWindowing) return;
-    const idx = visibleMessages.findIndex((m) => m.message.uuid === urlFocus);
+    if (!focusUuid || !data || skipWindowing) return;
+    const idx = visibleMessages.findIndex((m) => m.message.uuid === focusUuid);
     if (idx === -1) return;
     const needed = visibleMessages.length - idx;
     if (needed > windowSize) setWindowSize(needed);
-  }, [urlFocus, visibleMessages, windowSize, skipWindowing, data]);
+  }, [focusUuid, visibleMessages, windowSize, skipWindowing, data]);
 
   useEffect(() => {
-    if (!urlFocus || !data) return;
-    const key = `${sid}|${urlFocus}`;
+    if (!focusUuid || !data) return;
+    const key = `${sid}|${focusUuid}`;
     if (flashedKeyRef.current === key) return;
-    if (!renderList.some((m) => m.message.uuid === urlFocus)) return;
+    if (!renderList.some((m) => m.message.uuid === focusUuid)) return;
     flashedKeyRef.current = key;
     const rafId = requestAnimationFrame(() => {
       const el = document.querySelector<HTMLElement>(
-        `[data-uuid="${CSS.escape(urlFocus)}"]`,
+        `[data-uuid="${CSS.escape(focusUuid)}"]`,
       );
       if (!el) return;
       el.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -372,17 +417,18 @@ export default function SessionDetailRoute() {
     return () => cancelAnimationFrame(rafId);
   }, [urlFocus, renderList, data, sid]);
 
-  // Track whether the reader is parked at the bottom of the page, so live appends
-  // can follow the tail without hijacking an upward scroll through history.
+  // Track whether the reader is parked at the bottom of the timeline scroll container,
+  // so live appends can follow the tail without hijacking an upward scroll through history.
   useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
     const onScroll = () => {
-      const distance =
-        document.documentElement.scrollHeight - (window.scrollY + window.innerHeight);
+      const distance = el.scrollHeight - (el.scrollTop + el.clientHeight);
       stickToBottomRef.current = distance < BOTTOM_STICK_THRESHOLD_PX;
     };
     onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
   }, []);
 
   // When a live poll appends new messages and the reader is at the bottom — and not
@@ -393,9 +439,10 @@ export default function SessionDetailRoute() {
     prevMsgCountRef.current = count;
     if (prev === null || count === null || count <= prev) return;
     if (urlFocus || skipWindowing || !stickToBottomRef.current) return;
-    const rafId = requestAnimationFrame(() =>
-      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }),
-    );
+    const rafId = requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    });
     return () => cancelAnimationFrame(rafId);
   }, [data?.meta.messageCount, urlFocus, skipWindowing]);
 
@@ -406,9 +453,10 @@ export default function SessionDetailRoute() {
     prevIsWorkingRef.current = isWorking;
     if (!startedWorking) return;
     if (urlFocus || skipWindowing || !stickToBottomRef.current) return;
-    const rafId = requestAnimationFrame(() =>
-      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }),
-    );
+    const rafId = requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    });
     return () => cancelAnimationFrame(rafId);
   }, [isWorking, urlFocus, skipWindowing]);
 
@@ -457,16 +505,11 @@ export default function SessionDetailRoute() {
   });
 
   return (
-    <section className="flex min-h-[calc(100dvh-6rem)] flex-col">
-      {/* Title as a claude.ai-style breadcrumb on the canvas (project / session),
-          no card. The bar spans the full content width (like every other page's
-          breadcrumb) so it lines up with the canvas edges. The in-session search
-          sits beneath; both stick to the top. Session metadata + the Modified-files
-          entry live in the sticky footer below. */}
-      <div
-        ref={topbarRef}
-        className="z-30 lg:sticky lg:top-0 topbar-glass border-b border-[var(--color-hairline)]"
-      >
+    <section className="flex h-full min-h-0 flex-col overflow-hidden">
+      {/* 定高三层布局（上=页头 / 中=时间线+预览 / 下=页脚）。页头是 claude.ai 风的画布
+          面包屑（项目 / 会话），不套卡片，铺满内容宽度。中间层内部滚动、左右可拖拽拆分；
+          会话元信息 + 修改文件入口在底部页脚层。 */}
+      <div className="shrink-0 topbar-glass border-b border-[var(--color-hairline)]">
         <SessionTitleBar
           projectId={pid}
           projectTail={projectTail}
@@ -505,11 +548,11 @@ export default function SessionDetailRoute() {
         )}
       </div>
 
-      {/* 内容区拆成可拖拽两栏：左侧会话时间线，右侧文件预览面板（仅 lg+ 启用）。
+      {/* 中间层：左侧会话时间线（内部滚动容器 scrollRef），右侧文件预览面板（仅 lg+）。
           Provider 始终包住时间线，让深层的文件卡能拿到「打开预览」的回调。 */}
       <FilePreviewContext.Provider value={previewCtx}>
         <div ref={splitRef} className="flex min-h-0 flex-1">
-          <div className="mt-6 min-w-0 flex-1 px-3 pb-24">
+          <div ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto px-3 pb-16 pt-6">
             {data?.truncated && (
               <Admonition tone="warn" className="mb-6">
                 {t('session.truncated', { n: MAX_SESSION_MESSAGES.toLocaleString() })}
@@ -568,6 +611,7 @@ export default function SessionDetailRoute() {
                           message={m.message}
                           query={deferredQuery}
                           toolNames={toolNames}
+                          toolResults={toolResults}
                         />
                       </motion.li>
                     );
@@ -587,18 +631,15 @@ export default function SessionDetailRoute() {
                   setPaneWidth(clampPaneWidth(rect.right - clientX, rect.width))
                 }
               />
-              {/* 面板 sticky 钉在顶栏之下、页脚之上，滚动会话时始终在视野里铺着该文件。 */}
+              {/* 预览面板填满中间层：`self-stretch` 随中间层定高，被页头/页脚夹住，
+                  不压页脚、底部不脱离；内容超出由 FilePreviewPanel 内部滚动。 */}
               <aside
-                style={{
-                  width: paneWidth,
-                  top: topbarH,
-                  height: `calc(100dvh - ${topbarH}px - 3.5rem)`,
-                }}
-                className="sticky shrink-0 self-start overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-hairline)] bg-[var(--color-surface)] shadow-[var(--shadow-rise)]"
+                style={{ width: paneWidth }}
+                className="my-3 shrink-0 self-stretch overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-hairline)] bg-[var(--color-surface)] shadow-[var(--shadow-rise)]"
               >
                 <FilePreviewPanel
                   target={preview}
-                  readContent={resultLookup.get(preview.toolUseId) ?? null}
+                  readContent={toolResults.get(preview.toolUseId)?.content ?? null}
                   onClose={closePreview}
                 />
               </aside>
@@ -626,7 +667,7 @@ export default function SessionDetailRoute() {
         />
       )}
 
-      {data && <ScrollToEdges />}
+      {data && <ScrollToEdges scrollRef={scrollRef} />}
 
       {deleteOpen && currentSummary && (
         <DeleteDialog
@@ -768,7 +809,7 @@ function SessionFooter({
 }) {
   const t = useT();
   return (
-    <div className="z-30 mt-4 lg:sticky lg:bottom-0 topbar-glass border-t border-[var(--color-hairline)]">
+    <div className="shrink-0 topbar-glass border-t border-[var(--color-hairline)]">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2">
         <dl className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           {cwd && (
@@ -1298,8 +1339,14 @@ function isUserTyped(m: Message): boolean {
   return m.blocks.some((b) => b.type !== 'tool_result');
 }
 
-function hasError(m: Message): boolean {
-  return m.blocks.some((b) => b.type === 'tool_result' && b.isError);
+// 错误过滤：消息自身含 error 的独立 result（孤儿兜底），或含 tool_use 且其配对返回标了
+// is_error（独立 result 已被剔除、错误信息现内联在调用块里，过滤仍要能筛出来）。
+function hasError(m: Message, results: ToolResultLookup): boolean {
+  return m.blocks.some(
+    (b) =>
+      (b.type === 'tool_result' && b.isError) ||
+      (b.type === 'tool_use' && !!b.id && results.get(b.id)?.isError === true),
+  );
 }
 
 function indexMessage(message: Message): string {
@@ -1450,18 +1497,20 @@ function MenuTrashIcon() {
 
 const EDGE_THRESHOLD = 320;
 
-function ScrollToEdges() {
+function ScrollToEdges({ scrollRef }: { scrollRef: RefObject<HTMLDivElement | null> }) {
   const t = useT();
   const [showTop, setShowTop] = useState(false);
   const [showBottom, setShowBottom] = useState(false);
 
   useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
     let frame = 0;
     const update = () => {
       frame = 0;
-      const scrollY = window.scrollY;
-      const viewport = window.innerHeight;
-      const total = document.documentElement.scrollHeight;
+      const scrollY = el.scrollTop;
+      const viewport = el.clientHeight;
+      const total = el.scrollHeight;
       setShowTop(scrollY >= EDGE_THRESHOLD);
       setShowBottom(total - (scrollY + viewport) >= EDGE_THRESHOLD);
     };
@@ -1470,14 +1519,14 @@ function ScrollToEdges() {
       frame = requestAnimationFrame(update);
     };
     update();
-    window.addEventListener('scroll', schedule, { passive: true });
+    el.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', schedule, { passive: true });
     return () => {
-      window.removeEventListener('scroll', schedule);
+      el.removeEventListener('scroll', schedule);
       window.removeEventListener('resize', schedule);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, []);
+  }, [scrollRef]);
 
   if (!showTop && !showBottom) return null;
 
@@ -1491,7 +1540,7 @@ function ScrollToEdges() {
           type="button"
           aria-label={t('common.scrollToTop')}
           title={t('common.scrollToTop')}
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          onClick={() => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
           className={buttonClass}
         >
           <ChevronIcon direction="up" />
@@ -1502,9 +1551,10 @@ function ScrollToEdges() {
           type="button"
           aria-label={t('common.scrollToBottom')}
           title={t('common.scrollToBottom')}
-          onClick={() =>
-            window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
-          }
+          onClick={() => {
+            const el = scrollRef.current;
+            if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+          }}
           className={buttonClass}
         >
           <ChevronIcon direction="down" />

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useState } from 'react';
-import { Outlet, Route, Routes } from 'react-router-dom';
+import { Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { Loading } from './components/Loading.tsx';
 import SearchModal from './components/SearchModal.tsx';
 import Sidebar from './components/Sidebar.tsx';
@@ -71,11 +71,22 @@ function ChromeLayout() {
   const closeSearch = useCallback(() => setSearchOpen(false), []);
   useGlobalHotkey('mod+k', toggleSearch);
 
+  // 会话详情页是定高三层（页头/页脚固定、中间区内部滚动），需要一个铺满视口高度、
+  // 去掉纵向留白的外壳；其它路由维持原「窗口滚动 + 带 py 的居中容器」。用路径判断，
+  // 避免给每个路由各包一层壳。
+  const { pathname } = useLocation();
+  const fullBleed = /\/sessions\/[^/]+$/.test(pathname);
+
   return (
-    <div className="flex min-h-dvh">
+    <div className={'flex ' + (fullBleed ? 'h-dvh overflow-hidden' : 'min-h-dvh')}>
       <Sidebar onSearchOpen={openSearch} />
-      <main className="flex-1 min-w-0">
-        <div className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 lg:px-12">
+      <main className={'min-w-0 flex-1' + (fullBleed ? ' flex min-h-0 flex-col' : '')}>
+        <div
+          className={
+            'mx-auto w-full max-w-6xl px-5 sm:px-8 lg:px-12' +
+            (fullBleed ? ' flex min-h-0 flex-1 flex-col' : ' py-8')
+          }
+        >
           <Outlet />
         </div>
       </main>
