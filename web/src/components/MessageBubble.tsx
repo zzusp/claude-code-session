@@ -103,7 +103,7 @@ function UserMessage({
           model={message.model}
           ts={message.ts}
         />
-        <article className="mt-1.5 rounded-2xl rounded-tr-sm bg-[var(--color-accent-soft)] px-4 py-3 text-[var(--color-accent-ink)] dark:text-[var(--color-fg-primary)]">
+        <article className="mt-1.5 rounded-2xl rounded-tr-sm border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-4 py-3 text-[var(--color-fg-primary)]">
           <Blocks blocks={message.blocks} query={query} toolNames={toolNames} />
         </article>
       </div>

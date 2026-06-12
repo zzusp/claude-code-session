@@ -136,10 +136,10 @@ export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void })
                     aria-current={isActive ? 'page' : undefined}
                     onClick={() => setOpen(false)}
                     className={
-                      'group flex items-center gap-3 rounded-[var(--radius-input)] border px-4 py-3 text-sm transition ' +
+                      'group flex items-center gap-3 rounded-[var(--radius-input)] border px-3.5 py-2.5 text-sm transition ' +
                       (isActive
-                        ? 'border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-fg-primary)] shadow-[var(--shadow-rise)]'
-                        : 'border-transparent text-[var(--color-fg-secondary)] hover:bg-[color-mix(in_oklch,var(--color-surface)_60%,transparent)] hover:text-[var(--color-fg-primary)]')
+                        ? 'border-transparent bg-[var(--color-accent-soft)] font-medium text-[var(--color-accent-ink)] dark:text-[var(--color-fg-primary)]'
+                        : 'border-transparent text-[var(--color-fg-secondary)] hover:bg-[var(--color-surface)] hover:text-[var(--color-fg-primary)]')
                     }
                   >
                     <span
@@ -185,12 +185,12 @@ function Brand() {
     <div className="flex items-center gap-2.5">
       <span
         aria-hidden
-        className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-accent)] shadow-[var(--shadow-rise)]"
+        className="inline-flex h-9 w-9 items-center justify-center rounded-[0.7rem] bg-[var(--color-accent)] text-[var(--color-surface)] shadow-[var(--shadow-rise)]"
       >
         <Glyph />
       </span>
       <span className="flex flex-col leading-tight">
-        <span className="font-display text-[15px] font-medium tracking-tight text-[var(--color-fg-primary)]">
+        <span className="font-display text-[17px] font-medium tracking-[-0.01em] text-[var(--color-fg-primary)]">
           {t('app.brand.title')}
         </span>
         <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
@@ -201,11 +201,23 @@ function Brand() {
   );
 }
 
+// Claude-style sunburst mark — radiating spokes of alternating length, evoking
+// the Anthropic starburst without copying it.
 function Glyph() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-      <path d="M19 7.5A8 8 0 1 0 19 16.5" />
-      <path d="M15.5 9.5a4.5 4.5 0 1 0 0 5" opacity="0.45" />
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden>
+      <g>
+        <path d="M12 3.5v4.2" />
+        <path d="M12 16.3v4.2" />
+        <path d="M3.5 12h4.2" />
+        <path d="M16.3 12h4.2" />
+      </g>
+      <g opacity="0.6">
+        <path d="M6.3 6.3l2.6 2.6" />
+        <path d="M15.1 15.1l2.6 2.6" />
+        <path d="M6.3 17.7l2.6-2.6" />
+        <path d="M15.1 8.9l2.6-2.6" />
+      </g>
     </svg>
   );
 }
