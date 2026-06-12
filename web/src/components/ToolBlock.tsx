@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import type { Block } from '../lib/api.ts';
 import { rowsFromStrings, type UnifiedRow } from '../lib/diff.ts';
+import { useFilePreview } from '../lib/file-preview.ts';
 import { useT } from '../lib/i18n.ts';
 import FileThumb from './FileThumb.tsx';
 import HighlightedText from './HighlightedText.tsx';
@@ -21,6 +22,7 @@ export function ToolUseBlock({
   query: string;
 }) {
   const [open, setOpen] = useState(false);
+  const preview = useFilePreview();
   const input = asRecord(block.input);
   // 「读用富渲染，搜用原文高亮」：query 非空＝搜索态，展开体退回 JSON 原文 +
   // HighlightedText（同 main），保证 haystack 命中的内容在 UI 上一定能看到高亮；
@@ -43,6 +45,68 @@ export function ToolUseBlock({
   const fileOp = fileOpOf(block.name, input);
   if (fileOp) {
     const ext = fileExt(fileOp.path);
+    const fileCardInner = (
+      <>
+        <FileThumb />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] leading-tight text-[var(--color-fg-primary)]">
+            {fileName(fileOp.path)}
+          </span>
+          <span className="block truncate text-[11px] leading-tight text-[var(--color-fg-muted)]">
+            {block.name}
+            {ext && <span className="opacity-50"> · </span>}
+            {ext}
+          </span>
+        </span>
+      </>
+    );
+
+    // 有预览宿主（会话页且视口够宽）：点击文件卡在右栏拆出预览，不再行内展开。
+    if (preview?.enabled) {
+      const active = preview.activeId === block.id;
+      return (
+        <div
+          className={
+            'overflow-hidden rounded-[var(--radius-control)] border text-sm transition-colors ' +
+            (active
+              ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
+              : 'border-[var(--color-hairline)] hover:border-[var(--color-hairline-strong)]')
+          }
+        >
+          <button
+            type="button"
+            onClick={() =>
+              preview.open({
+                toolUseId: block.id,
+                name: block.name,
+                input: block.input,
+                path: fileOp.path,
+              })
+            }
+            title={fileOp.path}
+            aria-pressed={active}
+            className={
+              'group/file flex w-full items-center gap-3 px-3 py-2 text-left transition ' +
+              (active ? '' : 'hover:bg-[var(--color-sunken)]')
+            }
+          >
+            {fileCardInner}
+            <span
+              className={
+                'shrink-0 transition-colors ' +
+                (active
+                  ? 'text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]'
+                  : 'text-[var(--color-fg-faint)] group-hover/file:text-[var(--color-fg-muted)]')
+              }
+            >
+              <PanelIcon />
+            </span>
+          </button>
+        </div>
+      );
+    }
+
+    // 无宿主（修改文件视图 / 搜索弹窗里复用 MessageBubble）：保持原行内展开。
     return (
       <div className="overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-hairline)] text-sm transition-colors hover:border-[var(--color-hairline-strong)]">
         <button
@@ -51,17 +115,7 @@ export function ToolUseBlock({
           title={fileOp.path}
           className="group/file flex w-full items-center gap-3 px-3 py-2 text-left transition hover:bg-[var(--color-sunken)]"
         >
-          <FileThumb />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] leading-tight text-[var(--color-fg-primary)]">
-              {fileName(fileOp.path)}
-            </span>
-            <span className="block truncate text-[11px] leading-tight text-[var(--color-fg-muted)]">
-              {block.name}
-              {ext && <span className="opacity-50"> · </span>}
-              {ext}
-            </span>
-          </span>
+          {fileCardInner}
           <Caret open={open} />
         </button>
         {body}
@@ -588,6 +642,18 @@ function CopyIcon() {
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <rect x="9" y="9" width="11" height="11" rx="2" />
       <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    </svg>
+  );
+}
+
+// 「在右栏拆分预览」的提示图标：一个右侧栏被高亮的窗口框，呼应文件卡点击会从右侧
+// 拆出预览面板的行为。
+function PanelIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M14 4v16" />
+      <path d="M16.5 9.5 18.5 12l-2 2.5" />
     </svg>
   );
 }
