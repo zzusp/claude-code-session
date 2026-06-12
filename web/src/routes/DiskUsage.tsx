@@ -92,7 +92,7 @@ export default function DiskUsageRoute() {
 
   return (
     <section>
-      <div className="surface-card p-6">
+      <div className="mt-2">
         <Masthead
           title={t('disk.title')}
           tagline={t('disk.tagline')}
@@ -271,9 +271,9 @@ export default function DiskUsageRoute() {
             </Card>
           </div>
 
-          <div className="surface-card mt-12 p-6">
+          <div className="mt-12">
             <div className="flex items-baseline justify-between">
-              <h2 className="font-display text-xl font-light tracking-tight text-[var(--color-fg-primary)]">
+              <h2 className="font-display text-xl font-medium tracking-tight text-[var(--color-fg-primary)]">
                 {t('disk.heaviest.title')}
               </h2>
               {data.topSessions.length > 0 && (
@@ -282,11 +282,11 @@ export default function DiskUsageRoute() {
                 </span>
               )}
             </div>
-            <div className="rule-dotted mt-3" aria-hidden />
+            <div className="mt-3 h-px bg-[var(--color-hairline)]" aria-hidden />
             {data.topSessions.length === 0 ? (
               <Empty className="mt-6" />
             ) : (
-              <div className="mt-4 -mx-6 overflow-x-auto px-6">
+              <div className="mt-4 overflow-x-auto">
                 <table className="w-full table-fixed text-sm">
                   <colgroup>
                     <col className="w-10" />
@@ -372,11 +372,10 @@ function Masthead({
   return (
     <header className="relative">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <h1 className="font-display text-[clamp(1.75rem,3.5vw,2.25rem)] font-light leading-[1.1] tracking-[-0.02em] text-[var(--color-fg-primary)]">
+        <h1 className="font-display text-[clamp(1.75rem,3.5vw,2.25rem)] font-medium leading-[1.1] tracking-[-0.02em] text-[var(--color-fg-primary)]">
           {title}
-          <span className="text-[var(--color-accent)]">.</span>
         </h1>
-        <p className="min-w-0 flex-1 font-display text-[13px] italic leading-snug text-[var(--color-fg-muted)]">
+        <p className="min-w-0 flex-1 text-[13px] leading-snug text-[var(--color-fg-muted)]">
           {tagline}
         </p>
       </div>
@@ -430,7 +429,7 @@ function Card({
   return (
     <section className={`surface-card p-5 ${className}`}>
       <header className="mb-4 flex items-baseline justify-between gap-3">
-        <h3 className="font-display text-lg font-light tracking-tight text-[var(--color-fg-primary)]">
+        <h3 className="font-display text-lg font-medium tracking-tight text-[var(--color-fg-primary)]">
           {title}
         </h3>
         {subtitle && (

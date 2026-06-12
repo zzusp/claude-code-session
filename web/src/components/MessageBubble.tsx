@@ -38,6 +38,9 @@ export default function MessageBubble({
   return <AssistantMessage message={message} query={query} toolNames={toolNames} />;
 }
 
+// Assistant turn — claude.ai renders this as full-width prose, no bubble / card /
+// avatar. Tool-result turns get a faintly inset container so they read as machine
+// output rather than Claude's own voice.
 function AssistantMessage({
   message,
   query,
@@ -52,38 +55,28 @@ function AssistantMessage({
   const t = useT();
   const isTool = variant === 'tool';
   const label = isTool ? t('message.role.tool') : t('message.role.claude');
-  const borderClass = isTool
-    ? 'border-l-[var(--color-hairline-strong)]'
-    : 'border-l-[var(--color-accent)]';
   return (
-    <div className="flex items-start gap-3" data-uuid={message.uuid}>
-      <Avatar role="assistant" />
-      <div className="min-w-0 flex-1 max-w-[min(54rem,calc(100%-3rem))]">
-        <Header
-          align="left"
-          label={label}
-          model={message.model}
-          ts={message.ts}
-          accent={!isTool}
+    <div className="group" data-uuid={message.uuid}>
+      <MetaRow label={label} model={isTool ? null : message.model} ts={message.ts} />
+      <div
+        className={
+          isTool
+            ? 'mt-1 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-sunken)]/60 px-3.5 py-2.5'
+            : 'mt-0.5'
+        }
+      >
+        <Blocks
+          blocks={message.blocks}
+          query={query}
+          toolNames={toolNames}
+          markdown={!isTool && !query}
         />
-        <article
-          className={
-            'mt-1.5 rounded-2xl rounded-tl-sm border border-l-[3px] border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-3 shadow-[0_1px_0_0_var(--color-hairline)] ' +
-            borderClass
-          }
-        >
-          <Blocks
-            blocks={message.blocks}
-            query={query}
-            toolNames={toolNames}
-            markdown={!isTool && !query}
-          />
-        </article>
       </div>
     </div>
   );
 }
 
+// Human turn — claude.ai shows a right-aligned soft bubble, no avatar.
 function UserMessage({
   message,
   query,
@@ -95,19 +88,11 @@ function UserMessage({
 }) {
   const t = useT();
   return (
-    <div className="flex items-start justify-end gap-3" data-uuid={message.uuid}>
-      <div className="min-w-0 max-w-[min(46rem,calc(100%-3rem))]">
-        <Header
-          align="right"
-          label={t('message.role.you')}
-          model={message.model}
-          ts={message.ts}
-        />
-        <article className="mt-1.5 rounded-2xl rounded-tr-sm border border-[var(--color-hairline)] bg-[var(--color-sunken)] px-4 py-3 text-[var(--color-fg-primary)]">
-          <Blocks blocks={message.blocks} query={query} toolNames={toolNames} />
-        </article>
+    <div className="group flex flex-col items-end" data-uuid={message.uuid}>
+      <MetaRow label={t('message.role.you')} model={message.model} ts={message.ts} align="right" />
+      <div className="mt-0.5 max-w-[80%] rounded-[1.25rem] rounded-tr-md bg-[var(--color-sunken)] px-4 py-2.5 text-[15px] leading-relaxed text-[var(--color-fg-primary)]">
+        <Blocks blocks={message.blocks} query={query} toolNames={toolNames} />
       </div>
-      <Avatar role="user" />
     </div>
   );
 }
@@ -115,13 +100,13 @@ function UserMessage({
 function SystemMessage({ message, query }: { message: Message; query: string }) {
   const t = useT();
   return (
-    <div className="my-2 flex items-center gap-3 px-4" data-uuid={message.uuid}>
+    <div className="my-2 flex items-center gap-3" data-uuid={message.uuid}>
       <span className="h-px flex-1 bg-[var(--color-hairline)]" />
       <div className="max-w-2xl text-center">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-fg-muted)]">
+        <p className="text-[11px] font-medium text-[var(--color-fg-faint)]">
           {t('message.role.system')} · {formatDateTime(message.ts)}
         </p>
-        <div className="mt-1 space-y-1 text-xs italic text-[var(--color-fg-muted)]">
+        <div className="mt-1 space-y-1 text-xs text-[var(--color-fg-muted)]">
           {message.blocks.map((block, i) => {
             if (block.type === 'text') {
               const text = block.text.length > 200 ? block.text.slice(0, 200) + '…' : block.text;
@@ -142,44 +127,29 @@ function SystemMessage({ message, query }: { message: Message; query: string }) 
   );
 }
 
-function Header({
-  align,
+// Subtle role + model + time line above a turn. Muted and small so the dominant
+// impression stays claude.ai-clean; useful here because this is a history browser.
+function MetaRow({
   label,
   model,
   ts,
-  accent,
+  align = 'left',
 }: {
-  align: 'left' | 'right';
   label: string;
-  model: string | null;
+  model?: string | null;
   ts: string | null;
-  accent?: boolean;
+  align?: 'left' | 'right';
 }) {
   return (
     <div
       className={
-        'flex items-baseline gap-2 text-[11px] ' +
-        (align === 'right' ? 'flex-row-reverse text-right' : '')
+        'flex items-baseline gap-2 text-[11px] text-[var(--color-fg-faint)] ' +
+        (align === 'right' ? 'flex-row-reverse' : '')
       }
     >
-      <span
-        className={
-          'font-display text-[14px] font-medium tracking-tight ' +
-          (accent
-            ? 'text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]'
-            : 'text-[var(--color-fg-primary)]')
-        }
-      >
-        {label}
-      </span>
-      {model && (
-        <span className="truncate font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--color-fg-faint)]">
-          {model}
-        </span>
-      )}
-      <time className="font-mono tabular-nums text-[var(--color-fg-muted)]">
-        {formatDateTime(ts)}
-      </time>
+      <span className="font-medium text-[var(--color-fg-muted)]">{label}</span>
+      {model && <span className="truncate">{model}</span>}
+      <time className="tabular-nums">{formatDateTime(ts)}</time>
     </div>
   );
 }
@@ -205,7 +175,7 @@ function Blocks({
             const plain = (
               <p
                 key={i}
-                className="whitespace-pre-wrap break-words text-[14.5px] leading-relaxed"
+                className="whitespace-pre-wrap break-words text-[15px] leading-7"
               >
                 <HighlightedText text={block.text} query={query} />
               </p>
@@ -255,62 +225,19 @@ function Blocks({
 }
 
 // Trailing "Claude is working…" row — sits at the tail of a timeline while the
-// live poll keeps `isWorking` true, then unmounts when the reply lands. Shared by
-// the session detail timeline and the modified-files drawer's conversation column.
+// live poll keeps `isWorking` true, then unmounts when the reply lands.
 export function WorkingIndicator() {
   const t = useT();
   return (
-    <li className="py-3" aria-live="polite">
-      <div className="flex items-start gap-3">
-        <span
-          aria-hidden
-          className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)]"
-        >
-          <span className="relative inline-flex h-2.5 w-2.5">
-            <span className="absolute inset-0 rounded-full bg-[var(--color-accent)] pulse-amber" />
-            <span className="absolute inset-0 rounded-full bg-[var(--color-accent)]" />
-          </span>
+    <li className="py-2" aria-live="polite">
+      <div className="flex items-center gap-2.5 text-[var(--color-fg-muted)]">
+        <span aria-hidden className="loading-dots text-[var(--color-accent)]">
+          <span />
+          <span />
+          <span />
         </span>
-        <div className="min-w-0 flex-1">
-          <span className="block font-display text-[14px] font-medium tracking-tight text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
-            {t('message.role.claude')}
-          </span>
-          <article className="mt-1.5 inline-flex items-center gap-2.5 rounded-2xl rounded-tl-sm border border-l-[3px] border-[var(--color-hairline)] border-l-[var(--color-accent)] bg-[var(--color-surface)] px-4 py-3">
-            <span aria-hidden className="loading-dots text-[var(--color-accent)]">
-              <span />
-              <span />
-              <span />
-            </span>
-            <span className="font-display text-[13.5px] italic text-[var(--color-fg-muted)]">
-              {t('session.working.indicator')}
-            </span>
-          </article>
-        </div>
+        <span className="text-[14px]">{t('session.working.indicator')}</span>
       </div>
     </li>
-  );
-}
-
-function Avatar({ role }: { role: 'user' | 'assistant' }) {
-  if (role === 'assistant') {
-    return (
-      <span
-        aria-hidden
-        className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-accent)]"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
-          <path d="M19 7.5A8 8 0 1 0 19 16.5" />
-          <path d="M15.5 9.5a4.5 4.5 0 1 0 0 5" opacity="0.45" />
-        </svg>
-      </span>
-    );
-  }
-  return (
-    <span
-      aria-hidden
-      className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-fg-primary)] font-display text-sm font-medium text-[var(--color-canvas)]"
-    >
-      Y
-    </span>
   );
 }

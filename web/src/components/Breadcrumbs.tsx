@@ -8,23 +8,24 @@ export interface Crumb {
   icon?: ReactNode;
 }
 
-const ITEM_BASE = 'inline-flex min-w-0 items-center gap-1.5 rounded-lg px-3 py-1';
+const ITEM_BASE = 'inline-flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5';
 
+// Plain inline breadcrumb — claude.ai keeps these unboxed, muted, on the canvas.
 export default function Breadcrumbs({ items }: { items: Crumb[] }) {
   return (
     <nav
       aria-label="Breadcrumb"
-      className="inline-flex max-w-full items-center gap-1 overflow-hidden rounded-xl border border-[var(--color-accent)] bg-[var(--color-surface)] px-2 py-1.5 text-sm shadow-[var(--shadow-rise)]"
+      className="inline-flex max-w-full items-center gap-0.5 overflow-hidden text-[13px]"
     >
       {items.map((c, i) => {
         const last = i === items.length - 1;
         const family = c.mono ? 'font-mono' : 'font-sans';
         const tone = last
           ? 'text-[var(--color-fg-primary)]'
-          : 'text-[var(--color-fg-secondary)]';
+          : 'text-[var(--color-fg-muted)]';
         const inner = (
           <>
-            {c.icon && <span className="shrink-0 text-[var(--color-accent)]">{c.icon}</span>}
+            {c.icon && <span className="shrink-0 text-[var(--color-fg-faint)]">{c.icon}</span>}
             <span className="truncate">{c.label}</span>
           </>
         );
@@ -33,7 +34,7 @@ export default function Breadcrumbs({ items }: { items: Crumb[] }) {
             {c.to && !last ? (
               <Link
                 to={c.to}
-                className={`${ITEM_BASE} ${family} ${tone} transition-colors duration-150 hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent-ink)]`}
+                className={`${ITEM_BASE} ${family} ${tone} transition-colors duration-150 hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)]`}
               >
                 {inner}
               </Link>
@@ -61,10 +62,10 @@ function ChevronSep() {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2.4"
+      strokeWidth="2.2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="shrink-0 text-[var(--color-accent)]"
+      className="shrink-0 text-[var(--color-fg-faint)]"
       aria-hidden
     >
       <polyline points="9 6 15 12 9 18" />

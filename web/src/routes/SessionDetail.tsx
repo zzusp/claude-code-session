@@ -404,7 +404,7 @@ export default function SessionDetailRoute() {
       <Breadcrumbs items={crumbs} />
 
       {data && (
-        <div className="surface-card mt-4 p-6">
+        <div className="mt-4">
           <SessionMasthead
             sid={sid}
             isLive={isLive}
@@ -520,7 +520,7 @@ export default function SessionDetailRoute() {
         )}
 
         {data && visibleMessages.length === 0 && (
-          <p className="mt-2 max-w-2xl font-display text-[15px] italic text-[var(--color-fg-muted)]">
+          <p className="mt-2 max-w-2xl text-[14px] text-[var(--color-fg-muted)]">
             {t('common.noMessagesMatch')}
           </p>
         )}
@@ -714,13 +714,13 @@ function SessionMasthead({
         </div>
 
         <div className="lg:col-span-4 lg:pt-3">
-          <p className="border-l-2 border-[var(--color-accent)] pl-4 font-display text-[15px] italic leading-[1.55] text-[var(--color-fg-secondary)]">
+          <p className="text-[14px] leading-[1.6] text-[var(--color-fg-muted)]">
             {tagline}
           </p>
         </div>
       </div>
 
-      <div className="rule-dotted mt-6" aria-hidden />
+      <div className="mt-6 h-px bg-[var(--color-hairline)]" aria-hidden />
       <dl className="mt-3 flex flex-wrap items-baseline gap-x-8 gap-y-2">
         <Fact label={t('session.meta.messages')} value={messageCount.toLocaleString()} />
         <Fact label={t('session.meta.size')} value={formatBytes(bytes)} />
@@ -818,7 +818,7 @@ function StatusBeacon({ isLive, isWorking }: { isLive: boolean; isWorking: boole
 }
 
 const MASTHEAD_TITLE_CLASS =
-  'font-display text-[clamp(1.5rem,3vw,2rem)] font-light leading-[1.15] tracking-[-0.018em] text-[var(--color-fg-primary)]';
+  'font-display text-[clamp(1.5rem,3vw,2rem)] font-medium leading-[1.15] tracking-[-0.018em] text-[var(--color-fg-primary)]';
 
 function TitleSlot({
   title,
@@ -914,7 +914,6 @@ function TitleSlot({
     <div className="group flex items-baseline gap-3">
       <h1 className={MASTHEAD_TITLE_CLASS + (isFallback ? ' font-mono' : '')}>
         {title}
-        <span className="text-[var(--color-accent)]">.</span>
       </h1>
       <button
         type="button"

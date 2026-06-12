@@ -182,7 +182,7 @@ export default function ProjectDetail() {
         ]}
       />
 
-      <div className="surface-card mt-6 p-6">
+      <div className="mt-8">
         <PageHeader
           eyebrow={
             <span className="inline-flex items-center gap-2">
@@ -307,7 +307,7 @@ export default function ProjectDetail() {
       )}
 
       {sessions.length > 0 && (
-        <div className="surface-card mt-6 p-6">
+        <div className="mt-10">
           {(selectMode || bulkProgress || bulkOutcome) && (
             <BulkBar
               selectMode={selectMode}
@@ -328,13 +328,13 @@ export default function ProjectDetail() {
             />
           )}
           <div className="flex items-baseline justify-between">
-            <h2 className="font-display text-xl font-light tracking-tight text-[var(--color-fg-primary)]">
+            <h2 className="font-display text-xl font-medium tracking-tight text-[var(--color-fg-primary)]">
               {t('project.heading')}
             </h2>
           </div>
-          <div className="rule-dotted mt-3" aria-hidden />
+          <div className="mt-3 h-px bg-[var(--color-hairline)]" aria-hidden />
 
-          <div className="mt-4 -mx-6 overflow-x-auto px-6">
+          <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left">
@@ -501,7 +501,7 @@ function BulkBar({
   const isBusy = progress !== null;
   return (
     // sticky 顶部：被外层 card 的 padding 抵消；用 -mx-6 让条目贴齐 card 边缘
-    <div className="sticky top-2 z-30 -mx-6 mb-4 px-6">
+    <div className="sticky top-2 z-30 mb-4">
       {selectMode && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-input)] border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-4 py-2.5 shadow-[var(--shadow-rise)]">
           <div className="flex items-center gap-3">
