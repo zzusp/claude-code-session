@@ -42,6 +42,14 @@
   --shadow-rise: 0 1px 2px -1px oklch(0.40 0.02 60 / 0.08), 0 1px 0 0 oklch(0.86 0.005 85 / 0.6);
   --shadow-pop: 0 4px 14px -6px oklch(0.36 0.02 50 / 0.12), 0 12px 40px -18px oklch(0.36 0.02 50 / 0.16);
 
+  /* Sidebar selection — claude.ai's nav / Recents highlight is a *neutral* warm
+     overlay, NOT the coral accent (coral is reserved for the brand mark, links &
+     primary CTAs). A translucent fg-primary tint auto-adapts to both themes from
+     one definition: ~black on the cream sidebar in light, ~white on charcoal in
+     dark. `active` is the persistent selected fill; `hover` the lighter touch. */
+  --sidebar-active: color-mix(in oklch, var(--color-fg-primary) 9%, transparent);
+  --sidebar-hover: color-mix(in oklch, var(--color-fg-primary) 5%, transparent);
+
   /* Rounded scale. Pick the token by surface size, not by feel —
      mismatched radii on small elements get clipped to half-height and
      render as pills (e.g. --radius-card on a 30px button looks fully round).

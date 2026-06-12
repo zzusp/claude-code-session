@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import type { Block } from '../lib/api.ts';
 import { rowsFromStrings, type UnifiedRow } from '../lib/diff.ts';
 import { useT } from '../lib/i18n.ts';
+import FileThumb from './FileThumb.tsx';
 import HighlightedText from './HighlightedText.tsx';
 
 const PREVIEW_CHARS = 280;
@@ -21,11 +22,54 @@ export function ToolUseBlock({
 }) {
   const [open, setOpen] = useState(false);
   const input = asRecord(block.input);
-  const summary = toolSummary(block.name, input);
   // 「读用富渲染，搜用原文高亮」：query 非空＝搜索态，展开体退回 JSON 原文 +
   // HighlightedText（同 main），保证 haystack 命中的内容在 UI 上一定能看到高亮；
   // 否则走分工具的富展开体（diff / checklist / 命令块）。
   const searching = query.length > 0;
+
+  // 展开体两种头部共用：搜索态 JSON 原文，否则分工具富展开体。
+  const body = open && (
+    <div className="border-t border-[var(--color-hairline)] bg-[var(--color-surface)]">
+      {searching ? (
+        <JsonDump input={input} query={query} />
+      ) : (
+        <ToolUseBody name={block.name} input={input} />
+      )}
+    </div>
+  );
+
+  // 文件操作工具（Read/Write/Edit/…）的折叠头渲染成 claude.ai 风「文件卡」：
+  // 倾斜纸张缩略图 + 文件名标题 + 「操作 · 扩展名」副标题，展开仍是原 diff 体。
+  const fileOp = fileOpOf(block.name, input);
+  if (fileOp) {
+    const ext = fileExt(fileOp.path);
+    return (
+      <div className="overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-hairline)] text-sm transition-colors hover:border-[var(--color-hairline-strong)]">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          title={fileOp.path}
+          className="group/file flex w-full items-center gap-3 px-3 py-2 text-left transition hover:bg-[var(--color-sunken)]"
+        >
+          <FileThumb />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13px] leading-tight text-[var(--color-fg-primary)]">
+              {fileName(fileOp.path)}
+            </span>
+            <span className="block truncate text-[11px] leading-tight text-[var(--color-fg-muted)]">
+              {block.name}
+              {ext && <span className="opacity-50"> · </span>}
+              {ext}
+            </span>
+          </span>
+          <Caret open={open} />
+        </button>
+        {body}
+      </div>
+    );
+  }
+
+  const summary = toolSummary(block.name, input);
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--color-hairline)] bg-[var(--color-sunken)] text-sm">
       <button
@@ -45,17 +89,42 @@ export function ToolUseBlock({
           <Caret open={open} />
         </span>
       </button>
-      {open && (
-        <div className="border-t border-[var(--color-hairline)] bg-[var(--color-surface)]">
-          {searching ? (
-            <JsonDump input={input} query={query} />
-          ) : (
-            <ToolUseBody name={block.name} input={input} />
-          )}
-        </div>
-      )}
+      {body}
     </div>
   );
+}
+
+/** 文件操作工具 → 文件路径；非文件工具返回 null（仍走通用折叠行）。Read 也算
+ *  文件展示，纳入卡片；其展开体维持原样（输入 JSON）。 */
+function fileOpOf(name: string, input: Record<string, unknown>): { path: string } | null {
+  switch (name) {
+    case 'Read':
+    case 'Write':
+    case 'Edit':
+    case 'MultiEdit': {
+      const p = strOf(input.file_path);
+      return p ? { path: p } : null;
+    }
+    case 'NotebookEdit': {
+      const p = strOf(input.notebook_path);
+      return p ? { path: p } : null;
+    }
+    default:
+      return null;
+  }
+}
+
+/** 路径末段当文件名标题；扩展名大写当副标题（claude.ai 用「Document · MD」）。 */
+function fileName(p: string): string {
+  const segs = p.split(/[\\/]+/).filter(Boolean);
+  return segs[segs.length - 1] || p;
+}
+
+function fileExt(p: string): string {
+  const base = fileName(p);
+  const i = base.lastIndexOf('.');
+  if (i <= 0 || i === base.length - 1) return '';
+  return base.slice(i + 1).toUpperCase();
 }
 
 /** 富展开体按工具特化：Edit/Write 走与「修改的文件」弹窗同语言的 −/+ diff 行，

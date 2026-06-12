@@ -8,9 +8,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import Breadcrumbs, { BreadcrumbFolderIcon } from '../components/Breadcrumbs.tsx';
-import DeleteDialog from '../components/DeleteDialog.tsx';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import FileThumb from '../components/FileThumb.tsx';
 import { Loading } from '../components/Loading.tsx';
 import MessageBubble, { WorkingIndicator } from '../components/MessageBubble.tsx';
 import { type EditLookup } from '../components/ModifiedFilesView.tsx';
@@ -28,7 +27,7 @@ import {
   MAX_SESSION_MESSAGES,
   RECENT_ACTIVITY_WINDOW_MIN,
 } from '../lib/constants.ts';
-import { formatBytes, formatDateTime, formatRelativeTime } from '../lib/format.ts';
+import { formatBytes, formatDateTime } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
 import { fadeUpItem, staggerParent } from '../lib/motion.ts';
 import { queryKeys } from '../lib/query-keys.ts';
@@ -76,7 +75,6 @@ function lastTurnIncomplete(messages: Message[]): boolean {
 
 export default function SessionDetailRoute() {
   const t = useT();
-  const navigate = useNavigate();
   const { projectId, sessionId } = useParams<{ projectId: string; sessionId: string }>();
   const [searchParams] = useSearchParams();
   const pid = projectId ?? '';
@@ -88,9 +86,10 @@ export default function SessionDetailRoute() {
   const [onlyUser, setOnlyUser] = useState(false);
   const [onlyError, setOnlyError] = useState(false);
   const [query, setQuery] = useState('');
+  // Search is collapsed to a button in the title row; clicking reveals the input.
+  const [searchOpen, setSearchOpen] = useState(false);
   const deferredQuery = useDeferredValue(query);
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const urlAppliedRef = useRef<string | null>(null);
   const flashedKeyRef = useRef<string | null>(null);
   // Live-tail follow state: whether the reader is parked at the bottom, and the
@@ -143,12 +142,6 @@ export default function SessionDetailRoute() {
     () => projectSessionsQuery.data?.find((s) => s.id === sid) ?? null,
     [projectSessionsQuery.data, sid],
   );
-  const deleteTooltip = !currentSummary
-    ? projectSessionsQuery.isLoading
-      ? t('common.loading')
-      : t('session.action.deleteTooltipBlocked')
-    : undefined;
-
   // Modified-files summary (aggregated from a full jsonl scan, server-side). Fetched
   // eagerly at route level so the header trigger can show the count; the page reuses
   // this same data instead of querying again.
@@ -225,7 +218,10 @@ export default function SessionDetailRoute() {
     const key = `${sid}|${urlFocus ?? ''}|${urlQuery ?? ''}`;
     if (urlAppliedRef.current === key) return;
     urlAppliedRef.current = key;
-    if (urlQuery) setQuery(urlQuery);
+    if (urlQuery) {
+      setQuery(urlQuery);
+      setSearchOpen(true);
+    }
     if (urlFocus) {
       const target = data.messages.find((m) => m.uuid === urlFocus);
       if (target?.isMeta) setShowMeta(true);
@@ -311,6 +307,16 @@ export default function SessionDetailRoute() {
     return data.meta.customTitle ?? data.meta.title;
   }, [data]);
 
+  // Session model = the latest assistant turn's model (sessions have no top-level
+  // model field; the footer surfaces it like claude.ai's "Opus 4.8" footer chip).
+  const sessionModel = useMemo(() => {
+    if (!data) return null;
+    for (let i = data.messages.length - 1; i >= 0; i--) {
+      if (data.messages[i]!.model) return data.messages[i]!.model;
+    }
+    return null;
+  }, [data]);
+
   const queryClient = useQueryClient();
   const renameMutation = useMutation({
     mutationFn: (next: string) =>
@@ -333,105 +339,48 @@ export default function SessionDetailRoute() {
     },
   });
 
-  const taglineBranchPart = data?.meta.gitBranch
-    ? t('session.tagline.branch', { branch: data.meta.gitBranch })
-    : '';
-
-  const crumbs = [
-    { label: t('session.crumbProjects'), to: '/' },
-    {
-      label: projectTail,
-      to: `/projects/${encodeURIComponent(pid)}`,
-      mono: true,
-      icon: <BreadcrumbFolderIcon />,
-    },
-    {
-      label: sessionTitle ?? sid.slice(0, 8),
-      mono: !sessionTitle,
-      icon: <BreadcrumbFolderIcon />,
-    },
-  ];
-
   return (
-    <section className="mx-auto max-w-4xl">
-      <Breadcrumbs items={crumbs} />
-
-      {data && (
-        <MetaLine
-          sid={sid}
-          tagline={t('session.tagline', {
-            started: formatRelativeTime(data.meta.firstAt),
-            lastTouched: formatRelativeTime(data.meta.lastAt),
-            branchPart: taglineBranchPart,
-          })}
-          messageCount={data.meta.messageCount}
-          bytes={data.meta.bytes}
-          version={data.meta.version}
-          firstAt={data.meta.firstAt}
+    <section className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-4xl flex-col">
+      {/* Title as a claude.ai-style breadcrumb on the canvas (project / session),
+          no card. The in-session search sits beneath; both stick to the top. The
+          session metadata + Modified-files entry move to the sticky footer below. */}
+      <div className="z-30 lg:sticky lg:top-0 topbar-glass border-b border-[var(--color-hairline)]">
+        <SessionTitleBar
+          projectId={pid}
+          projectTail={projectTail}
+          isLive={isLive}
+          isWorking={isWorking}
+          title={sessionTitle ?? sid.slice(0, 12) + '…'}
+          isFallback={!sessionTitle}
+          editableValue={sessionTitle ?? ''}
+          onTitleEdit={async (next) => {
+            await renameMutation.mutateAsync(next);
+          }}
+          renameDisabled={currentSummary?.isLivePid === true}
+          renameTooltip={
+            currentSummary?.isLivePid === true
+              ? t('session.action.renameTooltipLive', { pid: currentSummary.livePid ?? '?' })
+              : undefined
+          }
+          searchOpen={searchOpen}
+          onToggleSearch={() => setSearchOpen((v) => !v)}
         />
-      )}
-
-      {/* Chat-style sticky header: live status + editable title + actions, with the
-          in-session search / filter row tucked beneath. One sticky element, so the
-          title stays in view while the breadcrumb + meta line scroll away. */}
-      <div className="z-30 mt-3 lg:sticky lg:top-0">
-        <div className="overflow-hidden rounded-[var(--radius-input)] border border-[var(--color-hairline)] bg-[var(--color-surface)] shadow-[var(--shadow-rise)]">
-          <ChatHeader
-            sid={sid}
-            isLive={isLive}
-            isWorking={isWorking}
-            title={sessionTitle}
-            editableValue={sessionTitle ?? ''}
-            onTitleEdit={async (next) => {
-              await renameMutation.mutateAsync(next);
-            }}
-            renameDisabled={currentSummary?.isLivePid === true}
-            renameTooltip={
-              currentSummary?.isLivePid === true
-                ? t('session.action.renameTooltipLive', {
-                    pid: currentSummary.livePid ?? '?',
-                  })
-                : undefined
-            }
-            onDelete={currentSummary ? () => setShowDeleteDialog(true) : undefined}
-            deleteDisabled={!currentSummary}
-            deleteTooltip={deleteTooltip}
-            deleteLabel={t('session.action.delete')}
-            onOpenModified={openModifiedInNewTab}
-            modifiedCount={modifiedFiles.length}
-            modifiedLoading={modifiedFilesQuery.isLoading}
-          />
-          <FilterRow
+        {searchOpen && (
+          <SearchReveal
             query={query}
             onQuery={setQuery}
-            showMeta={showMeta}
-            onShowMeta={setShowMeta}
-            onlyUser={onlyUser}
-            onOnlyUser={setOnlyUser}
-            onlyError={onlyError}
-            onOnlyError={setOnlyError}
+            onClose={() => {
+              setQuery('');
+              setSearchOpen(false);
+            }}
             shown={renderList.length}
             total={visibleMessages.length}
             hasData={!!data}
           />
-        </div>
+        )}
       </div>
 
-      {showDeleteDialog && currentSummary && (
-        <DeleteDialog
-          projectId={pid}
-          selected={[currentSummary]}
-          onClose={() => setShowDeleteDialog(false)}
-          onDeleted={(deletedIds) => {
-            if (deletedIds.includes(sid)) {
-              setShowDeleteDialog(false);
-              navigate(`/projects/${encodeURIComponent(pid)}`, { replace: true });
-            }
-          }}
-        />
-      )}
-
-      <div className="mt-6">
+      <div className="mt-6 flex-1 pb-24">
         {data?.truncated && (
           <Admonition tone="warn" className="mb-6">
             {t('session.truncated', { n: MAX_SESSION_MESSAGES.toLocaleString() })}
@@ -454,7 +403,7 @@ export default function SessionDetailRoute() {
         {data && visibleMessages.length > 0 && (
           <ol>
             {hasMoreEarlier && (
-              <li className="flex justify-center border-b border-[var(--color-hairline)] py-3">
+              <li className="flex items-center justify-center gap-3 border-b border-[var(--color-hairline)] py-3">
                 <button
                   type="button"
                   onClick={() =>
@@ -466,6 +415,9 @@ export default function SessionDetailRoute() {
                     n: Math.min(LOAD_STEP, visibleMessages.length - renderList.length),
                   })}
                 </button>
+                <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
+                  {t('session.shown', { shown: renderList.length, total: visibleMessages.length })}
+                </span>
               </li>
             )}
 
@@ -498,6 +450,27 @@ export default function SessionDetailRoute() {
         )}
       </div>
 
+      {data && (
+        <SessionFooter
+          cwd={data.meta.cwd ?? project?.decodedCwd ?? null}
+          branch={data.meta.gitBranch}
+          model={sessionModel}
+          bytes={data.meta.bytes}
+          version={data.meta.version}
+          startedAt={data.meta.firstAt}
+          messageCount={data.meta.messageCount}
+          modifiedCount={modifiedFiles.length}
+          modifiedLoading={modifiedFilesQuery.isLoading}
+          onOpenModified={openModifiedInNewTab}
+          showMeta={showMeta}
+          onShowMeta={setShowMeta}
+          onlyUser={onlyUser}
+          onOnlyUser={setOnlyUser}
+          onlyError={onlyError}
+          onOnlyError={setOnlyError}
+        />
+      )}
+
       {data && <ScrollToEdges />}
     </section>
   );
@@ -505,88 +478,199 @@ export default function SessionDetailRoute() {
 
 /* ─────────────────────────────────────────────────────────────────── */
 
-// Compact chat header — a single slim row: live/working beacon, the editable
-// session title, then the "Modified files" + delete actions. Replaces the old
-// editorial masthead; the heavier metadata moves to the non-sticky MetaLine above.
-function ChatHeader({
-  sid,
+// claude.ai-style title breadcrumb on the canvas: live beacon + monitor glyph +
+// project link / editable session title. No card box. Session metadata and the
+// Modified-files entry moved to the sticky footer; deletion moved off this page
+// (use the project page or the sidebar Recents).
+function SessionTitleBar({
+  projectId,
+  projectTail,
   isLive,
   isWorking,
   title,
+  isFallback,
   editableValue,
   onTitleEdit,
   renameDisabled,
   renameTooltip,
-  onDelete,
-  deleteDisabled,
-  deleteTooltip,
-  deleteLabel,
-  onOpenModified,
-  modifiedCount,
-  modifiedLoading,
+  searchOpen,
+  onToggleSearch,
 }: {
-  sid: string;
+  projectId: string;
+  projectTail: string;
   isLive: boolean;
   isWorking: boolean;
-  title: string | null;
+  title: string;
+  isFallback: boolean;
   editableValue: string;
   onTitleEdit: (next: string) => Promise<void>;
   renameDisabled?: boolean;
   renameTooltip?: string;
-  onDelete?: () => void;
-  deleteDisabled?: boolean;
-  deleteTooltip?: string;
-  deleteLabel?: string;
-  onOpenModified: () => void;
-  modifiedCount: number;
-  modifiedLoading: boolean;
+  searchOpen: boolean;
+  onToggleSearch: () => void;
 }) {
   const t = useT();
   return (
-    <header className="flex items-center gap-3 px-4 py-2.5">
+    <div className="flex items-center gap-2 px-3 py-2.5">
       <StatusBeacon isLive={isLive} isWorking={isWorking} />
+      <span aria-hidden className="shrink-0 text-[var(--color-fg-muted)]">
+        <MonitorIcon />
+      </span>
+      <Link
+        to={`/projects/${encodeURIComponent(projectId)}`}
+        title={projectTail}
+        className="hidden max-w-[14rem] shrink-0 truncate text-[13px] text-[var(--color-fg-muted)] transition-colors hover:text-[var(--color-fg-primary)] sm:inline"
+      >
+        {projectTail}
+      </Link>
+      <span aria-hidden className="hidden shrink-0 text-[var(--color-fg-faint)] sm:inline">
+        /
+      </span>
       <div className="min-w-0 flex-1">
         <TitleSlot
-          title={title ?? sid.slice(0, 12) + '…'}
+          title={title}
           editableValue={editableValue}
           onTitleEdit={onTitleEdit}
-          isFallback={!title}
+          isFallback={isFallback}
           disabled={renameDisabled}
           disabledTooltip={renameTooltip}
         />
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <button
-          type="button"
-          onClick={onOpenModified}
-          disabled={modifiedLoading}
-          aria-label={t('session.modified.openAria')}
-          title={t('session.modified.title')}
-          className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-[var(--color-accent)]"
-        >
-          <FilesIcon />
-          <span className="hidden sm:inline">{t('session.modified.title')}</span>
-          {modifiedCount > 0 && (
-            <span className="rounded-full bg-[var(--color-accent-soft)] px-1.5 font-mono text-[10px] tabular-nums text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
-              {modifiedCount}
-            </span>
+      <button
+        type="button"
+        onClick={onToggleSearch}
+        aria-label={t('common.searchPlaceholder')}
+        title={t('common.searchPlaceholder')}
+        aria-expanded={searchOpen}
+        className={
+          'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition ' +
+          (searchOpen
+            ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]'
+            : 'border-transparent text-[var(--color-fg-muted)] hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)]')
+        }
+      >
+        <SearchIcon />
+      </button>
+    </div>
+  );
+}
+
+// Sticky bottom info bar — claude.ai's footer. Carries the session metadata
+// (folder / branch / model / size / version / started) plus the Modified-files
+// entry, which moved here off the header. Stays reachable while scrolling.
+function SessionFooter({
+  cwd,
+  branch,
+  model,
+  bytes,
+  version,
+  startedAt,
+  messageCount,
+  modifiedCount,
+  modifiedLoading,
+  onOpenModified,
+  showMeta,
+  onShowMeta,
+  onlyUser,
+  onOnlyUser,
+  onlyError,
+  onOnlyError,
+}: {
+  cwd: string | null;
+  branch: string | null;
+  model: string | null;
+  bytes: number;
+  version: string | null;
+  startedAt: string | null;
+  messageCount: number;
+  modifiedCount: number;
+  modifiedLoading: boolean;
+  onOpenModified: () => void;
+  showMeta: boolean;
+  onShowMeta: (v: boolean) => void;
+  onlyUser: boolean;
+  onOnlyUser: (v: boolean) => void;
+  onlyError: boolean;
+  onOnlyError: (v: boolean) => void;
+}) {
+  const t = useT();
+  return (
+    <div className="z-30 mt-4 lg:sticky lg:bottom-0 topbar-glass border-t border-[var(--color-hairline)]">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2">
+        <dl className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          {cwd && (
+            <FooterFact icon={<FolderGlyph />} value={cwd} mono title={cwd} className="max-w-[20rem]" />
           )}
-        </button>
-        {(onDelete || deleteDisabled) && (
+          {branch && <FooterFact icon={<BranchGlyph />} value={branch} mono />}
+          {model && <FooterFact icon={<ModelGlyph />} value={model} mono />}
+          <FooterFact label={t('session.meta.size')} value={formatBytes(bytes)} />
+          <FooterFact label={t('session.meta.messages')} value={messageCount.toLocaleString()} />
+          {version && <FooterFact label={t('session.meta.version')} value={version} />}
+          {startedAt && (
+            <FooterFact label={t('session.meta.started')} value={formatDateTime(startedAt)} />
+          )}
+        </dl>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {/* Message filters live here (moved off the toolbar): system / only-me / errors. */}
+          <div className="flex items-center gap-3">
+            <ToggleSwitch checked={showMeta} onChange={onShowMeta} label={t('common.system')} />
+            <ToggleSwitch checked={onlyUser} onChange={onOnlyUser} label={t('common.onlyUser')} />
+            <ToggleSwitch checked={onlyError} onChange={onOnlyError} label={t('common.onlyError')} />
+          </div>
+          <span aria-hidden className="hidden h-4 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
           <button
             type="button"
-            onClick={onDelete}
-            disabled={deleteDisabled || !onDelete}
-            title={deleteTooltip}
-            aria-label={deleteLabel}
-            className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--color-danger)] transition hover:border-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={onOpenModified}
+            disabled={modifiedLoading}
+            aria-label={t('session.modified.openAria')}
+            title={t('session.modified.title')}
+            className="group/file inline-flex shrink-0 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] py-1 pl-1.5 pr-2.5 transition hover:border-[var(--color-accent)] hover:bg-[var(--color-sunken)] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <TrashIcon />
-            <span className="hidden sm:inline">{deleteLabel}</span>
+            <FileThumb size="sm" />
+            <span className="text-[12px] font-medium text-[var(--color-fg-secondary)] transition-colors group-hover/file:text-[var(--color-fg-primary)]">
+              {t('session.modified.title')}
+            </span>
+            {modifiedCount > 0 && (
+              <span className="rounded-full bg-[var(--color-accent-soft)] px-1.5 font-mono text-[10px] tabular-nums text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
+                {modifiedCount}
+              </span>
+            )}
           </button>
-        )}
+        </div>
       </div>
-    </header>
+    </div>
+  );
+}
+
+function FooterFact({
+  label,
+  icon,
+  value,
+  mono,
+  title,
+  className = '',
+}: {
+  label?: string;
+  icon?: ReactNode;
+  value: ReactNode;
+  mono?: boolean;
+  title?: string;
+  className?: string;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-1.5" title={title}>
+      {icon && <span className="shrink-0 text-[var(--color-fg-faint)]">{icon}</span>}
+      {label && <span className="eyebrow shrink-0">{label}</span>}
+      <span
+        className={
+          'truncate text-[11.5px] text-[var(--color-fg-secondary)] ' +
+          (mono ? 'font-mono ' : '') +
+          className
+        }
+      >
+        {value}
+      </span>
+    </div>
   );
 }
 
@@ -613,44 +697,10 @@ function StatusBeacon({ isLive, isWorking }: { isLive: boolean; isWorking: boole
   return <span aria-hidden className="shrink-0 text-[10px] text-[var(--color-accent)]">●</span>;
 }
 
-// Non-sticky subtitle under the breadcrumb: the editorial tagline plus a compact
-// fact row (messages / size / version / started) and the raw session id.
-function MetaLine({
-  sid,
-  tagline,
-  messageCount,
-  bytes,
-  version,
-  firstAt,
-}: {
-  sid: string;
-  tagline: string;
-  messageCount: number;
-  bytes: number;
-  version: string | null;
-  firstAt: string | null;
-}) {
-  const t = useT();
-  return (
-    <div className="mt-2 space-y-1.5">
-      <p className="font-display text-[13.5px] italic leading-snug text-[var(--color-fg-muted)]">
-        {tagline}
-      </p>
-      <dl className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-        <Fact label={t('session.meta.messages')} value={messageCount.toLocaleString()} />
-        <Fact label={t('session.meta.size')} value={formatBytes(bytes)} />
-        {version && <Fact label={t('session.meta.version')} value={version} />}
-        <Fact label={t('session.meta.started')} value={formatDateTime(firstAt)} />
-      </dl>
-      <p className="truncate font-mono text-[10.5px] tracking-[0.04em] text-[var(--color-fg-faint)]">
-        {sid}
-      </p>
-    </div>
-  );
-}
-
+// Breadcrumb-scale title — sits inline in the sticky title bar next to the
+// project link, claude.ai style (smaller than the old editorial masthead h1).
 const HEADER_TITLE_CLASS =
-  'font-display text-[18px] sm:text-[19px] font-medium leading-tight tracking-[-0.01em] text-[var(--color-fg-primary)]';
+  'font-display text-[15px] font-medium leading-tight tracking-[-0.01em] text-[var(--color-fg-primary)]';
 
 function TitleSlot({
   title,
@@ -746,7 +796,6 @@ function TitleSlot({
     <div className="group flex min-w-0 items-baseline gap-2">
       <h1 className={HEADER_TITLE_CLASS + ' truncate' + (isFallback ? ' font-mono' : '')}>
         {title}
-        <span className="text-[var(--color-accent)]">.</span>
       </h1>
       <button
         type="button"
@@ -762,74 +811,62 @@ function TitleSlot({
   );
 }
 
-function Fact({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="flex items-baseline gap-2">
-      <dt className="eyebrow">{label}</dt>
-      <dd className="font-mono text-[12px] tabular-nums text-[var(--color-fg-primary)]">
-        {value}
-      </dd>
-    </div>
-  );
-}
-
 /* ─────────────────────────────────────────────────────────────────── */
 
-function FilterRow({
+// Collapsible search — revealed from the title-bar search button. Just the input
+// (plus a live result count and a close button); the system/only-me/error filters
+// moved to the sticky footer, the load-more count to the "load earlier" row.
+function SearchReveal({
   query,
   onQuery,
-  showMeta,
-  onShowMeta,
-  onlyUser,
-  onOnlyUser,
-  onlyError,
-  onOnlyError,
+  onClose,
   shown,
   total,
   hasData,
 }: {
   query: string;
   onQuery: (v: string) => void;
-  showMeta: boolean;
-  onShowMeta: (v: boolean) => void;
-  onlyUser: boolean;
-  onOnlyUser: (v: boolean) => void;
-  onlyError: boolean;
-  onOnlyError: (v: boolean) => void;
+  onClose: () => void;
   shown: number;
   total: number;
   hasData: boolean;
 }) {
   const t = useT();
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--color-hairline)] px-4 py-2">
-      <div className="flex flex-1 min-w-[12rem] items-center gap-2 border-b border-[var(--color-hairline)] py-1 transition focus-within:border-[var(--color-accent)]">
+    <div className="flex items-center gap-3 border-t border-[var(--color-hairline)] px-3 py-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2 border-b border-[var(--color-hairline)] py-1 transition focus-within:border-[var(--color-accent)]">
         <SearchIcon className="text-[var(--color-fg-muted)]" />
         <input
           type="search"
+          autoFocus
           value={query}
           onChange={(e) => onQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              onClose();
+            }
+          }}
           placeholder={t('common.searchPlaceholder')}
           className="w-full bg-transparent text-sm text-[var(--color-fg-primary)] placeholder:text-[var(--color-fg-faint)] focus:outline-none"
         />
       </div>
-
-      <span className="hidden h-4 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
-
-      <div className="flex items-center gap-4">
-        <ToggleSwitch checked={showMeta} onChange={onShowMeta} label={t('common.system')} />
-        <ToggleSwitch checked={onlyUser} onChange={onOnlyUser} label={t('common.onlyUser')} />
-        <ToggleSwitch checked={onlyError} onChange={onOnlyError} label={t('common.onlyError')} />
-      </div>
-
-      {hasData && (
-        <>
-          <span className="hidden h-4 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
-          <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
-            {t('session.shown', { shown, total })}
-          </span>
-        </>
+      {hasData && query && (
+        <span className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
+          {t('session.shown', { shown, total })}
+        </span>
       )}
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={t('common.cancel')}
+        title={t('common.cancel')}
+        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--color-fg-muted)] transition hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)]"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden>
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
     </div>
   );
 }
@@ -939,41 +976,50 @@ function SearchIcon({ className = '' }: { className?: string }) {
   );
 }
 
-function TrashIcon() {
+// Monitor glyph for the title breadcrumb — denotes a Claude Code session, echoing
+// claude.ai/code's laptop mark before the project / session crumb.
+function MonitorIcon() {
   return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M3 6h18" />
-      <path d="M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6" />
-      <path d="M5.5 6l1.1 13.2A1.5 1.5 0 0 0 8.1 20.5h7.8a1.5 1.5 0 0 0 1.5-1.3L18.5 6" />
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="3" y="4" width="18" height="12" rx="1.6" />
+      <path d="M8 20h8" />
+      <path d="M12 16v4" />
     </svg>
   );
 }
 
-function FilesIcon() {
+function FolderGlyph() {
   return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M3 5h6l2 2h10" />
-      <path d="M3 5v14h18V9H3" />
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2a1.5 1.5 0 0 1 1.05.43l1.34 1.32A1.5 1.5 0 0 0 12.14 7.2H19.5A1.5 1.5 0 0 1 21 8.7v9.3a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z" />
+    </svg>
+  );
+}
+
+function BranchGlyph() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="6" cy="6" r="2.4" />
+      <circle cx="6" cy="18" r="2.4" />
+      <circle cx="18" cy="8" r="2.4" />
+      <path d="M6 8.4v7.2" />
+      <path d="M18 10.4c0 3.4-3.4 4.2-6 4.6" />
+    </svg>
+  );
+}
+
+// Sunburst glyph (same family as the brand mark) marking the model fact.
+function ModelGlyph() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 3v3.6" />
+      <path d="M12 17.4V21" />
+      <path d="M3 12h3.6" />
+      <path d="M17.4 12H21" />
+      <path d="M6.3 6.3l2.5 2.5" />
+      <path d="M15.2 15.2l2.5 2.5" />
+      <path d="M6.3 17.7l2.5-2.5" />
+      <path d="M15.2 8.8l2.5-2.5" />
     </svg>
   );
 }
