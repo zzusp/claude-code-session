@@ -130,6 +130,7 @@ const DICT = {
     'project.col.errors': 'Errors',
 
     'session.crumbProjects': 'Projects',
+    'session.action.menu': 'Session options',
     'session.action.delete': 'Delete',
     'session.action.deleteTooltipBlocked': 'Session metadata not available yet',
     'session.action.rename': 'Rename',
@@ -541,6 +542,7 @@ const DICT = {
     'project.col.errors': '错误',
 
     'session.crumbProjects': '项目',
+    'session.action.menu': '会话选项',
     'session.action.delete': '删除',
     'session.action.deleteTooltipBlocked': '暂无法获取该会话状态',
     'session.action.rename': '重命名',
