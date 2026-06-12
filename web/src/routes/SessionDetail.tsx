@@ -86,6 +86,8 @@ export default function SessionDetailRoute() {
   const [onlyUser, setOnlyUser] = useState(false);
   const [onlyError, setOnlyError] = useState(false);
   const [query, setQuery] = useState('');
+  // Search is collapsed to a button in the title row; clicking reveals the input.
+  const [searchOpen, setSearchOpen] = useState(false);
   const deferredQuery = useDeferredValue(query);
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
   const urlAppliedRef = useRef<string | null>(null);
@@ -216,7 +218,10 @@ export default function SessionDetailRoute() {
     const key = `${sid}|${urlFocus ?? ''}|${urlQuery ?? ''}`;
     if (urlAppliedRef.current === key) return;
     urlAppliedRef.current = key;
-    if (urlQuery) setQuery(urlQuery);
+    if (urlQuery) {
+      setQuery(urlQuery);
+      setSearchOpen(true);
+    }
     if (urlFocus) {
       const target = data.messages.find((m) => m.uuid === urlFocus);
       if (target?.isMeta) setShowMeta(true);
@@ -357,20 +362,22 @@ export default function SessionDetailRoute() {
               ? t('session.action.renameTooltipLive', { pid: currentSummary.livePid ?? '?' })
               : undefined
           }
+          searchOpen={searchOpen}
+          onToggleSearch={() => setSearchOpen((v) => !v)}
         />
-        <FilterRow
-          query={query}
-          onQuery={setQuery}
-          showMeta={showMeta}
-          onShowMeta={setShowMeta}
-          onlyUser={onlyUser}
-          onOnlyUser={setOnlyUser}
-          onlyError={onlyError}
-          onOnlyError={setOnlyError}
-          shown={renderList.length}
-          total={visibleMessages.length}
-          hasData={!!data}
-        />
+        {searchOpen && (
+          <SearchReveal
+            query={query}
+            onQuery={setQuery}
+            onClose={() => {
+              setQuery('');
+              setSearchOpen(false);
+            }}
+            shown={renderList.length}
+            total={visibleMessages.length}
+            hasData={!!data}
+          />
+        )}
       </div>
 
       <div className="mt-6 flex-1 pb-24">
@@ -396,7 +403,7 @@ export default function SessionDetailRoute() {
         {data && visibleMessages.length > 0 && (
           <ol>
             {hasMoreEarlier && (
-              <li className="flex justify-center border-b border-[var(--color-hairline)] py-3">
+              <li className="flex items-center justify-center gap-3 border-b border-[var(--color-hairline)] py-3">
                 <button
                   type="button"
                   onClick={() =>
@@ -408,6 +415,9 @@ export default function SessionDetailRoute() {
                     n: Math.min(LOAD_STEP, visibleMessages.length - renderList.length),
                   })}
                 </button>
+                <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
+                  {t('session.shown', { shown: renderList.length, total: visibleMessages.length })}
+                </span>
               </li>
             )}
 
@@ -452,6 +462,12 @@ export default function SessionDetailRoute() {
           modifiedCount={modifiedFiles.length}
           modifiedLoading={modifiedFilesQuery.isLoading}
           onOpenModified={openModifiedInNewTab}
+          showMeta={showMeta}
+          onShowMeta={setShowMeta}
+          onlyUser={onlyUser}
+          onOnlyUser={setOnlyUser}
+          onlyError={onlyError}
+          onOnlyError={setOnlyError}
         />
       )}
 
@@ -477,6 +493,8 @@ function SessionTitleBar({
   onTitleEdit,
   renameDisabled,
   renameTooltip,
+  searchOpen,
+  onToggleSearch,
 }: {
   projectId: string;
   projectTail: string;
@@ -488,7 +506,10 @@ function SessionTitleBar({
   onTitleEdit: (next: string) => Promise<void>;
   renameDisabled?: boolean;
   renameTooltip?: string;
+  searchOpen: boolean;
+  onToggleSearch: () => void;
 }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-2 px-3 py-2.5">
       <StatusBeacon isLive={isLive} isWorking={isWorking} />
@@ -515,6 +536,21 @@ function SessionTitleBar({
           disabledTooltip={renameTooltip}
         />
       </div>
+      <button
+        type="button"
+        onClick={onToggleSearch}
+        aria-label={t('common.searchPlaceholder')}
+        title={t('common.searchPlaceholder')}
+        aria-expanded={searchOpen}
+        className={
+          'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition ' +
+          (searchOpen
+            ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]'
+            : 'border-transparent text-[var(--color-fg-muted)] hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)]')
+        }
+      >
+        <SearchIcon />
+      </button>
     </div>
   );
 }
@@ -533,6 +569,12 @@ function SessionFooter({
   modifiedCount,
   modifiedLoading,
   onOpenModified,
+  showMeta,
+  onShowMeta,
+  onlyUser,
+  onOnlyUser,
+  onlyError,
+  onOnlyError,
 }: {
   cwd: string | null;
   branch: string | null;
@@ -544,12 +586,18 @@ function SessionFooter({
   modifiedCount: number;
   modifiedLoading: boolean;
   onOpenModified: () => void;
+  showMeta: boolean;
+  onShowMeta: (v: boolean) => void;
+  onlyUser: boolean;
+  onOnlyUser: (v: boolean) => void;
+  onlyError: boolean;
+  onOnlyError: (v: boolean) => void;
 }) {
   const t = useT();
   return (
     <div className="z-30 mt-4 lg:sticky lg:bottom-0 topbar-glass border-t border-[var(--color-hairline)]">
-      <div className="flex items-start justify-between gap-4 px-3 py-2">
-        <dl className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2">
+        <dl className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
           {cwd && (
             <FooterFact icon={<FolderGlyph />} value={cwd} mono title={cwd} className="max-w-[20rem]" />
           )}
@@ -562,24 +610,33 @@ function SessionFooter({
             <FooterFact label={t('session.meta.started')} value={formatDateTime(startedAt)} />
           )}
         </dl>
-        <button
-          type="button"
-          onClick={onOpenModified}
-          disabled={modifiedLoading}
-          aria-label={t('session.modified.openAria')}
-          title={t('session.modified.title')}
-          className="group/file inline-flex shrink-0 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] py-1 pl-1.5 pr-2.5 transition hover:border-[var(--color-accent)] hover:bg-[var(--color-sunken)] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <FileThumb size="sm" />
-          <span className="text-[12px] font-medium text-[var(--color-fg-secondary)] transition-colors group-hover/file:text-[var(--color-fg-primary)]">
-            {t('session.modified.title')}
-          </span>
-          {modifiedCount > 0 && (
-            <span className="rounded-full bg-[var(--color-accent-soft)] px-1.5 font-mono text-[10px] tabular-nums text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
-              {modifiedCount}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {/* Message filters live here (moved off the toolbar): system / only-me / errors. */}
+          <div className="flex items-center gap-3">
+            <ToggleSwitch checked={showMeta} onChange={onShowMeta} label={t('common.system')} />
+            <ToggleSwitch checked={onlyUser} onChange={onOnlyUser} label={t('common.onlyUser')} />
+            <ToggleSwitch checked={onlyError} onChange={onOnlyError} label={t('common.onlyError')} />
+          </div>
+          <span aria-hidden className="hidden h-4 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
+          <button
+            type="button"
+            onClick={onOpenModified}
+            disabled={modifiedLoading}
+            aria-label={t('session.modified.openAria')}
+            title={t('session.modified.title')}
+            className="group/file inline-flex shrink-0 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] py-1 pl-1.5 pr-2.5 transition hover:border-[var(--color-accent)] hover:bg-[var(--color-sunken)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <FileThumb size="sm" />
+            <span className="text-[12px] font-medium text-[var(--color-fg-secondary)] transition-colors group-hover/file:text-[var(--color-fg-primary)]">
+              {t('session.modified.title')}
             </span>
-          )}
-        </button>
+            {modifiedCount > 0 && (
+              <span className="rounded-full bg-[var(--color-accent-soft)] px-1.5 font-mono text-[10px] tabular-nums text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
+                {modifiedCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -756,61 +813,60 @@ function TitleSlot({
 
 /* ─────────────────────────────────────────────────────────────────── */
 
-function FilterRow({
+// Collapsible search — revealed from the title-bar search button. Just the input
+// (plus a live result count and a close button); the system/only-me/error filters
+// moved to the sticky footer, the load-more count to the "load earlier" row.
+function SearchReveal({
   query,
   onQuery,
-  showMeta,
-  onShowMeta,
-  onlyUser,
-  onOnlyUser,
-  onlyError,
-  onOnlyError,
+  onClose,
   shown,
   total,
   hasData,
 }: {
   query: string;
   onQuery: (v: string) => void;
-  showMeta: boolean;
-  onShowMeta: (v: boolean) => void;
-  onlyUser: boolean;
-  onOnlyUser: (v: boolean) => void;
-  onlyError: boolean;
-  onOnlyError: (v: boolean) => void;
+  onClose: () => void;
   shown: number;
   total: number;
   hasData: boolean;
 }) {
   const t = useT();
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--color-hairline)] px-4 py-2">
-      <div className="flex flex-1 min-w-[12rem] items-center gap-2 border-b border-[var(--color-hairline)] py-1 transition focus-within:border-[var(--color-accent)]">
+    <div className="flex items-center gap-3 border-t border-[var(--color-hairline)] px-3 py-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2 border-b border-[var(--color-hairline)] py-1 transition focus-within:border-[var(--color-accent)]">
         <SearchIcon className="text-[var(--color-fg-muted)]" />
         <input
           type="search"
+          autoFocus
           value={query}
           onChange={(e) => onQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              onClose();
+            }
+          }}
           placeholder={t('common.searchPlaceholder')}
           className="w-full bg-transparent text-sm text-[var(--color-fg-primary)] placeholder:text-[var(--color-fg-faint)] focus:outline-none"
         />
       </div>
-
-      <span className="hidden h-4 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
-
-      <div className="flex items-center gap-4">
-        <ToggleSwitch checked={showMeta} onChange={onShowMeta} label={t('common.system')} />
-        <ToggleSwitch checked={onlyUser} onChange={onOnlyUser} label={t('common.onlyUser')} />
-        <ToggleSwitch checked={onlyError} onChange={onOnlyError} label={t('common.onlyError')} />
-      </div>
-
-      {hasData && (
-        <>
-          <span className="hidden h-4 w-px bg-[var(--color-hairline-strong)] sm:inline-block" />
-          <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
-            {t('session.shown', { shown, total })}
-          </span>
-        </>
+      {hasData && query && (
+        <span className="shrink-0 font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
+          {t('session.shown', { shown, total })}
+        </span>
       )}
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={t('common.cancel')}
+        title={t('common.cancel')}
+        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--color-fg-muted)] transition hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)]"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden>
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
     </div>
   );
 }
