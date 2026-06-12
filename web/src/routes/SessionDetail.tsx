@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import {
+  useCallback,
   useDeferredValue,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -10,10 +12,12 @@ import {
 } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import DeleteDialog from '../components/DeleteDialog.tsx';
+import FilePreviewPanel from '../components/FilePreviewPanel.tsx';
 import FileThumb from '../components/FileThumb.tsx';
 import { Loading } from '../components/Loading.tsx';
 import MessageBubble, { WorkingIndicator } from '../components/MessageBubble.tsx';
 import { type EditLookup } from '../components/ModifiedFilesView.tsx';
+import { Splitter } from '../components/Splitter.tsx';
 import {
   api,
   type Block,
@@ -28,6 +32,11 @@ import {
   MAX_SESSION_MESSAGES,
   RECENT_ACTIVITY_WINDOW_MIN,
 } from '../lib/constants.ts';
+import {
+  FilePreviewContext,
+  type FilePreviewContextValue,
+  type FilePreviewTarget,
+} from '../lib/file-preview.ts';
 import { formatBytes, formatDateTime, formatDuration, formatTokens } from '../lib/format.ts';
 import { useT } from '../lib/i18n.ts';
 import { fadeUpItem, staggerParent } from '../lib/motion.ts';
@@ -55,6 +64,34 @@ const LIVE_WINDOW_MS = RECENT_ACTIVITY_WINDOW_MIN * 60 * 1000;
 // bottom — so watching the tail follows new messages, but scrolling up to read
 // history is never yanked back down.
 const BOTTOM_STICK_THRESHOLD_PX = 120;
+
+// 右侧文件预览面板：点会话流里的文件卡，从内容区右侧拆出一栏铺该文件。分割线可拖，
+// 各给两侧保底宽度；只在 lg+ 视口启用拆分，更窄视口退回原行内展开。
+const PREVIEW_MIN_WIDTH = 340;
+const TIMELINE_MIN_WIDTH = 380;
+const PREVIEW_DEFAULT_WIDTH = 480;
+const PREVIEW_BREAKPOINT = '(min-width: 1024px)';
+
+// 把面板宽夹在 [PREVIEW_MIN_WIDTH, 容器宽 − 时间线保底] 之间。
+function clampPaneWidth(width: number, containerWidth: number): number {
+  const max = Math.max(PREVIEW_MIN_WIDTH, containerWidth - TIMELINE_MIN_WIDTH);
+  return Math.min(max, Math.max(PREVIEW_MIN_WIDTH, width));
+}
+
+// 订阅一条 media query，视口跨过断点时重渲染。
+function useMediaQuery(query: string): boolean {
+  const [match, setMatch] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(query).matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const onChange = () => setMatch(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [query]);
+  return match;
+}
 
 function isWithinLiveWindow(lastAt: string | null | undefined): boolean {
   if (!lastAt) return false;
@@ -111,10 +148,66 @@ export default function SessionDetailRoute() {
   // appears (the indicator grows the page without bumping messageCount).
   const prevIsWorkingRef = useRef(false);
 
+  // 右侧文件预览：当前展示的文件操作（点会话流文件卡设置），以及面板宽度。
+  // 拆分只在 lg+ 视口启用，更窄时文件卡退回原行内展开。
+  const [preview, setPreview] = useState<FilePreviewTarget | null>(null);
+  const [paneWidth, setPaneWidth] = useState(PREVIEW_DEFAULT_WIDTH);
+  const isWide = useMediaQuery(PREVIEW_BREAKPOINT);
+  const paneOpen = !!preview && isWide;
+  // 拆分行的矩形（供分割线换算面板宽度）+ 顶栏高度（面板 sticky 贴在顶栏之下）。
+  const splitRef = useRef<HTMLDivElement>(null);
+  const [topbarH, setTopbarH] = useState(0);
+  const topbarRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     setWindowSize(INITIAL_WINDOW);
     prevMsgCountRef.current = null;
   }, [pid, sid]);
+
+  // 视口收窄到断点以下时收起预览，避免拆分布局在窄屏挤坏。
+  useEffect(() => {
+    if (!isWide) setPreview(null);
+  }, [isWide]);
+
+  // 切换会话时清掉上一会话残留的预览。
+  useEffect(() => {
+    setPreview(null);
+  }, [pid, sid]);
+
+  // 量顶栏实际高度（搜索展开时会变），用于面板 sticky 的 top 与高度计算。
+  useLayoutEffect(() => {
+    const el = topbarRef.current;
+    if (!el) return;
+    const measure = () => setTopbarH(el.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const openPreview = useCallback((target: FilePreviewTarget) => {
+    // 再次点同一张卡 = 收起（toggle）；点别的卡 = 切换。
+    setPreview((prev) => (prev && prev.toolUseId === target.toolUseId ? null : target));
+  }, []);
+  const closePreview = useCallback(() => setPreview(null), []);
+
+  const previewCtx: FilePreviewContextValue = useMemo(
+    () => ({ enabled: isWide, activeId: preview?.toolUseId ?? null, open: openPreview }),
+    [isWide, preview, openPreview],
+  );
+
+  // 预览开着时按 Esc 收起（不在输入框里时才接管，免得和会话内搜索的 Esc 抢）。
+  useEffect(() => {
+    if (!paneOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const el = document.activeElement;
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return;
+      setPreview(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [paneOpen]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.session(pid, sid),
@@ -203,6 +296,19 @@ export default function SessionDetailRoute() {
     for (const [id, v] of editLookup) m.set(id, v.name);
     return m;
   }, [editLookup]);
+
+  // toolUseId → tool_result 正文，供右侧预览面板渲染 Read 操作读到的文件正文
+  // （Read 的 input 只有路径，真正读到的内容在它对应的 tool_result 里）。
+  const resultLookup = useMemo(() => {
+    const m = new Map<string, string>();
+    if (!data) return m;
+    for (const msg of data.messages) {
+      for (const b of msg.blocks) {
+        if (b.type === 'tool_result') m.set(b.toolUseId, b.content);
+      }
+    }
+    return m;
+  }, [data]);
 
   const visibleMessages = useMemo(() => {
     let list = indexed;
@@ -357,7 +463,10 @@ export default function SessionDetailRoute() {
           breadcrumb) so it lines up with the canvas edges. The in-session search
           sits beneath; both stick to the top. Session metadata + the Modified-files
           entry live in the sticky footer below. */}
-      <div className="z-30 lg:sticky lg:top-0 topbar-glass border-b border-[var(--color-hairline)]">
+      <div
+        ref={topbarRef}
+        className="z-30 lg:sticky lg:top-0 topbar-glass border-b border-[var(--color-hairline)]"
+      >
         <SessionTitleBar
           projectId={pid}
           projectTail={projectTail}
@@ -396,75 +505,107 @@ export default function SessionDetailRoute() {
         )}
       </div>
 
-      <div className="mt-6 flex-1 px-3 pb-24">
-        {data?.truncated && (
-          <Admonition tone="warn" className="mb-6">
-            {t('session.truncated', { n: MAX_SESSION_MESSAGES.toLocaleString() })}
-          </Admonition>
-        )}
-
-        {isLoading && <Loading label={t('common.loadingSession')} />}
-        {error && (
-          <Admonition tone="danger">
-            {t('common.failedSession')}: {(error as Error).message}
-          </Admonition>
-        )}
-
-        {data && visibleMessages.length === 0 && (
-          <p className="mt-2 max-w-2xl font-display text-[15px] italic text-[var(--color-fg-muted)]">
-            {t('common.noMessagesMatch')}
-          </p>
-        )}
-
-        {data && visibleMessages.length > 0 && (
-          <ol>
-            {hasMoreEarlier && (
-              <li className="flex items-center justify-center gap-3 border-b border-[var(--color-hairline)] py-3">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setWindowSize((w) => Math.min(w + LOAD_STEP, visibleMessages.length))
-                  }
-                  className="rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
-                >
-                  {t('common.loadEarlier', {
-                    n: Math.min(LOAD_STEP, visibleMessages.length - renderList.length),
-                  })}
-                </button>
-                <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
-                  {t('session.shown', { shown: renderList.length, total: visibleMessages.length })}
-                </span>
-              </li>
+      {/* 内容区拆成可拖拽两栏：左侧会话时间线，右侧文件预览面板（仅 lg+ 启用）。
+          Provider 始终包住时间线，让深层的文件卡能拿到「打开预览」的回调。 */}
+      <FilePreviewContext.Provider value={previewCtx}>
+        <div ref={splitRef} className="flex min-h-0 flex-1">
+          <div className="mt-6 min-w-0 flex-1 px-3 pb-24">
+            {data?.truncated && (
+              <Admonition tone="warn" className="mb-6">
+                {t('session.truncated', { n: MAX_SESSION_MESSAGES.toLocaleString() })}
+              </Admonition>
             )}
 
-            <motion.div
-              key={renderList.length === 0 ? 'empty' : 'list'}
-              initial="hidden"
-              animate="show"
-              variants={staggerParent}
-            >
-              {renderList.map((m, i) => {
-                const isMeta = m.message.isMeta;
-                return (
-                  <motion.li
-                    key={m.message.uuid || m.message.ts || String(i)}
-                    variants={fadeUpItem}
-                    className={isMeta ? 'py-2' : 'py-3'}
-                  >
-                    <MessageBubble
-                      message={m.message}
-                      query={deferredQuery}
-                      toolNames={toolNames}
-                    />
-                  </motion.li>
-                );
-              })}
-            </motion.div>
+            {isLoading && <Loading label={t('common.loadingSession')} />}
+            {error && (
+              <Admonition tone="danger">
+                {t('common.failedSession')}: {(error as Error).message}
+              </Admonition>
+            )}
 
-            {isWorking && !skipWindowing && <WorkingIndicator />}
-          </ol>
-        )}
-      </div>
+            {data && visibleMessages.length === 0 && (
+              <p className="mt-2 max-w-2xl font-display text-[15px] italic text-[var(--color-fg-muted)]">
+                {t('common.noMessagesMatch')}
+              </p>
+            )}
+
+            {data && visibleMessages.length > 0 && (
+              <ol>
+                {hasMoreEarlier && (
+                  <li className="flex items-center justify-center gap-3 border-b border-[var(--color-hairline)] py-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setWindowSize((w) => Math.min(w + LOAD_STEP, visibleMessages.length))
+                      }
+                      className="rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--color-fg-secondary)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
+                    >
+                      {t('common.loadEarlier', {
+                        n: Math.min(LOAD_STEP, visibleMessages.length - renderList.length),
+                      })}
+                    </button>
+                    <span className="font-mono text-[11px] tabular-nums text-[var(--color-fg-muted)]">
+                      {t('session.shown', { shown: renderList.length, total: visibleMessages.length })}
+                    </span>
+                  </li>
+                )}
+
+                <motion.div
+                  key={renderList.length === 0 ? 'empty' : 'list'}
+                  initial="hidden"
+                  animate="show"
+                  variants={staggerParent}
+                >
+                  {renderList.map((m, i) => {
+                    const isMeta = m.message.isMeta;
+                    return (
+                      <motion.li
+                        key={m.message.uuid || m.message.ts || String(i)}
+                        variants={fadeUpItem}
+                        className={isMeta ? 'py-2' : 'py-3'}
+                      >
+                        <MessageBubble
+                          message={m.message}
+                          query={deferredQuery}
+                          toolNames={toolNames}
+                        />
+                      </motion.li>
+                    );
+                  })}
+                </motion.div>
+
+                {isWorking && !skipWindowing && <WorkingIndicator />}
+              </ol>
+            )}
+          </div>
+
+          {paneOpen && preview && (
+            <>
+              <Splitter
+                getRect={() => splitRef.current?.getBoundingClientRect() ?? null}
+                onResize={(clientX, rect) =>
+                  setPaneWidth(clampPaneWidth(rect.right - clientX, rect.width))
+                }
+              />
+              {/* 面板 sticky 钉在顶栏之下、页脚之上，滚动会话时始终在视野里铺着该文件。 */}
+              <aside
+                style={{
+                  width: paneWidth,
+                  top: topbarH,
+                  height: `calc(100dvh - ${topbarH}px - 3.5rem)`,
+                }}
+                className="sticky shrink-0 self-start overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-hairline)] bg-[var(--color-surface)] shadow-[var(--shadow-rise)]"
+              >
+                <FilePreviewPanel
+                  target={preview}
+                  readContent={resultLookup.get(preview.toolUseId) ?? null}
+                  onClose={closePreview}
+                />
+              </aside>
+            </>
+          )}
+        </div>
+      </FilePreviewContext.Provider>
 
       {data && (
         <SessionFooter

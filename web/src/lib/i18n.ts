@@ -182,6 +182,12 @@ const DICT = {
     'session.modified.added': 'added',
     'session.modified.modified': 'modified',
 
+    'session.preview.close': 'Close preview',
+    'session.preview.readSnapshot': 'read snapshot',
+    'session.preview.writtenContent': 'written content',
+    'session.preview.noResult':
+      'No file content was captured for this read (session truncated or still pending).',
+
     'message.role.you': 'You',
     'message.role.claude': 'Claude',
     'message.role.tool': 'Tool',
@@ -598,6 +604,11 @@ const DICT = {
     'session.modified.showEarlier': '显示更早的 {{n}} 条消息',
     'session.modified.added': '新增',
     'session.modified.modified': '修改',
+
+    'session.preview.close': '关闭预览',
+    'session.preview.readSnapshot': '读取快照',
+    'session.preview.writtenContent': '写入内容',
+    'session.preview.noResult': '未捕获到该 Read 的文件内容（会话被截断或仍在进行）。',
 
     'message.role.you': '我',
     'message.role.claude': 'Claude',
