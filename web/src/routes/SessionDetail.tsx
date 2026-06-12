@@ -40,7 +40,7 @@ interface IndexedMessage {
 // Mutually-exclusive message view modes for the footer's single-select filter.
 type MessageFilter = 'all' | 'system' | 'user' | 'error';
 
-const INITIAL_WINDOW = 50;
+const INITIAL_WINDOW = 300;
 const LOAD_STEP = 50;
 
 // Live tail: while a session is still being written, poll the detail endpoint so

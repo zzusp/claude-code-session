@@ -173,5 +173,5 @@ function MarkdownContent({ text }: { text: string }) {
   );
 }
 
-// 时间线一次窗口化渲染 50 条消息，memo 避免轮询引发的全量重解析。
+// 时间线一次窗口化渲染 300 条消息，memo 避免轮询引发的全量重解析。
 export default memo(MarkdownContent);
