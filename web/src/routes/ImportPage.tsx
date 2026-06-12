@@ -120,7 +120,7 @@ export default function ImportPage() {
 
   return (
     <section>
-      <div className="surface-card p-6">
+      <div className="mt-2">
         <PageHeader eyebrow={t('nav.import')} title={t('import.title')} />
         <p className="mt-2 max-w-2xl text-sm text-[var(--color-fg-muted)]">
           {t('import.tagline')}
@@ -159,7 +159,7 @@ export default function ImportPage() {
       </div>
 
       {preview && (
-        <div className="surface-card mt-6 space-y-6 p-6">
+        <div className="mt-8 space-y-6">
           <p className="break-all font-mono text-xs text-[var(--color-fg-muted)]">
             {t('import.source', { platform: preview.source.platform, cwd: preview.source.cwd })}
           </p>

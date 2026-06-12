@@ -164,7 +164,7 @@ export default function ProjectMemoryRoute() {
         ]}
       />
 
-      <div className="surface-card mt-6 p-6">
+      <div className="mt-2">
         <PageHeader
           eyebrow={
             <span className="inline-flex items-center gap-2">
@@ -275,7 +275,7 @@ function IndexCard({
   const noResults = searchActive && totalMatched === 0;
 
   return (
-    <div id="memo-index-card" className="surface-card mt-6 px-7 py-6">
+    <div id="memo-index-card" className="mt-8">
       <div className="flex items-baseline justify-between gap-3">
         <div>
           <div className="eyebrow">{t('memory.cover.title')}</div>
@@ -312,7 +312,7 @@ function IndexCard({
         </span>
       </div>
 
-      <div className="rule-dotted mt-5" aria-hidden />
+      <div className="mt-5 h-px bg-[var(--color-hairline)]" aria-hidden />
 
       {noResults ? (
         <p className="mt-6 text-sm text-[var(--color-fg-muted)]">{t('memory.list.noResults')}</p>
