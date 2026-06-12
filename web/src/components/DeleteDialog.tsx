@@ -56,6 +56,7 @@ export default function DeleteDialog({ projectId, selected, onClose, onDeleted }
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.projects() });
       queryClient.invalidateQueries({ queryKey: queryKeys.projectSessions(projectId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.recentSessions() });
       queryClient.invalidateQueries({ queryKey: queryKeys.diskUsage() });
       if (data.deleted.length > 0) {
         onDeleted?.(data.deleted.map((d) => d.sessionId));

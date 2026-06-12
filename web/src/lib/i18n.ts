@@ -17,6 +17,11 @@ const DICT = {
     'nav.language': 'Language',
     'nav.toggleNav': 'Toggle navigation',
     'nav.closeNav': 'Close navigation',
+    'nav.closeSidebar': 'Close sidebar',
+    'nav.openSidebar': 'Open sidebar',
+    'nav.recents': 'Recents',
+    'recents.empty': 'No recent sessions yet.',
+    'recents.loading': 'loading recents…',
 
     'version.label': 'Version',
     'version.badge.new': 'Update {{v}}',
@@ -420,6 +425,11 @@ const DICT = {
     'nav.language': '语言',
     'nav.toggleNav': '切换导航',
     'nav.closeNav': '关闭导航',
+    'nav.closeSidebar': '收起侧栏',
+    'nav.openSidebar': '展开侧栏',
+    'nav.recents': '最近',
+    'recents.empty': '暂无最近会话。',
+    'recents.loading': '读取最近会话…',
 
     'version.label': '版本',
     'version.badge.new': '新版本 {{v}}',

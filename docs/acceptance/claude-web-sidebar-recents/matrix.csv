@@ -1,0 +1,10 @@
+case,description,round-1
+TC1,typecheck 全绿（tsc -b 双 project）,PASS
+TC2,server 单元测试 9 files/61 tests 全绿（安全网未受影响）,PASS
+TC3,生产构建成功（vite build）,PASS
+TC4,GET /api/sessions/recent?limit=5 返回跨项目最近会话且 live/working/recent 标志正确,PASS
+TC5,侧栏 Recents 列出最近会话；working 行进点 / live 脉冲点 / idle 空心点；当前会话高亮（light+dark）,PASS
+TC6,Close sidebar 收起侧栏、主区占满、浮出再展开 handle；Open 恢复,PASS
+TC7,会话详情简化为 chat 风：精简 sticky header + 搜索过滤行 + 居中消息流（light+dark）,PASS
+TC8,滚动后不透明 sticky header 钉住、标题常驻、无内容透字,PASS
+TC9,实时轮询/跟随尾部仍工作（live 会话自动滚到底部 + “Claude is working…” 行）,PASS
