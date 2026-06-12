@@ -2,36 +2,43 @@
 
 @import "@fontsource-variable/plus-jakarta-sans/wght.css";
 @import "@fontsource-variable/plus-jakarta-sans/wght-italic.css";
+@import "@fontsource-variable/fraunces/wght.css";
+@import "@fontsource-variable/fraunces/wght-italic.css";
 @import "@fontsource-variable/geist-mono/wght.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --font-sans: "Plus Jakarta Sans Variable", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-sans);
+  /* Display = warm high-contrast serif (Fraunces), echoing Claude's Copernicus/
+     Tiempos editorial headings. Used for page titles, mastheads, message author
+     labels — anywhere `.font-display` / h1–h3 land. Body & UI stay on sans. */
+  --font-display: "Fraunces Variable", "Songti SC", "Noto Serif SC", Georgia, "Times New Roman", serif;
   --font-mono: "Geist Mono Variable", "PingFang SC", ui-monospace, "JetBrains Mono", monospace;
 
-  /* Light theme defaults */
-  --color-canvas: oklch(0.972 0.008 85);
-  --color-surface: oklch(1 0 0);
-  --color-sunken: oklch(0.945 0.010 85);
-  --color-fg-primary: oklch(0.21 0.012 85);
-  --color-fg-secondary: oklch(0.36 0.010 85);
-  --color-fg-muted: oklch(0.52 0.008 85);
-  --color-fg-faint: oklch(0.68 0.008 85);
-  --color-hairline: oklch(0.88 0.010 85);
-  --color-hairline-strong: oklch(0.78 0.012 85);
-  --color-accent: oklch(0.72 0.165 65);
-  --color-accent-ink: oklch(0.32 0.090 60);
-  --color-accent-soft: oklch(0.94 0.058 75);
-  --color-danger: oklch(0.56 0.180 25);
-  --color-danger-soft: oklch(0.94 0.052 30);
-  --color-moss: oklch(0.55 0.068 145);
-  --color-moss-soft: oklch(0.93 0.045 140);
-  --color-iris: oklch(0.55 0.085 240);
+  /* Light theme — Claude "paper + clay" palette. Warm cream canvas (#F5F4EE-ish),
+     near-white cards, terracotta/coral accent (#C15F3C ↔ #D97757). Hues sit in the
+     warm 40–95 band so greys read as warm paper, not cold neutral. */
+  --color-canvas: oklch(0.971 0.0095 92);
+  --color-surface: oklch(0.992 0.004 92);
+  --color-sunken: oklch(0.948 0.012 90);
+  --color-fg-primary: oklch(0.255 0.012 58);
+  --color-fg-secondary: oklch(0.405 0.013 55);
+  --color-fg-muted: oklch(0.535 0.012 55);
+  --color-fg-faint: oklch(0.675 0.011 58);
+  --color-hairline: oklch(0.895 0.010 82);
+  --color-hairline-strong: oklch(0.815 0.013 72);
+  --color-accent: oklch(0.635 0.118 44);
+  --color-accent-ink: oklch(0.455 0.105 42);
+  --color-accent-soft: oklch(0.925 0.038 62);
+  --color-danger: oklch(0.555 0.165 28);
+  --color-danger-soft: oklch(0.935 0.045 38);
+  --color-moss: oklch(0.55 0.064 150);
+  --color-moss-soft: oklch(0.93 0.042 145);
+  --color-iris: oklch(0.55 0.082 255);
 
-  --shadow-rise: 0 1px 0 0 oklch(0.78 0.012 85 / 0.5), 0 12px 32px -16px oklch(0.30 0.012 85 / 0.18);
-  --shadow-pop: 0 4px 14px -6px oklch(0.30 0.012 85 / 0.18), 0 16px 48px -20px oklch(0.30 0.012 85 / 0.20);
+  --shadow-rise: 0 1px 0 0 oklch(0.80 0.012 80 / 0.5), 0 10px 30px -18px oklch(0.36 0.04 50 / 0.20);
+  --shadow-pop: 0 4px 14px -6px oklch(0.36 0.04 50 / 0.18), 0 18px 50px -22px oklch(0.36 0.04 50 / 0.22);
 
   /* Rounded scale. Pick the token by surface size, not by feel —
      mismatched radii on small elements get clipped to half-height and
@@ -51,25 +58,28 @@
 }
 
 .dark {
-  --color-canvas: oklch(0.158 0.006 85);
-  --color-surface: oklch(0.205 0.006 85);
-  --color-sunken: oklch(0.130 0.005 85);
-  --color-fg-primary: oklch(0.945 0.010 85);
-  --color-fg-secondary: oklch(0.82 0.010 85);
-  --color-fg-muted: oklch(0.66 0.010 85);
-  --color-fg-faint: oklch(0.46 0.008 85);
-  --color-hairline: oklch(0.295 0.006 85);
-  --color-hairline-strong: oklch(0.380 0.008 85);
-  --color-accent: oklch(0.78 0.155 70);
-  --color-accent-ink: oklch(0.95 0.045 80);
-  --color-accent-soft: oklch(0.32 0.075 65);
-  --color-danger: oklch(0.68 0.175 25);
-  --color-danger-soft: oklch(0.30 0.090 25);
-  --color-moss: oklch(0.66 0.062 145);
-  --color-moss-soft: oklch(0.28 0.048 145);
-  --color-iris: oklch(0.70 0.080 240);
+  /* Dark theme — Claude warm charcoal (#262624). Canvas / surface / sunken stay
+     in the warm 60–70 hue band so the dark UI reads "warm graphite", not blue-black.
+     Clay accent lifts in lightness for contrast on the dark ground. */
+  --color-canvas: oklch(0.205 0.005 68);
+  --color-surface: oklch(0.248 0.006 66);
+  --color-sunken: oklch(0.175 0.004 66);
+  --color-fg-primary: oklch(0.935 0.008 78);
+  --color-fg-secondary: oklch(0.80 0.011 74);
+  --color-fg-muted: oklch(0.645 0.012 70);
+  --color-fg-faint: oklch(0.475 0.010 66);
+  --color-hairline: oklch(0.325 0.007 68);
+  --color-hairline-strong: oklch(0.405 0.009 68);
+  --color-accent: oklch(0.705 0.115 46);
+  --color-accent-ink: oklch(0.865 0.078 56);
+  --color-accent-soft: oklch(0.345 0.058 46);
+  --color-danger: oklch(0.685 0.165 28);
+  --color-danger-soft: oklch(0.315 0.082 30);
+  --color-moss: oklch(0.66 0.060 150);
+  --color-moss-soft: oklch(0.29 0.046 148);
+  --color-iris: oklch(0.70 0.078 255);
 
-  --shadow-rise: 0 1px 0 0 oklch(0.380 0.006 85 / 0.7), 0 18px 40px -20px oklch(0 0 0 / 0.55);
+  --shadow-rise: 0 1px 0 0 oklch(0.405 0.007 68 / 0.7), 0 18px 40px -20px oklch(0 0 0 / 0.55);
   --shadow-pop: 0 8px 24px -10px oklch(0 0 0 / 0.6), 0 24px 60px -30px oklch(0 0 0 / 0.55);
   color-scheme: dark;
 }
@@ -103,12 +113,12 @@
     z-index: 0;
     pointer-events: none;
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0   0 0 0 0 0   0 0 0 0 0   0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-    opacity: 0.045;
+    opacity: 0.03;
     mix-blend-mode: multiply;
   }
 
   .dark body::before {
-    opacity: 0.07;
+    opacity: 0.05;
     mix-blend-mode: screen;
   }
 
@@ -134,7 +144,7 @@
   *::-webkit-scrollbar-thumb:hover { background-color: var(--color-hairline-strong); background-clip: padding-box; }
 
   h1, h2, h3 {
-    font-family: var(--font-sans);
+    font-family: var(--font-display);
     letter-spacing: -0.012em;
   }
 
@@ -207,9 +217,9 @@
     transform: scaleY(1);
   }
 
-  /* Live status pulse (no JS) */
+  /* Live status pulse (no JS) — clay/coral to match the accent */
   .pulse-amber {
-    box-shadow: 0 0 0 0 oklch(0.78 0.155 70 / 0.6);
+    box-shadow: 0 0 0 0 oklch(0.68 0.13 46 / 0.6);
     animation: pulse-amber 1.6s cubic-bezier(0.4, 0, 0.4, 1) infinite;
   }
 
@@ -451,9 +461,9 @@
 }
 
 @keyframes pulse-amber {
-  0%   { box-shadow: 0 0 0 0   oklch(0.78 0.155 70 / 0.55); }
-  70%  { box-shadow: 0 0 0 6px oklch(0.78 0.155 70 / 0); }
-  100% { box-shadow: 0 0 0 0   oklch(0.78 0.155 70 / 0); }
+  0%   { box-shadow: 0 0 0 0   oklch(0.68 0.13 46 / 0.55); }
+  70%  { box-shadow: 0 0 0 6px oklch(0.68 0.13 46 / 0); }
+  100% { box-shadow: 0 0 0 0   oklch(0.68 0.13 46 / 0); }
 }
 
 @keyframes pulse-danger {
