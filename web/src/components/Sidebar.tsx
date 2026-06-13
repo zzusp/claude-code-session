@@ -208,7 +208,7 @@ export default function Sidebar({
           />
         </nav>
 
-        <div className="surface-card mx-4 mb-4 space-y-3 p-4">
+        <footer className="space-y-3 border-t border-[var(--color-hairline)] px-4 py-4">
           <div className="flex items-center justify-between">
             <span className="eyebrow">{t('nav.language')}</span>
             <LocaleToggle />
@@ -221,7 +221,7 @@ export default function Sidebar({
           <p className="font-mono text-[10px] leading-snug text-[var(--color-fg-faint)]">
             {t('app.brand.footnote')}
           </p>
-        </div>
+        </footer>
       </aside>
     </>
   );
