@@ -13,22 +13,10 @@ import SessionDetail from './routes/SessionDetail.tsx';
 const DiskUsage = lazy(() => import('./routes/DiskUsage.tsx'));
 const ProjectMemory = lazy(() => import('./routes/ProjectMemory.tsx'));
 const ImportPage = lazy(() => import('./routes/ImportPage.tsx'));
-const ModifiedFilesPage = lazy(() => import('./routes/ModifiedFilesPage.tsx'));
 
 export default function App() {
   return (
     <Routes>
-      {/* 独立整页：在新标签里打开，刻意不套 app chrome（无侧栏 / 无 max-w 盒），
-          这样三栏占满整个标签页，也脱离会话页的实时轮询与大时间线渲染。 */}
-      <Route
-        path="/projects/:projectId/sessions/:sessionId/modified"
-        element={
-          <Suspense fallback={<RouteFallback />}>
-            <ModifiedFilesPage />
-          </Suspense>
-        }
-      />
-      {/* 其余路由都套在侧栏 + 主区的 chrome 布局里。 */}
       <Route element={<ChromeLayout />}>
         <Route path="/" element={<ProjectsList />} />
         <Route path="/projects/:projectId" element={<ProjectDetail />} />

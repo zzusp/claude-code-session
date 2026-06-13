@@ -20,13 +20,14 @@ import MessageBubble, {
   WorkingIndicator,
   type ToolResultLookup,
 } from '../components/MessageBubble.tsx';
-import { type EditLookup } from '../components/ModifiedFilesView.tsx';
+import ModifiedFilesPanel, { type EditLookup } from '../components/ModifiedFilesPanel.tsx';
 import { Splitter } from '../components/Splitter.tsx';
 import {
   api,
   type Block,
   type Message,
   type ModifiedFilesResponse,
+  type OpenFileResult,
   type ProjectSummary,
   type SessionDetail,
   type SessionSummary,
@@ -54,6 +55,12 @@ interface IndexedMessage {
 
 // Mutually-exclusive message view modes for the footer's single-select filter.
 type MessageFilter = 'all' | 'system' | 'user' | 'error';
+
+// 内容区右侧拆分栏的两种互斥内容：点会话流文件卡 → 单文件预览；点页脚「修改的文件」
+// → 本会话变更文件清单。两者同栖一栏，打开其一即替换另一。
+type RightPanel =
+  | { kind: 'file'; target: FilePreviewTarget }
+  | { kind: 'modified' };
 
 const INITIAL_WINDOW = 300;
 const LOAD_STEP = 50;
@@ -153,19 +160,24 @@ export default function SessionDetailRoute() {
   // appears (the indicator grows the page without bumping messageCount).
   const prevIsWorkingRef = useRef(false);
 
-  // 右侧文件预览：当前展示的文件操作（点会话流文件卡设置），以及面板宽度。
-  // 拆分只在 lg+ 视口启用，更窄时文件卡退回原行内展开。
-  const [preview, setPreview] = useState<FilePreviewTarget | null>(null);
+  // 右侧拆分栏：可展示单文件预览（点会话流文件卡）或本会话变更文件清单（点页脚按钮），
+  // 二选一。文件预览只在 lg+ 视口启用（窄屏文件卡退回行内展开）；修改文件清单窄屏时
+  // 接管整片内容区（见下方 narrowPanel）。
+  const [rightPanel, setRightPanel] = useState<RightPanel | null>(null);
   const [paneWidth, setPaneWidth] = useState(PREVIEW_DEFAULT_WIDTH);
   const isWide = useMediaQuery(PREVIEW_BREAKPOINT);
-  const paneOpen = !!preview && isWide;
+  // 宽屏：左时间线 + 右侧定宽可拖拽栏。窄屏：仅「修改文件」清单允许接管整片内容区
+  // （文件预览窄屏不开，故 narrowPanel 只认 modified；避免视口收窄那一帧把时间线误隐）。
+  const paneOpen = !!rightPanel && isWide;
+  const narrowPanel = rightPanel?.kind === 'modified' && !isWide;
+  const rightOpen = paneOpen || narrowPanel;
   // 拆分行的矩形（供分割线换算面板宽度）。三层定高布局下，中间层左列时间线是内部滚动
   // 容器（scrollRef），右列预览面板用 `h-full` 自动填满，不再靠 sticky + 顶栏高度计算。
   const splitRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 打开文件预览时临时收起左侧侧栏让出宽度。用的是「自动收起」临时标志（不持久化），
-  // 关闭预览 / 离开本页即清掉，恢复用户自己的折叠偏好；用户预览期间手动重开侧栏也不会被反复强收。
+  // 右栏（宽屏拆分）打开时临时收起左侧侧栏让出宽度。用的是「自动收起」临时标志（不持久化），
+  // 关闭 / 离开本页即清掉，恢复用户自己的折叠偏好；用户期间手动重开侧栏也不会被反复强收。
   const sidebar = useSidebar();
   useEffect(() => {
     if (!sidebar) return;
@@ -178,39 +190,52 @@ export default function SessionDetailRoute() {
     prevMsgCountRef.current = null;
   }, [pid, sid]);
 
-  // 视口收窄到断点以下时收起预览，避免拆分布局在窄屏挤坏。
+  // 视口收窄到断点以下时收起单文件预览（窄屏文件卡退回行内展开）；修改文件清单保留，
+  // 改为窄屏接管整片内容区。
   useEffect(() => {
-    if (!isWide) setPreview(null);
+    if (!isWide) setRightPanel((prev) => (prev?.kind === 'file' ? null : prev));
   }, [isWide]);
 
-  // 切换会话时清掉上一会话残留的预览。
+  // 切换会话时清掉上一会话残留的右栏。
   useEffect(() => {
-    setPreview(null);
+    setRightPanel(null);
   }, [pid, sid]);
 
-  const openPreview = useCallback((target: FilePreviewTarget) => {
-    // 再次点同一张卡 = 收起（toggle）；点别的卡 = 切换。
-    setPreview((prev) => (prev && prev.toolUseId === target.toolUseId ? null : target));
+  const openFilePreview = useCallback((target: FilePreviewTarget) => {
+    // 再次点同一张卡 = 收起（toggle）；点别的卡 / 从修改文件清单切回 = 切换。
+    setRightPanel((prev) =>
+      prev?.kind === 'file' && prev.target.toolUseId === target.toolUseId
+        ? null
+        : { kind: 'file', target },
+    );
   }, []);
-  const closePreview = useCallback(() => setPreview(null), []);
+  const toggleModified = useCallback(
+    () => setRightPanel((prev) => (prev?.kind === 'modified' ? null : { kind: 'modified' })),
+    [],
+  );
+  const closeRight = useCallback(() => setRightPanel(null), []);
 
   const previewCtx: FilePreviewContextValue = useMemo(
-    () => ({ enabled: isWide, activeId: preview?.toolUseId ?? null, open: openPreview }),
-    [isWide, preview, openPreview],
+    () => ({
+      enabled: isWide,
+      activeId: rightPanel?.kind === 'file' ? rightPanel.target.toolUseId : null,
+      open: openFilePreview,
+    }),
+    [isWide, rightPanel, openFilePreview],
   );
 
-  // 预览开着时按 Esc 收起（不在输入框里时才接管，免得和会话内搜索的 Esc 抢）。
+  // 右栏开着时按 Esc 收起（不在输入框里时才接管，免得和会话内搜索的 Esc 抢）。
   useEffect(() => {
-    if (!paneOpen) return;
+    if (!rightOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       const el = document.activeElement;
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return;
-      setPreview(null);
+      setRightPanel(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [paneOpen]);
+  }, [rightOpen]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: queryKeys.session(pid, sid),
@@ -250,8 +275,8 @@ export default function SessionDetailRoute() {
     [projectSessionsQuery.data, sid],
   );
   // Modified-files summary (aggregated from a full jsonl scan, server-side). Fetched
-  // eagerly at route level so the header trigger can show the count; the page reuses
-  // this same data instead of querying again.
+  // eagerly at route level so the footer trigger can show the count; the right-split
+  // panel reuses this same data instead of querying again.
   const modifiedFilesQuery = useQuery({
     queryKey: queryKeys.sessionModifiedFiles(pid, sid),
     queryFn: () =>
@@ -262,14 +287,15 @@ export default function SessionDetailRoute() {
   });
   const modifiedFiles = modifiedFilesQuery.data?.files ?? [];
 
-  // 「修改的文件」改为在新标签里打开独立整页（见 ModifiedFilesPage）——脱离本会话页
-  // 的实时轮询 / 大时间线 DOM / 滚动监听。
-  const openModifiedInNewTab = () =>
-    window.open(
-      `/projects/${encodeURIComponent(pid)}/sessions/${encodeURIComponent(sid)}/modified`,
-      '_blank',
-      'noopener',
-    );
+  // 「修改的文件」清单里点「open file」时，让 backend 用系统默认程序打开磁盘上的真实文件。
+  const openFileMutation = useMutation({
+    mutationFn: (filePath: string) =>
+      api<OpenFileResult>(
+        `/api/sessions/${encodeURIComponent(pid)}/${encodeURIComponent(sid)}/open-file`,
+        { method: 'POST', body: JSON.stringify({ filePath }) },
+      ),
+    onError: (err: Error) => window.alert(t('session.modified.openFailed', { msg: err.message })),
+  });
 
   const indexed: IndexedMessage[] = useMemo(() => {
     if (!data) return [];
@@ -559,11 +585,18 @@ export default function SessionDetailRoute() {
         )}
       </div>
 
-      {/* 中间层：左侧会话时间线（内部滚动容器 scrollRef），右侧文件预览面板（仅 lg+）。
-          Provider 始终包住时间线，让深层的文件卡能拿到「打开预览」的回调。 */}
+      {/* 中间层：左侧会话时间线（内部滚动容器 scrollRef），右侧拆分栏（文件预览 / 修改文件清单）。
+          Provider 始终包住时间线，让深层的文件卡能拿到「打开预览」的回调。窄屏时修改文件清单
+          接管整片内容区（narrowPanel），时间线临时隐藏。 */}
       <FilePreviewContext.Provider value={previewCtx}>
         <div ref={splitRef} className="flex min-h-0 flex-1">
-          <div ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto px-8 pb-16 pt-6 lg:px-12">
+          <div
+            ref={scrollRef}
+            className={
+              (narrowPanel ? 'hidden ' : '') +
+              'min-w-0 flex-1 overflow-y-auto px-8 pb-16 pt-6 lg:px-12'
+            }
+          >
             {data?.truncated && (
               <Admonition tone="warn" className="mb-6">
                 {t('session.truncated', { n: MAX_SESSION_MESSAGES.toLocaleString() })}
@@ -634,26 +667,44 @@ export default function SessionDetailRoute() {
             )}
           </div>
 
-          {paneOpen && preview && (
+          {rightOpen && rightPanel && (
             <>
-              <Splitter
-                getRect={() => splitRef.current?.getBoundingClientRect() ?? null}
-                onResize={(clientX, rect) =>
-                  setPaneWidth(clampPaneWidth(rect.right - clientX, rect.width))
-                }
-              />
-              {/* 预览面板贴满中间层：`self-stretch` 随中间层定高、被页头/页脚夹住，左右/上下
-                  都不留边距、不套圆角——左侧分割线已由 Splitter 画出，自身只给一块 surface 底，
-                  从中间层顶贴到底；内容超出由 FilePreviewPanel 内部滚动。 */}
-              <aside
-                style={{ width: paneWidth }}
-                className="shrink-0 self-stretch overflow-hidden bg-[var(--color-surface)]"
-              >
-                <FilePreviewPanel
-                  target={preview}
-                  readContent={toolResults.get(preview.toolUseId)?.content ?? null}
-                  onClose={closePreview}
+              {/* 宽屏才画分割线 + 给定宽；窄屏（仅修改文件清单）整片接管，无分割线。 */}
+              {isWide && (
+                <Splitter
+                  getRect={() => splitRef.current?.getBoundingClientRect() ?? null}
+                  onResize={(clientX, rect) =>
+                    setPaneWidth(clampPaneWidth(rect.right - clientX, rect.width))
+                  }
                 />
+              )}
+              {/* 拆分栏贴满中间层：`self-stretch` 随中间层定高、被页头/页脚夹住，左右/上下
+                  都不留边距、不套圆角——左侧分割线已由 Splitter 画出，自身只给一块 surface 底，
+                  从中间层顶贴到底；内容超出由各面板内部滚动。 */}
+              <aside
+                style={isWide ? { width: paneWidth } : undefined}
+                className={
+                  'self-stretch overflow-hidden bg-[var(--color-surface)] ' +
+                  (isWide ? 'shrink-0' : 'min-w-0 flex-1')
+                }
+              >
+                {rightPanel.kind === 'file' ? (
+                  <FilePreviewPanel
+                    target={rightPanel.target}
+                    readContent={toolResults.get(rightPanel.target.toolUseId)?.content ?? null}
+                    onClose={closeRight}
+                  />
+                ) : (
+                  <ModifiedFilesPanel
+                    files={modifiedFiles}
+                    cwd={data?.meta.cwd ?? project?.decodedCwd ?? null}
+                    editLookup={editLookup}
+                    loading={modifiedFilesQuery.isLoading}
+                    error={modifiedFilesQuery.error as Error | null}
+                    onClose={closeRight}
+                    onOpenFile={(filePath) => openFileMutation.mutate(filePath)}
+                  />
+                )}
               </aside>
             </>
           )}
@@ -671,7 +722,8 @@ export default function SessionDetailRoute() {
           messageCount={data.meta.messageCount}
           modifiedCount={modifiedFiles.length}
           modifiedLoading={modifiedFilesQuery.isLoading}
-          onOpenModified={openModifiedInNewTab}
+          modifiedActive={rightPanel?.kind === 'modified'}
+          onOpenModified={toggleModified}
           filter={filter}
           onFilter={setFilter}
           contextTokens={data.meta.contextTokens}
@@ -798,6 +850,7 @@ function SessionFooter({
   messageCount,
   modifiedCount,
   modifiedLoading,
+  modifiedActive,
   onOpenModified,
   filter,
   onFilter,
@@ -813,6 +866,7 @@ function SessionFooter({
   messageCount: number;
   modifiedCount: number;
   modifiedLoading: boolean;
+  modifiedActive: boolean;
   onOpenModified: () => void;
   filter: MessageFilter;
   onFilter: (v: MessageFilter) => void;
@@ -860,11 +914,24 @@ function SessionFooter({
             onClick={onOpenModified}
             disabled={modifiedLoading}
             aria-label={t('session.modified.openAria')}
+            aria-pressed={modifiedActive}
             title={t('session.modified.title')}
-            className="group/file inline-flex shrink-0 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-hairline-strong)] py-1 pl-1.5 pr-2.5 transition hover:border-[var(--color-accent)] hover:bg-[var(--color-sunken)] disabled:cursor-not-allowed disabled:opacity-40"
+            className={
+              'group/file inline-flex shrink-0 items-center gap-2 rounded-[var(--radius-control)] border py-1 pl-1.5 pr-2.5 transition disabled:cursor-not-allowed disabled:opacity-40 ' +
+              (modifiedActive
+                ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
+                : 'border-[var(--color-hairline-strong)] hover:border-[var(--color-accent)] hover:bg-[var(--color-sunken)]')
+            }
           >
             <FileThumb size="sm" />
-            <span className="text-[12px] font-medium text-[var(--color-fg-secondary)] transition-colors group-hover/file:text-[var(--color-fg-primary)]">
+            <span
+              className={
+                'text-[12px] font-medium transition-colors ' +
+                (modifiedActive
+                  ? 'text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]'
+                  : 'text-[var(--color-fg-secondary)] group-hover/file:text-[var(--color-fg-primary)]')
+              }
+            >
               {t('session.modified.title')}
             </span>
             {modifiedCount > 0 && (

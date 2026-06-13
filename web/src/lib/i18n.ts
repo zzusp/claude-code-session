@@ -181,6 +181,7 @@ const DICT = {
     'session.modified.showEarlier': 'show {{n}} earlier messages',
     'session.modified.added': 'added',
     'session.modified.modified': 'modified',
+    'session.modified.backToList': 'Back to file list',
 
     'session.preview.close': 'Close preview',
     'session.preview.readSnapshot': 'read snapshot',
@@ -605,6 +606,7 @@ const DICT = {
     'session.modified.showEarlier': '显示更早的 {{n}} 条消息',
     'session.modified.added': '新增',
     'session.modified.modified': '修改',
+    'session.modified.backToList': '返回文件列表',
 
     'session.preview.close': '关闭预览',
     'session.preview.readSnapshot': '读取快照',

@@ -1,14 +1,5 @@
-import { motion } from 'motion/react';
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type PointerEvent as ReactPointerEvent,
-} from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type {
-  Message,
   ModifiedFileSummary,
   ModifiedFileToolName,
 } from '../lib/api.ts';
@@ -19,23 +10,10 @@ import {
 } from '../lib/diff.ts';
 import { useT } from '../lib/i18n.ts';
 import { Loading } from './Loading.tsx';
-import MessageBubble, { WorkingIndicator } from './MessageBubble.tsx';
 import { SplitDiff } from './SplitDiff.tsx';
 
-// 三栏布局的最小内容区宽度：拖动任一分割线时，给中间文件内容栏保底的像素宽。
-const CONTENT_MIN_PX = 320;
-
-// 对话栏初始只渲染最新的这么多条消息（默认落点在底部最新一条），更早的折叠在
-// 顶部「显示更早」后按这个步长逐批展开——会话动辄上百条，全量渲染既慢又埋没最新动态。
-const CONV_INITIAL_VISIBLE = 20;
-const CONV_LOAD_STEP = 40;
-
-// 对话栏「贴底跟随」阈值：滚动位置离底部小于这个像素时，视作用户在追看最新动态——
-// 实时轮询追加新消息（或 Claude 开始处理）后自动滚到底；超过则认为在往上翻历史，不打断。
-const CONV_BOTTOM_STICK_PX = 120;
-
 /** Lookup from a tool_use id → the issuing tool's name + raw input, built from the
- *  already-loaded session messages. Lets the detail pane render the actual edit
+ *  already-loaded session messages. Lets the detail view render the actual edit
  *  content (Write body / Edit diff) without a second backend round-trip. */
 export type EditLookup = Map<string, { name: string; input: unknown }>;
 
@@ -43,29 +21,21 @@ interface Props {
   files: ModifiedFileSummary[];
   cwd: string | null;
   editLookup: EditLookup;
-  /** Session conversation, rendered in the left column so edits can be read
-   *  alongside the dialogue that drove them. Already meta-filtered upstream. */
-  messages: Message[];
-  /** Active search query, forwarded to MessageBubble for in-message highlight. */
-  query: string;
-  /** Live poll says Claude is mid-turn — append the working indicator to the
-   *  conversation column's tail, mirroring the session timeline. */
-  isWorking: boolean;
   loading: boolean;
   error: Error | null;
-  /** 返回会话页（Esc 与右上角 ✕ 都走它）。 */
+  /** 收起整个面板（会话页右栏的 ✕ / Esc 都走它）。 */
   onClose: () => void;
   /** Open the real file on disk in the OS default app. */
   onOpenFile: (filePath: string) => void;
 }
 
-export default function ModifiedFilesView({
+/** 「修改的文件」右栏面板：和会话流里的文件预览同栖于内容区右侧拆分栏，单列 master-detail。
+ *  列表态铺变更文件树，点某个文件切到明细态（左旧右新合并 diff），返回键回到列表。
+ *  全部数据来自已加载的会话消息 + 一次 modified-files 扫描，不发二次请求。 */
+export default function ModifiedFilesPanel({
   files,
   cwd,
   editLookup,
-  messages,
-  query,
-  isWorking,
   loading,
   error,
   onClose,
@@ -73,30 +43,9 @@ export default function ModifiedFilesView({
 }: Props) {
   const t = useT();
   const tree = useMemo(() => buildTree(files), [files]);
-
-  // 对话栏 tool_result 头部标注来源工具：从 editLookup 萃取 toolUseId → 工具名。
-  const toolNames = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const [id, v] of editLookup) m.set(id, v.name);
-    return m;
-  }, [editLookup]);
-
-  // 选中文件路径（明细对象用 filePath 作为稳定 key）。打开时自动选第一个，
-  // 避免右侧空白；files 变化后若当前选中已不在则回落到第一个。
-  const [selected, setSelected] = useState<string | null>(null);
-  useEffect(() => {
-    setSelected((prev) =>
-      prev && files.some((f) => f.filePath === prev) ? prev : files[0]?.filePath ?? null,
-    );
-  }, [files]);
-
-  const selectedFile = useMemo(
-    () => files.find((f) => f.filePath === selected) ?? null,
-    [files, selected],
-  );
+  const allFolders = useMemo(() => collectFolderPaths(tree), [tree]);
 
   // 折叠的文件夹集合（默认全展开——修改文件清单通常不长，铺开更利于一眼扫）。
-  const allFolders = useMemo(() => collectFolderPaths(tree), [tree]);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const toggleFolder = (path: string) =>
     setCollapsed((prev) => {
@@ -106,334 +55,111 @@ export default function ModifiedFilesView({
       return next;
     });
 
-  // 三栏（对话 | 内容 | 文件树）的两条可拖拽分割线：对话栏与文件树栏各持一个像素
-  // 宽度，中间内容栏吃掉剩余空间。拖动时实时改、并各自给内容区留 CONTENT_MIN_PX 保底。
-  const splitRef = useRef<HTMLDivElement>(null);
-  const convScrollRef = useRef<HTMLDivElement>(null);
-  const [convWidth, setConvWidth] = useState(420);
-  const [railWidth, setRailWidth] = useState(280);
-
-  // 对话栏可见消息：默认只展示尾部最新 CONV_INITIAL_VISIBLE 条，更早的折叠。
-  const [visibleCount, setVisibleCount] = useState(CONV_INITIAL_VISIBLE);
-  const startIndex = Math.max(0, messages.length - visibleCount);
-  const visibleMessages = useMemo(() => messages.slice(startIndex), [messages, startIndex]);
-  const hiddenCount = startIndex;
-
-  // 展开更早消息时需要在重排后修正滚动位置：restoreFromBottom 保持「离底部的距离」
-  // 不变，避免视口往上跳。
-  const restoreFromBottom = useRef<number | null>(null);
-
-  // 实时跟随状态：用户是否停在对话栏底部（决定要不要追新），以及上一次的消息数 /
-  // 处理中标志（只在「真有新消息到达」或「刚开始处理」时才追，避免每次轮询都滚动）。
-  const stickToBottom = useRef(true);
-  const prevMsgCount = useRef(messages.length);
-  const prevIsWorking = useRef(isWorking);
-
-  // 打开页面时把对话栏滚到底——最新一条消息就是落点。messages 已就绪，commit 后
-  // scrollHeight 即为准确值，用 layout effect 在绘制前定位，避免可见的跳动。
-  useLayoutEffect(() => {
-    const el = convScrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-    // 只在首次挂载（页面打开）时落到底部。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // visibleCount 变化（展开更早）后修正滚动位置。
-  useLayoutEffect(() => {
-    const el = convScrollRef.current;
-    if (!el) return;
-    if (restoreFromBottom.current != null) {
-      el.scrollTop = el.scrollHeight - restoreFromBottom.current;
-      restoreFromBottom.current = null;
-    }
-  }, [visibleCount]);
-
-  // 滚动时记录是否停在底部，供下面的实时跟随判断「该不该追新」。
-  // 用 rAF 把 layout 读延到下一帧：直接在 scroll handler 里读 scrollHeight 会强制 flush layout，
-  // 一旦 layout 脏（拉新消息 / lazy markdown 解析）就吃几 ms 同步重排，连续滚动下足够丢帧。
-  const stickRafRef = useRef<number | null>(null);
-  function onConvScroll() {
-    if (stickRafRef.current != null) return;
-    stickRafRef.current = requestAnimationFrame(() => {
-      stickRafRef.current = null;
-      const el = convScrollRef.current;
-      if (!el) return;
-      stickToBottom.current = el.scrollHeight - (el.scrollTop + el.clientHeight) < CONV_BOTTOM_STICK_PX;
-    });
-  }
-
-  // 实时轮询追加了新消息、或 Claude 刚开始处理（WorkingIndicator 出现）时，若用户停在
-  // 底部就跟随到最新——和会话时间线的自动跟随同义。展开更早触发的重排由上面的
-  // visibleCount layout effect 负责，这里给 restoreFromBottom 让位，避免互相打架。
-  useLayoutEffect(() => {
-    const grew = messages.length > prevMsgCount.current;
-    const startedWorking = isWorking && !prevIsWorking.current;
-    prevMsgCount.current = messages.length;
-    prevIsWorking.current = isWorking;
-    if (!grew && !startedWorking) return;
-    if (restoreFromBottom.current != null) return;
-    if (!stickToBottom.current) return;
-    const el = convScrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length, isWorking]);
-
-  function showEarlier() {
-    const el = convScrollRef.current;
-    restoreFromBottom.current = el ? el.scrollHeight - el.scrollTop : null;
-    setVisibleCount((c) => Math.min(messages.length, c + CONV_LOAD_STEP));
-  }
-
-  // Esc 关闭 + 背景滚动锁。
+  // 当前查看的文件路径：null = 列表态，非空 = 明细态。
+  const [selected, setSelected] = useState<string | null>(null);
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
-      if (stickRafRef.current != null) cancelAnimationFrame(stickRafRef.current);
-    };
-  }, [onClose]);
+    if (selected && !files.some((f) => f.filePath === selected)) setSelected(null);
+  }, [files, selected]);
+  const selectedFile = useMemo(
+    () => files.find((f) => f.filePath === selected) ?? null,
+    [files, selected],
+  );
 
   const count = files.length;
-  const countLabel =
-    count === 1
-      ? t('session.modified.count', { n: count })
-      : t('session.modified.countPlural', { n: count });
 
-  const content = (
-    <>
-      <header className="flex items-center justify-between gap-3 border-b border-[var(--color-hairline)] px-5 py-1.5">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="text-[var(--color-accent)]">
-              <TreeGlyph />
-            </span>
-            <div className="min-w-0">
-              <h2 className="font-display text-[14px] font-light leading-tight tracking-tight text-[var(--color-fg-primary)]">
-                {t('session.modified.title')}
-              </h2>
-              {cwd && (
-                <p
-                  className="truncate font-mono text-[10.5px] tracking-[0.02em] text-[var(--color-fg-faint)]"
-                  title={cwd}
-                >
-                  {cwd}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2.5">
-            {count > 0 && (
-              <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] tabular-nums text-[var(--color-fg-muted)]">
-                {countLabel}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={t('session.modified.close')}
-              className="rounded-[var(--radius-control)] p-1.5 text-[var(--color-fg-muted)] transition hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)]"
+  return (
+    <div className="flex h-full flex-col">
+      <header className="flex shrink-0 items-center gap-2.5 border-b border-[var(--color-hairline)] px-3.5 py-2">
+        {selectedFile ? (
+          <button
+            type="button"
+            onClick={() => setSelected(null)}
+            aria-label={t('session.modified.backToList')}
+            title={t('session.modified.backToList')}
+            className="shrink-0 rounded-[var(--radius-control)] p-1 text-[var(--color-fg-muted)] transition hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)]"
+          >
+            <BackIcon />
+          </button>
+        ) : (
+          <span className="shrink-0 text-[var(--color-accent)]">
+            <TreeGlyph />
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-[13px] font-medium leading-tight text-[var(--color-fg-primary)]">
+            {t('session.modified.title')}
+          </h3>
+          {cwd && (
+            <p
+              className="truncate font-mono text-[10.5px] leading-tight text-[var(--color-fg-faint)]"
+              title={cwd}
             >
-              <CloseIcon />
-            </button>
-          </div>
-        </header>
+              {cwd}
+            </p>
+          )}
+        </div>
+        {!selectedFile && count > 0 && (
+          <span className="shrink-0 rounded-full bg-[var(--color-accent-soft)] px-1.5 font-mono text-[10px] tabular-nums text-[var(--color-accent-ink)] dark:text-[var(--color-accent)]">
+            {count}
+          </span>
+        )}
+        {!selectedFile && allFolders.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setCollapsed((prev) => (prev.size === 0 ? new Set(allFolders) : new Set()))}
+            className="shrink-0 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--color-fg-muted)] transition hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
+          >
+            {collapsed.size === 0 ? t('session.modified.collapseAll') : t('session.modified.expandAll')}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={t('session.modified.close')}
+          title={t('session.modified.close')}
+          className="shrink-0 rounded-[var(--radius-control)] p-1.5 text-[var(--color-fg-muted)] transition hover:bg-[var(--color-sunken)] hover:text-[var(--color-fg-primary)]"
+        >
+          <CloseIcon />
+        </button>
+      </header>
 
-        {loading && <Loading label={t('session.modified.loading')} className="m-6" />}
-
-        {error && !loading && (
-          <p className="m-5 rounded-[var(--radius-control)] border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-4 py-3 text-sm text-[var(--color-danger)]">
+      <div className="min-h-0 flex-1 overflow-auto [contain:paint]">
+        {loading ? (
+          <Loading label={t('session.modified.loading')} className="m-6" />
+        ) : error ? (
+          <p className="m-4 rounded-[var(--radius-control)] border border-[var(--color-danger)]/40 bg-[var(--color-danger-soft)] px-3 py-2 text-[12px] text-[var(--color-danger)]">
             {t('session.modified.failed')}: {error.message}
           </p>
+        ) : count === 0 ? (
+          <p className="px-4 py-8 text-center text-[12px] italic text-[var(--color-fg-muted)]">
+            {t('session.modified.empty')}
+          </p>
+        ) : selectedFile ? (
+          <FileDetail
+            key={selectedFile.filePath}
+            file={selectedFile}
+            editLookup={editLookup}
+            onOpenFile={onOpenFile}
+          />
+        ) : (
+          <ul role="tree" className="w-max min-w-full select-none py-1.5">
+            {tree.map((node) => (
+              <TreeRow
+                key={nodeKey(node)}
+                node={node}
+                depth={0}
+                collapsed={collapsed}
+                onToggleFolder={toggleFolder}
+                selected={selected}
+                onSelectFile={setSelected}
+                onOpenFile={onOpenFile}
+              />
+            ))}
+          </ul>
         )}
-
-        {/* 无修改文件时仍保留三栏框架与左侧对话栏——右两栏走各自的空态，
-            而不是把整页塌成一句提示。 */}
-        {!loading && !error && (
-          <div ref={splitRef} className="flex min-h-0 flex-1">
-            {/* ① 对话栏：左侧，入场时从左缘滑入——读作「对话流进了弹窗」。 */}
-            <motion.div
-              initial={{ opacity: 0, x: -32 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1], delay: 0.06 }}
-              className="flex shrink-0 flex-col border-r border-[var(--color-hairline)]"
-              style={{ width: convWidth }}
-            >
-              <div className="flex items-center gap-2 border-b border-[var(--color-hairline)] px-4 py-1.5">
-                <span className="eyebrow">{t('session.modified.col.conversation')}</span>
-                <span className="ml-auto font-mono text-[10px] tabular-nums text-[var(--color-fg-muted)]">
-                  {messages.length}
-                </span>
-              </div>
-              <div
-                ref={convScrollRef}
-                onScroll={onConvScroll}
-                className="min-h-0 flex-1 overflow-auto px-4 py-2 [contain:paint]"
-              >
-                {messages.length === 0 && !isWorking ? (
-                  <p className="px-1 py-3 text-sm italic text-[var(--color-fg-muted)]">
-                    {t('common.noMessagesMatch')}
-                  </p>
-                ) : (
-                  <>
-                    {hiddenCount > 0 && (
-                      <button
-                        type="button"
-                        onClick={showEarlier}
-                        className="mb-1 flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-input)] border border-dashed border-[var(--color-hairline-strong)] py-2 font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--color-fg-muted)] transition hover:border-[var(--color-accent)] hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
-                      >
-                        {t('session.modified.showEarlier', { n: hiddenCount })}
-                      </button>
-                    )}
-                    <ol>
-                      {visibleMessages.map((m, i) => (
-                        <li key={m.uuid || m.ts || String(startIndex + i)} className="py-3">
-                          <MessageBubble message={m} query={query} toolNames={toolNames} />
-                        </li>
-                      ))}
-                      {isWorking && <WorkingIndicator />}
-                    </ol>
-                  </>
-                )}
-              </div>
-            </motion.div>
-
-            <Splitter
-              getRect={() => splitRef.current?.getBoundingClientRect() ?? null}
-              onResize={(clientX, rect) =>
-                setConvWidth(clampWidth(clientX - rect.left, rect.width - railWidth))
-              }
-            />
-
-            {/* ② 文件内容栏：中间，吃掉剩余空间。 */}
-            <div className="min-w-0 flex-1 overflow-auto [contain:paint]">
-              {selectedFile ? (
-                <FileDetail
-                  key={selectedFile.filePath}
-                  file={selectedFile}
-                  editLookup={editLookup}
-                  onOpenFile={onOpenFile}
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center px-6">
-                  <p className="text-center text-sm italic text-[var(--color-fg-muted)]">
-                    {count === 0
-                      ? t('session.modified.empty')
-                      : t('session.modified.selectFile')}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <Splitter
-              getRect={() => splitRef.current?.getBoundingClientRect() ?? null}
-              onResize={(clientX, rect) =>
-                setRailWidth(clampWidth(rect.right - clientX, rect.width - convWidth))
-              }
-            />
-
-            {/* ③ 文件树栏：右侧，入场时从右缘滑入。 */}
-            <motion.div
-              initial={{ opacity: 0, x: 32 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.34, ease: [0.16, 1, 0.3, 1], delay: 0.06 }}
-              className="flex shrink-0 flex-col border-l border-[var(--color-hairline)]"
-              style={{ width: railWidth }}
-            >
-              <div className="flex items-center justify-between gap-2 border-b border-[var(--color-hairline)] px-3 py-1.5">
-                <span className="eyebrow">{t('session.modified.col.file')}</span>
-                {allFolders.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCollapsed((prev) =>
-                        prev.size === 0 ? new Set(allFolders) : new Set(),
-                      )
-                    }
-                    className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--color-fg-muted)] transition hover:text-[var(--color-accent-ink)] dark:hover:text-[var(--color-accent)]"
-                  >
-                    {collapsed.size === 0
-                      ? t('session.modified.collapseAll')
-                      : t('session.modified.expandAll')}
-                  </button>
-                )}
-              </div>
-              <div className="min-h-0 flex-1 overflow-auto py-1.5 [contain:paint]">
-                <ul role="tree" className="w-max min-w-full select-none">
-                  {tree.map((node) => (
-                    <TreeRow
-                      key={nodeKey(node)}
-                      node={node}
-                      depth={0}
-                      collapsed={collapsed}
-                      onToggleFolder={toggleFolder}
-                      selected={selected}
-                      onSelectFile={setSelected}
-                      onOpenFile={onOpenFile}
-                    />
-                  ))}
-                </ul>
-              </div>
-            </motion.div>
-          </div>
-        )}
-    </>
-  );
-
-  // 独立整页：占满整个标签页，自身就是顶层视图（无 backdrop / 无模态外壳）。
-  return (
-    <div className="fixed inset-0 z-[40] flex h-[100dvh] w-full flex-col bg-[var(--color-surface)]">
-      {content}
+      </div>
     </div>
   );
-}
-
-/* ── Draggable column splitter ──────────────────────────────────────────── */
-
-// 竖向分割线：拖动时把指针的 clientX 连同容器矩形回传，由调用方换算出该侧栏宽度。
-// 用 setPointerCapture 锁住指针，拖出分割线也不丢事件。
-function Splitter({
-  getRect,
-  onResize,
-}: {
-  getRect: () => DOMRect | null;
-  onResize: (clientX: number, rect: DOMRect) => void;
-}) {
-  const dragging = useRef(false);
-  return (
-    <div
-      role="separator"
-      aria-orientation="vertical"
-      onPointerDown={(e: ReactPointerEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.currentTarget.setPointerCapture(e.pointerId);
-        dragging.current = true;
-      }}
-      onPointerMove={(e: ReactPointerEvent<HTMLDivElement>) => {
-        if (!dragging.current) return;
-        const rect = getRect();
-        if (rect) onResize(e.clientX, rect);
-      }}
-      onPointerUp={(e: ReactPointerEvent<HTMLDivElement>) => {
-        dragging.current = false;
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      }}
-      className="relative w-px shrink-0 cursor-col-resize touch-none bg-[var(--color-hairline)] hover:bg-[var(--color-accent)]"
-    >
-      {/* 加宽命中区，但不挤占布局。 */}
-      <span className="absolute inset-y-0 -left-1.5 -right-1.5" aria-hidden />
-    </div>
-  );
-}
-
-// 把某侧栏宽夹在 [220px, available − 内容保底] 之间。available = 容器宽 − 另一侧栏宽。
-function clampWidth(value: number, available: number): number {
-  const min = 220;
-  const max = Math.max(min, available - CONTENT_MIN_PX);
-  return Math.min(max, Math.max(min, value));
 }
 
 /* ── File tree ──────────────────────────────────────────────────────────── */
@@ -649,7 +375,10 @@ function TreeRow({
         </span>
         <button
           type="button"
-          onClick={() => onOpenFile(f.filePath)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenFile(f.filePath);
+          }}
           title={openLabel}
           aria-label={openLabel}
           className="hidden rounded-[var(--radius-control)] p-0.5 text-[var(--color-fg-muted)] transition hover:text-[var(--color-accent-ink)] group-hover:inline-flex dark:hover:text-[var(--color-accent)]"
@@ -680,12 +409,12 @@ function FileDetail({
 
   return (
     <div className="flex flex-col">
-      <div className="sticky top-0 z-10 border-b border-[var(--color-hairline)] bg-[var(--color-surface)] px-5 py-3">
+      <div className="sticky top-0 z-10 border-b border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-3">
         <div className="flex items-center gap-2">
           <FileIcon errored={file.errorCount > 0} tone={changeType} />
           <h3
             className={
-              'min-w-0 flex-1 truncate font-mono text-[13.5px] font-medium ' +
+              'min-w-0 flex-1 truncate font-mono text-[13px] font-medium ' +
               (file.errorCount > 0 ? 'text-[var(--color-danger)]' : changeToneClass(changeType))
             }
             title={file.filePath}
@@ -718,7 +447,7 @@ function FileDetail({
         </div>
       </div>
 
-      <div className="px-5 py-4">
+      <div className="px-4 py-4">
         <SplitDiff rows={rows} label={newFile ? t('session.modified.newContent') : undefined} />
       </div>
     </div>
@@ -855,6 +584,14 @@ function ExternalIcon() {
       <path d="M14 4h6v6" />
       <path d="M20 4l-9 9" />
       <path d="M19 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5" />
+    </svg>
+  );
+}
+
+function BackIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M15 18l-6-6 6-6" />
     </svg>
   );
 }
