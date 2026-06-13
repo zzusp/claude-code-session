@@ -40,41 +40,24 @@ const NAV: NavItem[] = [
   },
 ];
 
-const COLLAPSE_KEY = 'sidebar-collapsed';
-
-// Desktop collapse state (Claude-style "Close sidebar"). Persisted to localStorage
-// so the choice survives reloads; mobile uses the separate `open` drawer state.
-function useCollapsed(): [boolean, (v: boolean) => void] {
-  const [collapsed, setState] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      return localStorage.getItem(COLLAPSE_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
-  const setCollapsed = (v: boolean) => {
-    setState(v);
-    try {
-      localStorage.setItem(COLLAPSE_KEY, v ? '1' : '0');
-    } catch {
-      /* storage might be blocked — fall back to in-memory */
-    }
-  };
-  return [collapsed, setCollapsed];
-}
-
 // Current session id from the URL, so the matching Recents row can highlight.
 function activeSessionId(pathname: string): string | null {
   const m = pathname.match(/\/sessions\/([^/]+)/);
   return m?.[1] ? decodeURIComponent(m[1]) : null;
 }
 
-export default function Sidebar({ onSearchOpen }: { onSearchOpen?: () => void }) {
+export default function Sidebar({
+  onSearchOpen,
+  collapsed,
+  setCollapsed,
+}: {
+  onSearchOpen?: () => void;
+  collapsed: boolean; // desktop collapse — owned by the chrome layout
+  setCollapsed: (v: boolean) => void;
+}) {
   const t = useT();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false); // mobile drawer
-  const [collapsed, setCollapsed] = useCollapsed(); // desktop collapse
   const hasUpdate = useVersionInfo().data?.hasUpdate ?? false;
 
   useEffect(() => {

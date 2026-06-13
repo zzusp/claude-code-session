@@ -45,6 +45,7 @@ import { formatBytes, formatDateTime, formatDuration, formatTokens } from '../li
 import { useT } from '../lib/i18n.ts';
 import { fadeUpItem, staggerParent } from '../lib/motion.ts';
 import { queryKeys } from '../lib/query-keys.ts';
+import { useSidebar } from '../lib/sidebar.ts';
 
 interface IndexedMessage {
   message: Message;
@@ -162,6 +163,15 @@ export default function SessionDetailRoute() {
   // 容器（scrollRef），右列预览面板用 `h-full` 自动填满，不再靠 sticky + 顶栏高度计算。
   const splitRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // 打开文件预览时临时收起左侧侧栏让出宽度。用的是「自动收起」临时标志（不持久化），
+  // 关闭预览 / 离开本页即清掉，恢复用户自己的折叠偏好；用户预览期间手动重开侧栏也不会被反复强收。
+  const sidebar = useSidebar();
+  useEffect(() => {
+    if (!sidebar) return;
+    if (paneOpen) sidebar.setAutoCollapsed(true);
+    return () => sidebar.setAutoCollapsed(false);
+  }, [paneOpen, sidebar]);
 
   useEffect(() => {
     setWindowSize(INITIAL_WINDOW);
