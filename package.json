@@ -1,6 +1,6 @@
 {
   "name": "@zzusp/ccsm",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Local web UI to view and clean up Claude Code session history (~/.claude/)",
   "license": "MIT",
   "repository": {
