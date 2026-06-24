@@ -646,7 +646,6 @@ export function ThinkingBlock({
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const hasText = block.text.trim() !== '';
   // 与非文件工具调用（Bash/Grep/…）同款折叠：无外框的「glyph + 标签 + caret」行，悬浮染底；
   // 展开后正文才落进一张浅边框卡片——不再用整条带边框 + sunken 底的「条状」块。
   return (
@@ -666,15 +665,9 @@ export function ThinkingBlock({
       </button>
       {open && (
         <div className="mt-1 overflow-hidden rounded-[var(--radius-control)] border border-[var(--color-hairline)] bg-[var(--color-surface)]">
-          {hasText ? (
-            <div className="whitespace-pre-wrap break-words px-3 py-2 text-[13px] leading-relaxed text-[var(--color-fg-secondary)]">
-              <HighlightedText text={block.text} query={query} />
-            </div>
-          ) : (
-            <p className="px-3 py-2 text-[12px] italic text-[var(--color-fg-muted)]">
-              {t('tool.thinkingEncrypted')}
-            </p>
-          )}
+          <div className="whitespace-pre-wrap break-words px-3 py-2 text-[13px] leading-relaxed text-[var(--color-fg-secondary)]">
+            <HighlightedText text={block.text} query={query} />
+          </div>
         </div>
       )}
     </div>

@@ -223,12 +223,13 @@ function parseContent(content: unknown): Block[] {
           isError: b.is_error === true,
         });
         break;
-      case 'thinking':
-        out.push({
-          type: 'thinking',
-          text: typeof b.thinking === 'string' ? b.thinking : '',
-        });
+      case 'thinking': {
+        // Claude Code 把思考块持久化为「空明文 + 加密 signature」——只留重放令牌，明文不落盘。
+        // 空块无可展示内容，整块跳过（与 search-session 一致），不再渲染占位。
+        const thinking = typeof b.thinking === 'string' ? b.thinking : '';
+        if (thinking.trim()) out.push({ type: 'thinking', text: thinking });
         break;
+      }
       case 'image': {
         const src = b.source as { media_type?: unknown } | undefined;
         out.push({
